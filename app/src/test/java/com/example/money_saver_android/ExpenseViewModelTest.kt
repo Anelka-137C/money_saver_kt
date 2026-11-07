@@ -1,8 +1,9 @@
 package com.example.money_saver_android
 
-import com.example.money_saver_android.data.Expense
-import com.example.money_saver_android.data.ExpenseRepository
-import com.example.money_saver_android.ui.ExpenseViewModel
+import com.example.money_saver_android.data.repository.ExpenseRepository
+import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.usecase.ExpenseUseCase
+import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +44,8 @@ class ExpenseViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = FakeExpenseRepository()
-        viewModel = ExpenseViewModel(repository)
+        val useCase = ExpenseUseCase(repository)
+        viewModel = ExpenseViewModel(useCase)
     }
 
     @After

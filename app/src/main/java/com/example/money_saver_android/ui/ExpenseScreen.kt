@@ -54,8 +54,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Category
-import com.example.money_saver_android.data.Expense
 import com.example.money_saver_android.data.defaultCategories
+import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.viewmodel.EditExpenseState
+import com.example.money_saver_android.viewmodel.ExpenseUiState
+import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.DarkBackground

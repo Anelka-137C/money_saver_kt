@@ -1,9 +1,10 @@
-package com.example.money_saver_android.ui
+package com.example.money_saver_android.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.money_saver_android.data.Expense
-import com.example.money_saver_android.data.ExpenseRepository
+import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.usecase.ExpenseResult
+import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +34,7 @@ data class ExpenseUiState(
 )
 
 class ExpenseViewModel(
-    private val repository: ExpenseRepository
+    private val expenseUseCase: ExpenseUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExpenseUiState())
@@ -41,7 +42,7 @@ class ExpenseViewModel(
 
     init {
         viewModelScope.launch {
-            repository.getAllExpenses().collect { list ->
+            expenseUseCase.getExpenses().collect { list ->
                 _uiState.update { it.copy(expenses = list) }
             }
         }
@@ -114,40 +115,33 @@ class ExpenseViewModel(
 
     fun confirmEdit() {
         val editState = _uiState.value.editingExpense ?: return
-        val amount = editState.amount.toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
-            _uiState.update { state ->
-                state.copy(
-                    editingExpense = state.editingExpense?.copy(
-                        errorMessage = "El monto debe ser mayor a cero"
-                    )
-                )
-            }
-            return
-        }
-        if (editState.category.isBlank()) {
-            _uiState.update { state ->
-                state.copy(
-                    editingExpense = state.editingExpense?.copy(
-                        errorMessage = "Debes seleccionar una categoría"
-                    )
-                )
-            }
-            return
-        }
-
         viewModelScope.launch {
-            repository.updateExpense(
-                Expense(
-                    id = editState.expenseId,
-                    amount = amount,
-                    date = editState.date,
-                    description = editState.description,
-                    category = editState.category,
-                    subcategory = editState.subcategory
-                )
-            )
-            _uiState.update { it.copy(editingExpense = null, toastMessage = "Gasto guardado") }
+            when (val result = expenseUseCase.updateExpense(
+                id = editState.expenseId,
+                amountInput = editState.amount,
+                dateInput = editState.date,
+                descriptionInput = editState.description,
+                categoryInput = editState.category,
+                subcategoryInput = editState.subcategory
+            )) {
+                is ExpenseResult.Error -> {
+                    _uiState.update { state ->
+                        state.copy(
+                            editingExpense = state.editingExpense?.copy(
+                                errorMessage = result.message
+                            )
+                        )
+                    }
+                }
+                is ExpenseResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            editingExpense = null,
+                            toastMessage = "Gasto guardado"
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -161,34 +155,29 @@ class ExpenseViewModel(
 
     fun saveExpense() {
         val current = _uiState.value
-        val amount = current.amountInput.toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
-            _uiState.update { it.copy(errorMessage = "El monto debe ser mayor a cero") }
-            return
-        }
-        if (current.categoryInput.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Debes seleccionar una categoría") }
-            return
-        }
-        _uiState.update { it.copy(errorMessage = null) }
         viewModelScope.launch {
-            repository.insertExpense(
-                Expense(
-                    amount = amount,
-                    date = current.dateInput,
-                    description = current.descriptionInput,
-                    category = current.categoryInput,
-                    subcategory = current.subcategoryInput
-                )
-            )
-            _uiState.update {
-                it.copy(
-                    amountInput = "",
-                    descriptionInput = "",
-                    categoryInput = "",
-                    subcategoryInput = "",
-                    toastMessage = "Gasto guardado"
-                )
+            when (val result = expenseUseCase.saveExpense(
+                amountInput = current.amountInput,
+                dateInput = current.dateInput,
+                descriptionInput = current.descriptionInput,
+                categoryInput = current.categoryInput,
+                subcategoryInput = current.subcategoryInput
+            )) {
+                is ExpenseResult.Error -> {
+                    _uiState.update { it.copy(errorMessage = result.message) }
+                }
+                is ExpenseResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            amountInput = "",
+                            descriptionInput = "",
+                            categoryInput = "",
+                            subcategoryInput = "",
+                            errorMessage = null,
+                            toastMessage = "Gasto guardado"
+                        )
+                    }
+                }
             }
         }
     }
