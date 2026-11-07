@@ -7,6 +7,7 @@ data class Subcategory(
 data class Category(
     val name: String,
     val icon: String = "💰",
+    val color: String = "#4E73DF",
     val subcategories: List<Subcategory>
 )
 
@@ -14,6 +15,7 @@ val defaultCategories = listOf(
     Category(
         name = "Employment",
         icon = "💼",
+        color = "#4E73DF",
         subcategories = listOf(
             Subcategory("Salary"),
             Subcategory("Bonus"),
@@ -24,6 +26,7 @@ val defaultCategories = listOf(
     Category(
         name = "Food & Dining",
         icon = "🍔",
+        color = "#1CC88A",
         subcategories = listOf(
             Subcategory("Supermarket"),
             Subcategory("Restaurants"),
@@ -33,6 +36,7 @@ val defaultCategories = listOf(
     Category(
         name = "Housing & Bills",
         icon = "🏠",
+        color = "#F6C23E",
         subcategories = listOf(
             Subcategory("Rent"),
             Subcategory("Utilities"),
@@ -42,6 +46,7 @@ val defaultCategories = listOf(
     Category(
         name = "Transport",
         icon = "🚗",
+        color = "#E74A3B",
         subcategories = listOf(
             Subcategory("Gas"),
             Subcategory("Public Transit"),
@@ -51,6 +56,7 @@ val defaultCategories = listOf(
     Category(
         name = "Other",
         icon = "📦",
+        color = "#858796",
         subcategories = listOf(
             Subcategory("General"),
             Subcategory("Miscellaneous")

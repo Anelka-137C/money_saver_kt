@@ -75,7 +75,6 @@ import androidx.compose.ui.window.Dialog
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import com.example.money_saver_android.data.Category
-import com.example.money_saver_android.data.defaultCategories
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.viewmodel.EditExpenseState
 import com.example.money_saver_android.viewmodel.ExpenseUiState
@@ -185,8 +184,22 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
 
         if (showCategorySheet) {
             CategorySelectionSheet(
-                categories = defaultCategories,
-                onDismiss = { showCategorySheet = false },
+                categories = state.categories,
+                newCategoryName = state.newCategoryNameInput,
+                selectedColorHex = state.newCategoryColorInput,
+                categoryError = state.categoryErrorMessage,
+                newSubcategoryName = state.newSubcategoryNameInput,
+                subcategoryError = state.subcategoryErrorMessage,
+                onCategoryNameChange = viewModel::onNewCategoryNameChange,
+                onColorSelect = viewModel::onNewCategoryColorChange,
+                onCreateCategory = viewModel::createCategory,
+                onSubcategoryNameChange = viewModel::onNewSubcategoryNameChange,
+                onCreateSubcategory = viewModel::createSubcategory,
+                onDismiss = {
+                    showCategorySheet = false
+                    viewModel.clearCategoryError()
+                    viewModel.clearSubcategoryError()
+                },
                 onCategorySelected = { category, subcategory ->
                     viewModel.onCategoryChange(category, subcategory)
                     showCategorySheet = false
@@ -209,8 +222,22 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
 
         if (showEditCategorySheet) {
             CategorySelectionSheet(
-                categories = defaultCategories,
-                onDismiss = { showEditCategorySheet = false },
+                categories = state.categories,
+                newCategoryName = state.newCategoryNameInput,
+                selectedColorHex = state.newCategoryColorInput,
+                categoryError = state.categoryErrorMessage,
+                newSubcategoryName = state.newSubcategoryNameInput,
+                subcategoryError = state.subcategoryErrorMessage,
+                onCategoryNameChange = viewModel::onNewCategoryNameChange,
+                onColorSelect = viewModel::onNewCategoryColorChange,
+                onCreateCategory = viewModel::createCategory,
+                onSubcategoryNameChange = viewModel::onNewSubcategoryNameChange,
+                onCreateSubcategory = viewModel::createSubcategory,
+                onDismiss = {
+                    showEditCategorySheet = false
+                    viewModel.clearCategoryError()
+                    viewModel.clearSubcategoryError()
+                },
                 onCategorySelected = { category, subcategory ->
                     viewModel.onEditCategoryChange(category, subcategory)
                     showEditCategorySheet = false
@@ -561,114 +588,6 @@ fun ExpenseCardItem(
                     )
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CategorySelectionSheet(
-    categories: List<Category>,
-    onDismiss: () -> Unit,
-    onCategorySelected: (category: String, subcategory: String) -> Unit
-) {
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = CardBackground,
-        contentColor = TextPrimary
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (selectedCategory != null) {
-                    IconButton(onClick = { selectedCategory = null }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = TextPrimary
-                        )
-                    }
-                }
-                Text(
-                    text = if (selectedCategory == null) "Seleccionar categoría" else selectedCategory!!.name,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = TextSecondary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (selectedCategory == null) {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(categories) { category ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(FieldBackground)
-                                .clickable { selectedCategory = category }
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = category.icon, fontSize = 20.sp)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = category.name,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = TextPrimary
-                                )
-                            }
-                            Text(text = ">", fontSize = 16.sp, color = TextSecondary)
-                        }
-                    }
-                }
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(selectedCategory!!.subcategories) { sub ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(FieldBackground)
-                                .clickable {
-                                    onCategorySelected(selectedCategory!!.name, sub.name)
-                                }
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = sub.name,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextPrimary
-                            )
-                            Text(text = "✓", fontSize = 16.sp, color = GreenAccent)
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

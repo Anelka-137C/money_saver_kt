@@ -6,7 +6,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.room.Room
 import com.example.money_saver_android.data.local.AppDatabase
+import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
+import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.ui.ExpenseScreen
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
@@ -19,19 +21,29 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             AppDatabase::class.java,
             "money_saver.db"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     private val repository by lazy {
         RoomExpenseRepository(database.expenseDao())
     }
 
+    private val categoryRepository by lazy {
+        RoomCategoryRepository(database.categoryDao())
+    }
+
     private val expenseUseCase by lazy {
         ExpenseUseCase(repository)
     }
 
+    private val categoryUseCase by lazy {
+        CategoryUseCase(categoryRepository)
+    }
+
     private val viewModel by lazy {
-        ExpenseViewModel(expenseUseCase)
+        ExpenseViewModel(expenseUseCase, categoryUseCase)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

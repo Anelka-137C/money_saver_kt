@@ -2,7 +2,10 @@ package com.example.money_saver_android.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.usecase.CategoryResult
+import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,11 +34,18 @@ data class ExpenseUiState(
     val errorMessage: String? = null,
     val toastMessage: String? = null,
     val editingExpense: EditExpenseState? = null,
-    val expenseToDelete: Expense? = null
+    val expenseToDelete: Expense? = null,
+    val categories: List<Category> = emptyList(),
+    val newCategoryNameInput: String = "",
+    val newCategoryColorInput: String = "#4E73DF",
+    val categoryErrorMessage: String? = null,
+    val newSubcategoryNameInput: String = "",
+    val subcategoryErrorMessage: String? = null
 )
 
 class ExpenseViewModel(
-    private val expenseUseCase: ExpenseUseCase
+    private val expenseUseCase: ExpenseUseCase,
+    private val categoryUseCase: CategoryUseCase? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExpenseUiState())
@@ -45,6 +55,14 @@ class ExpenseViewModel(
         viewModelScope.launch {
             expenseUseCase.getExpenses().collect { list ->
                 _uiState.update { it.copy(expenses = list) }
+            }
+        }
+        categoryUseCase?.let { uc ->
+            viewModelScope.launch {
+                uc.preloadDefaultCategoriesIfNeeded()
+                uc.getCategories().collect { list ->
+                    _uiState.update { it.copy(categories = list) }
+                }
             }
         }
     }
@@ -208,5 +226,74 @@ class ExpenseViewModel(
                 }
             }
         }
+    }
+
+    fun onNewCategoryNameChange(name: String) {
+        _uiState.update { it.copy(newCategoryNameInput = name, categoryErrorMessage = null) }
+    }
+
+    fun onNewCategoryColorChange(color: String) {
+        _uiState.update { it.copy(newCategoryColorInput = color) }
+    }
+
+    fun createCategory() {
+        val current = _uiState.value
+        val uc = categoryUseCase ?: return
+        viewModelScope.launch {
+            when (val result = uc.createCategory(
+                nameInput = current.newCategoryNameInput,
+                colorInput = current.newCategoryColorInput
+            )) {
+                is CategoryResult.Error -> {
+                    _uiState.update { it.copy(categoryErrorMessage = result.message) }
+                }
+                is CategoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            newCategoryNameInput = "",
+                            newCategoryColorInput = "#4E73DF",
+                            categoryErrorMessage = null,
+                            toastMessage = "Categoría creada"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun onNewSubcategoryNameChange(name: String) {
+        _uiState.update { it.copy(newSubcategoryNameInput = name, subcategoryErrorMessage = null) }
+    }
+
+    fun createSubcategory(categoryName: String) {
+        val current = _uiState.value
+        val uc = categoryUseCase ?: return
+        viewModelScope.launch {
+            when (val result = uc.createSubcategory(
+                categoryName = categoryName,
+                subcategoryNameInput = current.newSubcategoryNameInput
+            )) {
+                is CategoryResult.Error -> {
+                    _uiState.update { it.copy(subcategoryErrorMessage = result.message) }
+                }
+                is CategoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            newSubcategoryNameInput = "",
+                            subcategoryErrorMessage = null,
+                            toastMessage = "Subcategoría creada"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearCategoryError() {
+        _uiState.update { it.copy(categoryErrorMessage = null) }
+    }
+
+    fun clearSubcategoryError() {
+        _uiState.update { it.copy(subcategoryErrorMessage = null) }
     }
 }

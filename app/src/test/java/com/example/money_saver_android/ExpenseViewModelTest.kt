@@ -1,7 +1,11 @@
 package com.example.money_saver_android
 
+import com.example.money_saver_android.data.Category
+import com.example.money_saver_android.data.Subcategory
+import com.example.money_saver_android.data.repository.CategoryRepository
 import com.example.money_saver_android.data.repository.ExpenseRepository
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +21,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -37,19 +42,54 @@ class FakeExpenseRepository : ExpenseRepository {
     }
 }
 
+class FakeCategoryRepoForVm : CategoryRepository {
+    private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    override fun getAllCategories(): Flow<List<Category>> = _categories
+
+    override suspend fun preloadDefaultCategoriesIfNeeded() {
+        if (_categories.value.isEmpty()) {
+            _categories.value = listOf(
+                Category(
+                    name = "Alimentación",
+                    icon = "🍔",
+                    color = "#1CC88A",
+                    subcategories = listOf(Subcategory("Restaurante"))
+                )
+            )
+        }
+    }
+
+    override suspend fun insertCategory(category: Category) {
+        _categories.value = _categories.value + category
+    }
+
+    override suspend fun insertSubcategory(categoryName: String, subcategory: Subcategory) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name.equals(categoryName, ignoreCase = true)) {
+                cat.copy(subcategories = cat.subcategories + subcategory)
+            } else {
+                cat
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ExpenseViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeExpenseRepository
+    private lateinit var categoryRepository: FakeCategoryRepoForVm
     private lateinit var viewModel: ExpenseViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = FakeExpenseRepository()
-        val useCase = ExpenseUseCase(repository)
-        viewModel = ExpenseViewModel(useCase)
+        categoryRepository = FakeCategoryRepoForVm()
+        val expenseUseCase = ExpenseUseCase(repository)
+        val categoryUseCase = CategoryUseCase(categoryRepository)
+        viewModel = ExpenseViewModel(expenseUseCase, categoryUseCase)
     }
 
     @After
@@ -327,5 +367,67 @@ class ExpenseViewModelTest {
         assertNull(state.expenseToDelete)
         assertEquals(0, state.expenses.size)
         assertEquals("Gasto eliminado", state.toastMessage)
+    }
+
+    @Test
+    fun createCategory_withValidData_clearsInputAndRefreshesCategoryList() = runTest(testDispatcher) {
+        viewModel.onNewCategoryNameChange("Transporte")
+        viewModel.onNewCategoryColorChange("#E74A3B")
+
+        viewModel.createCategory()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.newCategoryNameInput)
+        assertNull(state.categoryErrorMessage)
+        assertEquals("Categoría creada", state.toastMessage)
+        val created = state.categories.find { it.name == "Transporte" }
+        assertNotNull(created)
+        assertEquals("#E74A3B", created?.color)
+    }
+
+    @Test
+    fun createCategory_withInvalidData_setsCategoryErrorMessage() = runTest(testDispatcher) {
+        viewModel.onNewCategoryNameChange("   ")
+
+        viewModel.createCategory()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("El nombre de la categoría no puede estar vacío", state.categoryErrorMessage)
+    }
+
+    @Test
+    fun createSubcategory_withValidData_clearsInputAndRefreshesCategoryList() = runTest(testDispatcher) {
+        viewModel.onNewCategoryNameChange("Alimentación")
+        viewModel.onNewCategoryColorChange("#1CC88A")
+        viewModel.createCategory()
+        advanceUntilIdle()
+
+        viewModel.onNewSubcategoryNameChange("Supermercado")
+        viewModel.createSubcategory("Alimentación")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.newSubcategoryNameInput)
+        assertNull(state.subcategoryErrorMessage)
+        assertEquals("Subcategoría creada", state.toastMessage)
+        val alimentacion = state.categories.find { it.name == "Alimentación" }
+        assertNotNull(alimentacion)
+        assertTrue(alimentacion!!.subcategories.any { it.name == "Supermercado" })
+    }
+
+    @Test
+    fun createSubcategory_withInvalidData_setsSubcategoryErrorMessage() = runTest(testDispatcher) {
+        viewModel.onNewCategoryNameChange("Alimentación")
+        viewModel.createCategory()
+        advanceUntilIdle()
+
+        viewModel.onNewSubcategoryNameChange("  ")
+        viewModel.createSubcategory("Alimentación")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("El nombre de la subcategoría no puede estar vacío", state.subcategoryErrorMessage)
     }
 }
