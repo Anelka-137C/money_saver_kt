@@ -10,7 +10,7 @@ import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
-import com.example.money_saver_android.ui.ExpenseScreen
+import com.example.money_saver_android.ui.ExpensesView
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 
@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Money_saver_androidTheme {
-                ExpenseScreen(viewModel = viewModel)
+                ExpensesView(viewModel = viewModel)
             }
         }
     }
