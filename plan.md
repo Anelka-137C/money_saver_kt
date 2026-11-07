@@ -1,24 +1,24 @@
-# Story #2: Editar gasto existente
+# Story #3: Eliminar gasto registrado
 
 ## Story
-Como usuario, quiero editar un gasto existente desde un popup, para corregir errores en su monto, descripción o clasificación.
+Como usuario, quiero eliminar un gasto registrado desde un menú de opciones con confirmación deslizante, para mantener mi historial actualizado y evitar eliminaciones accidentales.
 
 ## Acceptance criteria
-- [ ] Given que tengo un gasto en el historial, when presiono la tarjeta del gasto, then se abre un popup modal con los datos actuales precargados para su edición.
-- [ ] Given que estoy en el popup de edición, when modifico los campos (monto, fecha, categoría/subcategoría o descripción) y confirmo, then los cambios se actualizan en la base de datos local, el popup se cierra y la lista refleja los datos actualizados.
-- [ ] Given que estoy en el popup de edición, when ingreso un monto inválido (vacío o menor/igual a cero) e intento guardar, then se muestra un mensaje de validación en el popup y la edición no se guarda, conservando los datos originales.
+- [ ] Given que tengo un gasto en el historial, when presiono el botón de tres puntos de su tarjeta y selecciono "Eliminar", then se muestra un diálogo de confirmación con un botón deslizante para confirmar la eliminación.
+- [ ] Given que está visible la confirmación con el botón deslizante, when deslizo el botón completamente para confirmar, then el gasto se elimina de la base de datos local, desaparece del historial y se muestra un mensaje de confirmación.
+- [ ] Given que está visible la confirmación con el botón deslizante, when cancelo o cierro el diálogo sin completar el deslizamiento, then el gasto permanece intacto en el historial.
 
 ## Plan
-- Habilitar la actualización de un gasto en la persistencia local.
-- Manejar en la lógica de presentación el estado del popup de edición y la carga de los datos del gasto seleccionado.
-- Aplicar la validación del monto antes de persistir las modificaciones en el popup.
-- Diseñar y construir el popup modal de edición siguiendo el estilo visual oscuro y acentos verdes.
-- Conectar la apertura del popup al pulsar una tarjeta del historial y cerrar tras guardar o cancelar.
+- Permitir la eliminación de un gasto por su identificador en la capa de persistencia local.
+- Añadir el caso de uso para ejecutar la eliminación del gasto.
+- Gestionar en la lógica de presentación el menú de opciones del gasto y el estado del diálogo de confirmación.
+- Incorporar el botón de tres puntos con la opción "Eliminar" en la tarjeta del gasto.
+- Diseñar e integrar el diálogo de confirmación con el botón deslizante de confirmación.
 
 ## Out of scope
-- Eliminación de gastos (pertenece a la Historia #3).
-- Creación de nuevas categorías o subcategorías personalizadas (pertenece a la Historia #4).
-- Historial de cambios o auditoría de ediciones pasadas.
+- Función de deshacer (Undo) o papelera de reciclaje.
+- Eliminación múltiple o en bloque de gastos.
+- Otras opciones en el menú de tres puntos fuera de "Eliminar".
 
 ## Suggestions (your call)
-- Implementar el popup mediante un `ModalBottomSheet` o `Dialog` reutilizando los componentes de captura (monto, fecha, selector de categoría) y la paleta oscura de `design/gastos.png` para asegurar consistencia con el formulario de registro.
+- Implementar un retorno elástico (snap-back) en el botón deslizante si el usuario suelta el control antes de alcanzar el umbral mínimo de confirmación, garantizando una acción 100% deliberada.

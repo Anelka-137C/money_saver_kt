@@ -30,6 +30,9 @@ interface ExpenseDao {
 
     @Update
     suspend fun update(entity: ExpenseEntity)
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }
 
 @Database(entities = [ExpenseEntity::class], version = 1, exportSchema = false)

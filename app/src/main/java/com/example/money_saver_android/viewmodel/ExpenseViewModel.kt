@@ -30,7 +30,8 @@ data class ExpenseUiState(
     val subcategoryInput: String = "",
     val errorMessage: String? = null,
     val toastMessage: String? = null,
-    val editingExpense: EditExpenseState? = null
+    val editingExpense: EditExpenseState? = null,
+    val expenseToDelete: Expense? = null
 )
 
 class ExpenseViewModel(
@@ -147,6 +148,33 @@ class ExpenseViewModel(
 
     fun cancelEditing() {
         _uiState.update { it.copy(editingExpense = null) }
+    }
+
+    fun requestDeleteExpense(expense: Expense) {
+        _uiState.update { it.copy(expenseToDelete = expense) }
+    }
+
+    fun dismissDeleteConfirmation() {
+        _uiState.update { it.copy(expenseToDelete = null) }
+    }
+
+    fun confirmDeleteExpense() {
+        val expense = _uiState.value.expenseToDelete ?: return
+        viewModelScope.launch {
+            when (expenseUseCase.deleteExpense(expense.id)) {
+                is ExpenseResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            expenseToDelete = null,
+                            toastMessage = "Gasto eliminado"
+                        )
+                    }
+                }
+                is ExpenseResult.Error -> {
+                    // No-op for now
+                }
+            }
+        }
     }
 
     fun clearToastMessage() {

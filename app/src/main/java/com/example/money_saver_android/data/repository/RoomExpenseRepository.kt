@@ -47,4 +47,8 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
             )
         )
     }
+
+    override suspend fun deleteExpense(id: Long) {
+        dao.deleteById(id)
+    }
 }

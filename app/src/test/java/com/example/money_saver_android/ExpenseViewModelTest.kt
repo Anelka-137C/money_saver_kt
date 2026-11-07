@@ -31,6 +31,10 @@ class FakeExpenseRepository : ExpenseRepository {
     override suspend fun updateExpense(expense: Expense) {
         _expenses.value = _expenses.value.map { if (it.id == expense.id) expense else it }
     }
+
+    override suspend fun deleteExpense(id: Long) {
+        _expenses.value = _expenses.value.filter { it.id != id }
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -261,5 +265,67 @@ class ExpenseViewModelTest {
         assertNull(state.editingExpense)
         val expenseInList = state.expenses.first { it.id == 30L }
         assertEquals(35.0, expenseInList.amount, 0.0)
+    }
+
+    @Test
+    fun requestDeleteExpense_setsExpenseToDeleteInUiState() = runTest(testDispatcher) {
+        val expense = Expense(
+            id = 50L,
+            amount = 15.0,
+            date = "2026-11-06",
+            description = "Helado",
+            category = "Alimentación",
+            subcategory = "Postre"
+        )
+
+        viewModel.requestDeleteExpense(expense)
+
+        val state = viewModel.uiState.value
+        assertEquals(expense, state.expenseToDelete)
+    }
+
+    @Test
+    fun dismissDeleteConfirmation_clearsExpenseToDeleteWithoutDeleting() = runTest(testDispatcher) {
+        val expense = Expense(
+            id = 55L,
+            amount = 12.0,
+            date = "2026-11-06",
+            description = "Jugo",
+            category = "Alimentación",
+            subcategory = "Bebidas"
+        )
+        repository.insertExpense(expense)
+        advanceUntilIdle()
+
+        viewModel.requestDeleteExpense(expense)
+        viewModel.dismissDeleteConfirmation()
+
+        val state = viewModel.uiState.value
+        assertNull(state.expenseToDelete)
+        assertEquals(1, state.expenses.size)
+        assertEquals(55L, state.expenses.first().id)
+    }
+
+    @Test
+    fun confirmDeleteExpense_deletesFromRepositoryClearsDialogAndEmitsToast() = runTest(testDispatcher) {
+        val expense = Expense(
+            id = 60L,
+            amount = 45.0,
+            date = "2026-11-06",
+            description = "Cena",
+            category = "Alimentación",
+            subcategory = "Restaurante"
+        )
+        repository.insertExpense(expense)
+        advanceUntilIdle()
+
+        viewModel.requestDeleteExpense(expense)
+        viewModel.confirmDeleteExpense()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.expenseToDelete)
+        assertEquals(0, state.expenses.size)
+        assertEquals("Gasto eliminado", state.toastMessage)
     }
 }

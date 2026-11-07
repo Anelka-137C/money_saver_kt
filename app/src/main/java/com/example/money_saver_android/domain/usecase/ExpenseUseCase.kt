@@ -71,4 +71,9 @@ class ExpenseUseCase(
         )
         return ExpenseResult.Success
     }
+
+    suspend fun deleteExpense(id: Long): ExpenseResult {
+        repository.deleteExpense(id)
+        return ExpenseResult.Success
+    }
 }

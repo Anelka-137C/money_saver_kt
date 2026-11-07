@@ -24,6 +24,10 @@ class FakeRepositoryForUseCase : ExpenseRepository {
     override suspend fun updateExpense(expense: Expense) {
         _expenses.value = _expenses.value.map { if (it.id == expense.id) expense else it }
     }
+
+    override suspend fun deleteExpense(id: Long) {
+        _expenses.value = _expenses.value.filter { it.id != id }
+    }
 }
 
 class ExpenseUseCaseTest {
@@ -140,5 +144,17 @@ class ExpenseUseCaseTest {
 
         assertTrue(result is ExpenseResult.Error)
         assertEquals("Debes seleccionar una categoría", (result as ExpenseResult.Error).message)
+    }
+
+    @Test
+    fun deleteExpense_callsRepositoryAndReturnsSuccess() = runBlocking {
+        val initial = Expense(id = 7L, amount = 20.0, date = "2026-11-06", description = "Snack", category = "Alimentación", subcategory = "Snack")
+        repository.insertExpense(initial)
+
+        val result = useCase.deleteExpense(7L)
+
+        assertTrue(result is ExpenseResult.Success)
+        val list = useCase.getExpenses().first()
+        assertEquals(0, list.size)
     }
 }

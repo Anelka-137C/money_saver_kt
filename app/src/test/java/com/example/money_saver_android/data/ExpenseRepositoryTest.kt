@@ -84,4 +84,22 @@ class ExpenseRepositoryTest {
         assertEquals("Cena", retrieved.subcategory)
         assertEquals(inserted.id, retrieved.id)
     }
+
+    @Test
+    fun deleteExpense_removesRecordFromDatabase() = runBlocking {
+        val expense = Expense(
+            amount = 50.0,
+            date = "2026-11-06",
+            description = "Café",
+            category = "Alimentación",
+            subcategory = "Café"
+        )
+        repository.insertExpense(expense)
+        val inserted = repository.getAllExpenses().first().first()
+
+        repository.deleteExpense(inserted.id)
+
+        val expenses = repository.getAllExpenses().first()
+        assertEquals(0, expenses.size)
+    }
 }
