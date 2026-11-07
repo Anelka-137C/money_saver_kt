@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -65,7 +66,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -95,6 +100,9 @@ import java.util.Locale
 fun ExpenseScreen(viewModel: ExpenseViewModel) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val view = LocalView.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     var showCategorySheet by remember { mutableStateOf(false) }
     var showEditCategorySheet by remember { mutableStateOf(false) }
 
@@ -147,7 +155,10 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                     onDateChange = viewModel::onDateChange,
                     onDescriptionChange = viewModel::onDescriptionChange,
                     onSelectCategoryClick = { showCategorySheet = true },
-                    onSaveClick = viewModel::saveExpense
+                    onSaveClick = {
+                        hideKeyboard(context, view, keyboardController, focusManager)
+                        viewModel.saveExpense()
+                    }
                 )
             }
 
@@ -215,7 +226,10 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 onDateChange = viewModel::onEditDateChange,
                 onDescriptionChange = viewModel::onEditDescriptionChange,
                 onSelectCategoryClick = { showEditCategorySheet = true },
-                onConfirm = viewModel::confirmEdit,
+                onConfirm = {
+                    hideKeyboard(context, view, keyboardController, focusManager)
+                    viewModel.confirmEdit()
+                },
                 onDismiss = viewModel::cancelEditing
             )
         }
@@ -417,6 +431,9 @@ fun AddExpenseCard(
                     onValueChange = onDescriptionChange,
                     placeholder = { Text("Agregar una descripción...", color = TextSecondary) },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onSaveClick() }),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
@@ -764,6 +781,8 @@ fun EditExpenseDialog(
                         onValueChange = onDescriptionChange,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { onConfirm() }),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent,

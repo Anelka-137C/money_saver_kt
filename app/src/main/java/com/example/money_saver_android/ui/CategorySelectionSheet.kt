@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -40,9 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Category
@@ -101,6 +106,9 @@ fun CategorySelectionSheet(
         containerColor = CardBackground,
         contentColor = TextPrimary
     ) {
+        val sheetContext = LocalContext.current
+        val sheetView = LocalView.current
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -162,6 +170,13 @@ fun CategorySelectionSheet(
                             onValueChange = onCategoryNameChange,
                             placeholder = { Text("Nombre de la categoría", color = TextSecondary, fontSize = 14.sp) },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    hideKeyboard(sheetContext, sheetView, keyboardController, focusManager)
+                                    onCreateCategory()
+                                }
+                            ),
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = TextPrimary,
@@ -174,8 +189,7 @@ fun CategorySelectionSheet(
                         )
                         Button(
                             onClick = {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
+                                hideKeyboard(sheetContext, sheetView, keyboardController, focusManager)
                                 onCreateCategory()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = selectedCategoryColor),
@@ -284,6 +298,13 @@ fun CategorySelectionSheet(
                             onValueChange = onSubcategoryNameChange,
                             placeholder = { Text("Nombre de la subcategoría", color = TextSecondary, fontSize = 14.sp) },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    hideKeyboard(sheetContext, sheetView, keyboardController, focusManager)
+                                    onCreateSubcategory(selectedCategory.name)
+                                }
+                            ),
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = TextPrimary,
@@ -296,8 +317,7 @@ fun CategorySelectionSheet(
                         )
                         Button(
                             onClick = {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
+                                hideKeyboard(sheetContext, sheetView, keyboardController, focusManager)
                                 onCreateSubcategory(selectedCategory.name)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = parentCategoryColor),
