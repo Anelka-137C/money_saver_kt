@@ -1,5 +1,6 @@
 package com.example.money_saver_android
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,13 +9,32 @@ import androidx.room.Room
 import com.example.money_saver_android.data.local.AppDatabase
 import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
+import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
+import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.ui.ExpensesView
+import com.example.money_saver_android.ui.MainContainer
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
+import com.example.money_saver_android.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val i18nManager by lazy {
+        I18nManager().apply {
+            initFromContext(applicationContext)
+        }
+    }
+
+    private val languageRepository by lazy {
+        val prefs = applicationContext.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+        SharedPrefsLanguageRepository(prefs)
+    }
+
+    private val settingsViewModel by lazy {
+        SettingsViewModel(languageRepository, i18nManager)
+    }
 
     private val database by lazy {
         Room.databaseBuilder(
@@ -51,7 +71,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Money_saver_androidTheme {
-                ExpensesView(viewModel = viewModel)
+                MainContainer(
+                    settingsViewModel = settingsViewModel,
+                    i18nManager = i18nManager,
+                    expensesContent = {
+                        ExpensesView(viewModel = viewModel)
+                    }
+                )
             }
         }
     }

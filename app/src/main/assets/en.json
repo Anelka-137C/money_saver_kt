@@ -1,0 +1,61 @@
+{
+  "navigation": {
+    "tab_expenses": "Expenses",
+    "tab_settings": "Settings"
+  },
+  "expenses": {
+    "header": {
+      "title": "Expenses"
+    },
+    "add_card": {
+      "title": "Add Expense",
+      "amount_label": "Amount",
+      "amount_placeholder": "0.00",
+      "date_label": "Date",
+      "category_label": "Category",
+      "category_placeholder": "Select category",
+      "description_label": "Note (optional)",
+      "description_placeholder": "Add a description...",
+      "save_button": "Save Expense"
+    },
+    "history": {
+      "title": "Expense history",
+      "empty_message": "No expenses recorded yet"
+    },
+    "edit_dialog": {
+      "title": "Edit Expense",
+      "amount_label": "Amount",
+      "amount_placeholder": "0.00",
+      "date_label": "Date",
+      "category_label": "Category",
+      "category_placeholder": "Select category",
+      "description_label": "Description (optional)",
+      "cancel_button": "Cancel",
+      "save_button": "Save"
+    },
+    "delete_dialog": {
+      "title": "Delete this expense?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
+    },
+    "category_sheet": {
+      "title": "Select Category",
+      "create_category": "Create Category"
+    }
+  },
+  "settings": {
+    "header": {
+      "title": "Settings"
+    },
+    "language_section": {
+      "title": "Language",
+      "description": "Select application language"
+    },
+    "languages": {
+      "es": "Español",
+      "en": "English",
+      "de": "Deutsch",
+      "pt": "Português (Brasil)"
+    }
+  }
+}

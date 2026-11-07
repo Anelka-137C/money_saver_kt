@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -64,7 +65,7 @@ fun AddExpenseCard(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Registrar Gasto",
+                text = t("expenses.add_card.title"),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
@@ -81,7 +82,7 @@ fun AddExpenseCard(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Monto",
+                    text = t("expenses.add_card.amount_label"),
                     fontSize = 12.sp,
                     color = TextSecondary,
                     fontWeight = FontWeight.Medium
@@ -99,7 +100,7 @@ fun AddExpenseCard(
                         onValueChange = onAmountChange,
                         placeholder = {
                             Text(
-                                "0.00",
+                                t("expenses.add_card.amount_placeholder"),
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextSecondary.copy(alpha = 0.5f)
@@ -131,7 +132,7 @@ fun AddExpenseCard(
                     .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
                     .padding(12.dp)
             ) {
-                Text(text = "Fecha", fontSize = 11.sp, color = TextSecondary)
+                Text(text = t("expenses.add_card.date_label"), fontSize = 11.sp, color = TextSecondary)
                 OutlinedTextField(
                     value = state.dateInput,
                     onValueChange = onDateChange,
@@ -156,7 +157,7 @@ fun AddExpenseCard(
                     .clickable { onSelectCategoryClick() }
                     .padding(14.dp)
             ) {
-                Text(text = "Categoría", fontSize = 11.sp, color = TextSecondary)
+                Text(text = t("expenses.add_card.category_label"), fontSize = 11.sp, color = TextSecondary)
                 Spacer(modifier = Modifier.height(4.dp))
                 if (state.categoryInput.isNotBlank()) {
                     Text(
@@ -179,7 +180,7 @@ fun AddExpenseCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Seleccionar categoría",
+                            text = t("expenses.add_card.category_placeholder"),
                             fontSize = 15.sp,
                             color = GreenAccent
                         )
@@ -197,11 +198,11 @@ fun AddExpenseCard(
                     .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
                     .padding(12.dp)
             ) {
-                Text(text = "Nota (opcional)", fontSize = 11.sp, color = TextSecondary)
+                Text(text = t("expenses.add_card.description_label"), fontSize = 11.sp, color = TextSecondary)
                 OutlinedTextField(
                     value = state.descriptionInput,
                     onValueChange = onDescriptionChange,
-                    placeholder = { Text("Agregar una descripción...", color = TextSecondary) },
+                    placeholder = { Text(t("expenses.add_card.description_placeholder"), color = TextSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -238,7 +239,7 @@ fun AddExpenseCard(
                 )
             ) {
                 Text(
-                    text = "✓ Guardar Gasto",
+                    text = "✓ " + t("expenses.add_card.save_button"),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )

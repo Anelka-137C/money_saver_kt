@@ -1,0 +1,61 @@
+{
+  "navigation": {
+    "tab_expenses": "Gastos",
+    "tab_settings": "Configuración"
+  },
+  "expenses": {
+    "header": {
+      "title": "Gastos"
+    },
+    "add_card": {
+      "title": "Registrar Gasto",
+      "amount_label": "Monto",
+      "amount_placeholder": "0.00",
+      "date_label": "Fecha",
+      "category_label": "Categoría",
+      "category_placeholder": "Seleccionar categoría",
+      "description_label": "Nota (opcional)",
+      "description_placeholder": "Agregar una descripción...",
+      "save_button": "Guardar Gasto"
+    },
+    "history": {
+      "title": "Historial de gastos",
+      "empty_message": "Aún no hay gastos registrados"
+    },
+    "edit_dialog": {
+      "title": "Modificar Gasto",
+      "amount_label": "Monto",
+      "amount_placeholder": "0.00",
+      "date_label": "Fecha",
+      "category_label": "Categoría",
+      "category_placeholder": "Seleccionar categoría",
+      "description_label": "Descripción (opcional)",
+      "cancel_button": "Cancelar",
+      "save_button": "Guardar"
+    },
+    "delete_dialog": {
+      "title": "¿Eliminar este gasto?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "category_sheet": {
+      "title": "Seleccionar Categoría",
+      "create_category": "Crear Categoría"
+    }
+  },
+  "settings": {
+    "header": {
+      "title": "Configuración"
+    },
+    "language_section": {
+      "title": "Idioma",
+      "description": "Selecciona el idioma de la aplicación"
+    },
+    "languages": {
+      "es": "Español",
+      "en": "English",
+      "de": "Deutsch",
+      "pt": "Português (Brasil)"
+    }
+  }
+}

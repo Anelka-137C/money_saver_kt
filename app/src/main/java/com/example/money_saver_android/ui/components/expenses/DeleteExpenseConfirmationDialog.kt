@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -76,7 +77,7 @@ fun DeleteExpenseConfirmationDialog(
                 }
 
                 Text(
-                    text = "¿Eliminar este gasto?",
+                    text = t("expenses.delete_dialog.title"),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
@@ -113,7 +114,7 @@ fun DeleteExpenseConfirmationDialog(
                 }
 
                 Text(
-                    text = "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+                    text = t("expenses.delete_dialog.warning_message"),
                     fontSize = 13.sp,
                     color = TextSecondary,
                     textAlign = TextAlign.Center
@@ -130,7 +131,7 @@ fun DeleteExpenseConfirmationDialog(
                     border = BorderStroke(1.dp, BorderColor),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
                 ) {
-                    Text(text = "Cancelar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text = t("expenses.delete_dialog.cancel_button"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

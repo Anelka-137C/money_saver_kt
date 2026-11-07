@@ -1,0 +1,61 @@
+{
+  "navigation": {
+    "tab_expenses": "Despesas",
+    "tab_settings": "Configurações"
+  },
+  "expenses": {
+    "header": {
+      "title": "Despesas"
+    },
+    "add_card": {
+      "title": "Registrar Despesa",
+      "amount_label": "Valor",
+      "amount_placeholder": "0.00",
+      "date_label": "Data",
+      "category_label": "Categoria",
+      "category_placeholder": "Selecionar categoria",
+      "description_label": "Nota (opcional)",
+      "description_placeholder": "Adicionar uma descrição...",
+      "save_button": "Salvar Despesa"
+    },
+    "history": {
+      "title": "Histórico de despesas",
+      "empty_message": "Nenhuma despesa registrada ainda"
+    },
+    "edit_dialog": {
+      "title": "Editar Despesa",
+      "amount_label": "Valor",
+      "amount_placeholder": "0.00",
+      "date_label": "Data",
+      "category_label": "Categoria",
+      "category_placeholder": "Selecionar categoria",
+      "description_label": "Descrição (opcional)",
+      "cancel_button": "Cancelar",
+      "save_button": "Salvar"
+    },
+    "delete_dialog": {
+      "title": "Excluir esta despesa?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "category_sheet": {
+      "title": "Selecionar Categoria",
+      "create_category": "Criar Categoria"
+    }
+  },
+  "settings": {
+    "header": {
+      "title": "Configurações"
+    },
+    "language_section": {
+      "title": "Idioma",
+      "description": "Selecione o idioma do aplicativo"
+    },
+    "languages": {
+      "es": "Español",
+      "en": "English",
+      "de": "Deutsch",
+      "pt": "Português (Brasil)"
+    }
+  }
+}

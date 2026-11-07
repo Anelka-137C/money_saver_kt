@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.expenses.AddExpenseCard
 import com.example.money_saver_android.ui.components.expenses.DeleteExpenseConfirmationDialog
 import com.example.money_saver_android.ui.components.expenses.EditExpenseDialog
@@ -74,7 +75,7 @@ fun ExpensesView(viewModel: ExpenseViewModel) {
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item {
-                ExpensesHeader()
+                ExpensesHeader(title = t("expenses.header.title"))
             }
 
             // Formulario "Add Expense"
@@ -95,7 +96,7 @@ fun ExpensesView(viewModel: ExpenseViewModel) {
             // Lista de gastos
             item {
                 Text(
-                    text = "Historial de gastos",
+                    text = t("expenses.history.title"),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextPrimary,

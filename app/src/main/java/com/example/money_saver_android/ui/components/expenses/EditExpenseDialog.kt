@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -81,7 +82,7 @@ fun EditExpenseDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Modificar Gasto",
+                        text = t("expenses.edit_dialog.title"),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -89,7 +90,7 @@ fun EditExpenseDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Cerrar",
+                            contentDescription = t("expenses.edit_dialog.cancel_button"),
                             tint = TextSecondary
                         )
                     }
@@ -106,7 +107,7 @@ fun EditExpenseDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Monto",
+                        text = t("expenses.edit_dialog.amount_label"),
                         fontSize = 12.sp,
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium
@@ -124,7 +125,7 @@ fun EditExpenseDialog(
                             onValueChange = onAmountChange,
                             placeholder = {
                                 Text(
-                                    "0.00",
+                                    t("expenses.edit_dialog.amount_placeholder"),
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextSecondary.copy(alpha = 0.5f)
@@ -156,7 +157,7 @@ fun EditExpenseDialog(
                         .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
-                    Text(text = "Fecha", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = t("expenses.edit_dialog.date_label"), fontSize = 11.sp, color = TextSecondary)
                     OutlinedTextField(
                         value = editState.date,
                         onValueChange = onDateChange,
@@ -181,7 +182,7 @@ fun EditExpenseDialog(
                         .clickable { onSelectCategoryClick() }
                         .padding(14.dp)
                 ) {
-                    Text(text = "Categoría", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = t("expenses.edit_dialog.category_label"), fontSize = 11.sp, color = TextSecondary)
                     Spacer(modifier = Modifier.height(4.dp))
                     if (editState.category.isNotBlank()) {
                         Text(
@@ -199,7 +200,7 @@ fun EditExpenseDialog(
                         }
                     } else {
                         Text(
-                            text = "Seleccionar categoría",
+                            text = t("expenses.edit_dialog.category_placeholder"),
                             fontSize = 14.sp,
                             color = TextSecondary
                         )
@@ -215,7 +216,7 @@ fun EditExpenseDialog(
                         .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
-                    Text(text = "Descripción (opcional)", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = t("expenses.edit_dialog.description_label"), fontSize = 11.sp, color = TextSecondary)
                     OutlinedTextField(
                         value = editState.description,
                         onValueChange = onDescriptionChange,
@@ -258,7 +259,7 @@ fun EditExpenseDialog(
                             contentColor = TextSecondary
                         )
                     ) {
-                        Text(text = "Cancelar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(text = t("expenses.edit_dialog.cancel_button"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
 
                     Button(
@@ -273,7 +274,7 @@ fun EditExpenseDialog(
                         )
                     ) {
                         Text(
-                            text = "Guardar",
+                            text = t("expenses.edit_dialog.save_button"),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )

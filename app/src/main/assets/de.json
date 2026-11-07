@@ -1,0 +1,61 @@
+{
+  "navigation": {
+    "tab_expenses": "Ausgaben",
+    "tab_settings": "Einstellungen"
+  },
+  "expenses": {
+    "header": {
+      "title": "Ausgaben"
+    },
+    "add_card": {
+      "title": "Ausgabe erfassen",
+      "amount_label": "Betrag",
+      "amount_placeholder": "0.00",
+      "date_label": "Datum",
+      "category_label": "Kategorie",
+      "category_placeholder": "Kategorie auswählen",
+      "description_label": "Notiz (optional)",
+      "description_placeholder": "Beschreibung hinzufügen...",
+      "save_button": "Ausgabe speichern"
+    },
+    "history": {
+      "title": "Ausgabenhistorie",
+      "empty_message": "Noch keine Ausgaben erfasst"
+    },
+    "edit_dialog": {
+      "title": "Ausgabe bearbeiten",
+      "amount_label": "Betrag",
+      "amount_placeholder": "0.00",
+      "date_label": "Datum",
+      "category_label": "Kategorie",
+      "category_placeholder": "Kategorie auswählen",
+      "description_label": "Beschreibung (optional)",
+      "cancel_button": "Abbrechen",
+      "save_button": "Speichern"
+    },
+    "delete_dialog": {
+      "title": "Diese Ausgabe löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie zum Bestätigen.",
+      "cancel_button": "Abbrechen"
+    },
+    "category_sheet": {
+      "title": "Kategorie auswählen",
+      "create_category": "Kategorie erstellen"
+    }
+  },
+  "settings": {
+    "header": {
+      "title": "Einstellungen"
+    },
+    "language_section": {
+      "title": "Sprache",
+      "description": "Anwendungssprache auswählen"
+    },
+    "languages": {
+      "es": "Español",
+      "en": "English",
+      "de": "Deutsch",
+      "pt": "Português (Brasil)"
+    }
+  }
+}
