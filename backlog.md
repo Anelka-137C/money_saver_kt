@@ -6,7 +6,7 @@ Stack: Android nativo (Kotlin, Jetpack Compose, Room / SQLite)
 Expensive decisions: Offline-first con backups a Google Drive; multi-idioma; moneda de preferencia configurable; autenticación por PIN / biometría
 
 ## Backlog
-- [ ] **#1** Como usuario, quiero registrar un gasto con su monto, descripción y categoría/subcategoría, para clasificar y visualizar mis salidas de dinero.
+- [*] **#1** Como usuario, quiero registrar un gasto con su monto, descripción y categoría/subcategoría, para clasificar y visualizar mis salidas de dinero.
 - [ ] **#2** Como usuario, quiero editar un gasto existente, para corregir errores en su monto, descripción o clasificación. Requires: #1
 - [ ] **#3** Como usuario, quiero eliminar un gasto registrado, para mantener mi historial actualizado. Requires: #1
 - [ ] **#4** Como usuario, quiero crear, editar y eliminar categorías y subcategorías para gastos, ingresos y ahorros, para adaptar la clasificación a mis necesidades.

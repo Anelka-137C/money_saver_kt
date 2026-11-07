@@ -1,5 +1,7 @@
 package com.example.money_saver_android.ui
 
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,11 +32,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -66,7 +71,16 @@ import java.util.Locale
 @Composable
 fun ExpenseScreen(viewModel: ExpenseViewModel) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showCategorySheet by remember { mutableStateOf(false) }
+    var showEditCategorySheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.toastMessage) {
+        state.toastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearToastMessage()
+        }
+    }
 
     // Inicializar fecha de hoy por defecto si está vacía
     val todayFormatted = remember {
@@ -136,7 +150,10 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 }
             } else {
                 items(state.expenses, key = { it.id }) { expense ->
-                    ExpenseCardItem(expense = expense)
+                    ExpenseCardItem(
+                        expense = expense,
+                        onClick = { viewModel.startEditing(expense) }
+                    )
                 }
             }
         }
@@ -148,6 +165,30 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 onCategorySelected = { category, subcategory ->
                     viewModel.onCategoryChange(category, subcategory)
                     showCategorySheet = false
+                }
+            )
+        }
+
+        val editState = state.editingExpense
+        if (editState != null) {
+            EditExpenseSheet(
+                editState = editState,
+                onAmountChange = viewModel::onEditAmountChange,
+                onDateChange = viewModel::onEditDateChange,
+                onDescriptionChange = viewModel::onEditDescriptionChange,
+                onSelectCategoryClick = { showEditCategorySheet = true },
+                onConfirm = viewModel::confirmEdit,
+                onDismiss = viewModel::cancelEditing
+            )
+        }
+
+        if (showEditCategorySheet) {
+            CategorySelectionSheet(
+                categories = defaultCategories,
+                onDismiss = { showEditCategorySheet = false },
+                onCategorySelected = { category, subcategory ->
+                    viewModel.onEditCategoryChange(category, subcategory)
+                    showEditCategorySheet = false
                 }
             )
         }
@@ -357,9 +398,14 @@ fun AddExpenseCard(
 }
 
 @Composable
-fun ExpenseCardItem(expense: Expense) {
+fun ExpenseCardItem(
+    expense: Expense,
+    onClick: () -> Unit = {}
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BorderColor))
@@ -539,6 +585,236 @@ fun CategorySelectionSheet(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditExpenseSheet(
+    editState: EditExpenseState,
+    onAmountChange: (String) -> Unit,
+    onDateChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onSelectCategoryClick: () -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = CardBackground,
+        contentColor = TextPrimary
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Editar Gasto",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = TextSecondary
+                    )
+                }
+            }
+
+            // Monto
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FieldBackground)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Monto",
+                    fontSize = 12.sp,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$ ",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GreenAccent
+                    )
+                    OutlinedTextField(
+                        value = editState.amount,
+                        onValueChange = onAmountChange,
+                        placeholder = {
+                            Text(
+                                "0.00",
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary.copy(alpha = 0.5f)
+                            )
+                        },
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        ),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+                }
+            }
+
+            // Fecha
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FieldBackground)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Text(text = "Fecha", fontSize = 11.sp, color = TextSecondary)
+                OutlinedTextField(
+                    value = editState.date,
+                    onValueChange = onDateChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+            }
+
+            // Selector Categoría
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FieldBackground)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .clickable { onSelectCategoryClick() }
+                    .padding(14.dp)
+            ) {
+                Text(text = "Categoría", fontSize = 11.sp, color = TextSecondary)
+                Spacer(modifier = Modifier.height(4.dp))
+                if (editState.category.isNotBlank()) {
+                    Text(
+                        text = editState.category,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                    if (editState.subcategory.isNotBlank()) {
+                        Text(
+                            text = editState.subcategory,
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Seleccionar categoría",
+                        fontSize = 14.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            // Descripción
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FieldBackground)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Text(text = "Descripción (opcional)", fontSize = 11.sp, color = TextSecondary)
+                OutlinedTextField(
+                    value = editState.description,
+                    onValueChange = onDescriptionChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+            }
+
+            // Error de validación
+            if (!editState.errorMessage.isNullOrBlank()) {
+                Text(
+                    text = editState.errorMessage,
+                    color = ErrorRed,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // Botones Cancelar y Guardar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, BorderColor),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = TextSecondary
+                    )
+                ) {
+                    Text(text = "Cancelar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = GreenAccent,
+                        contentColor = Color(0xFF0C1017)
+                    )
+                ) {
+                    Text(
+                        text = "Guardar",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

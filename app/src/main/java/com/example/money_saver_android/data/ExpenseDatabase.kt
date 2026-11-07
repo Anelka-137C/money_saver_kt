@@ -7,6 +7,7 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -27,6 +28,9 @@ interface ExpenseDao {
 
     @Insert
     suspend fun insert(entity: ExpenseEntity)
+
+    @Update
+    suspend fun update(entity: ExpenseEntity)
 }
 
 @Database(entities = [ExpenseEntity::class], version = 1, exportSchema = false)
@@ -52,6 +56,19 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
 
     override suspend fun insertExpense(expense: Expense) {
         dao.insert(
+            ExpenseEntity(
+                id = expense.id,
+                amount = expense.amount,
+                date = expense.date,
+                description = expense.description,
+                category = expense.category,
+                subcategory = expense.subcategory
+            )
+        )
+    }
+
+    override suspend fun updateExpense(expense: Expense) {
+        dao.update(
             ExpenseEntity(
                 id = expense.id,
                 amount = expense.amount,

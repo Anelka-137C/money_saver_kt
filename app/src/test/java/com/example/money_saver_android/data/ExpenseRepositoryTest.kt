@@ -53,4 +53,32 @@ class ExpenseRepositoryTest {
         assertEquals("Ingresos", retrieved.category)
         assertEquals("Nómina", retrieved.subcategory)
     }
+
+    @Test
+    fun updateExpense_updatesExistingRecordInDatabase() = runBlocking {
+        val initial = Expense(
+            amount = 100.0,
+            date = "2026-11-06",
+            description = "Almuerzo",
+            category = "Alimentación",
+            subcategory = "Restaurante"
+        )
+        repository.insertExpense(initial)
+        val inserted = repository.getAllExpenses().first().first()
+
+        val updated = inserted.copy(
+            amount = 120.0,
+            description = "Cena familiar",
+            subcategory = "Cena"
+        )
+        repository.updateExpense(updated)
+
+        val expenses = repository.getAllExpenses().first()
+        assertEquals(1, expenses.size)
+        val retrieved = expenses.first()
+        assertEquals(120.0, retrieved.amount, 0.0)
+        assertEquals("Cena familiar", retrieved.description)
+        assertEquals("Cena", retrieved.subcategory)
+        assertEquals(inserted.id, retrieved.id)
+    }
 }

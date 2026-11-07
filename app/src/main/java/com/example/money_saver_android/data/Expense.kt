@@ -14,4 +14,5 @@ data class Expense(
 interface ExpenseRepository {
     fun getAllExpenses(): Flow<List<Expense>>
     suspend fun insertExpense(expense: Expense)
+    suspend fun updateExpense(expense: Expense)
 }
