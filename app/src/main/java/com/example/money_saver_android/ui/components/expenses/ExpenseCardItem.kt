@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.money_saver_android.data.Currency
+import com.example.money_saver_android.data.defaultCurrencies
+import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
@@ -51,6 +54,7 @@ import java.util.Locale
 fun ExpenseCardItem(
     expense: Expense,
     modifier: Modifier = Modifier,
+    currency: Currency = defaultCurrencies.first(),
     onEditClick: () -> Unit = {},
     onDeleteClick: () -> Unit = {}
 ) {
@@ -76,7 +80,7 @@ fun ExpenseCardItem(
                         .background(GreenAccent.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "$", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GreenAccent)
+                    Text(text = currency.symbol, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GreenAccent)
                 }
 
                 Spacer(modifier = Modifier.width(14.dp))
@@ -96,7 +100,7 @@ fun ExpenseCardItem(
                 }
 
                 Text(
-                    text = String.format(Locale.US, "$%.2f", expense.amount),
+                    text = CurrencyFormatter.format(expense.amount, currency),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary

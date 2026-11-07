@@ -27,11 +27,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.money_saver_android.data.Currency
+import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
@@ -50,7 +53,8 @@ fun AddExpenseCard(
     onDescriptionChange: (String) -> Unit,
     onSelectCategoryClick: () -> Unit,
     onSaveClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    currency: Currency = defaultCurrencies.first()
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -90,10 +94,11 @@ fun AddExpenseCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "$ ",
+                        text = "${currency.symbol} ",
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
-                        color = GreenAccent
+                        color = GreenAccent,
+                        modifier = Modifier.testTag("add_amount_currency_symbol")
                     )
                     OutlinedTextField(
                         value = state.amountInput,

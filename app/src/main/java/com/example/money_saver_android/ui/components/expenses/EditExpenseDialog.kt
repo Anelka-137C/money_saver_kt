@@ -37,9 +37,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.money_saver_android.data.Currency
+import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
@@ -58,7 +61,8 @@ fun EditExpenseDialog(
     onDescriptionChange: (String) -> Unit,
     onSelectCategoryClick: () -> Unit,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    currency: Currency = defaultCurrencies.first()
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -115,10 +119,11 @@ fun EditExpenseDialog(
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "$ ",
+                            text = "${currency.symbol} ",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GreenAccent
+                            color = GreenAccent,
+                            modifier = Modifier.testTag("edit_amount_currency_symbol")
                         )
                         OutlinedTextField(
                             value = editState.amount,

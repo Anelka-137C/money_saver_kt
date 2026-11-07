@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.money_saver_android.data.Currency
+import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.expenses.AddExpenseCard
 import com.example.money_saver_android.ui.components.expenses.DeleteExpenseConfirmationDialog
@@ -39,7 +41,10 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ExpensesView(viewModel: ExpenseViewModel) {
+fun ExpensesView(
+    viewModel: ExpenseViewModel,
+    currency: Currency = defaultCurrencies.first()
+) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val view = LocalView.current
@@ -82,6 +87,7 @@ fun ExpensesView(viewModel: ExpenseViewModel) {
             item {
                 AddExpenseCard(
                     state = state,
+                    currency = currency,
                     onAmountChange = viewModel::onAmountChange,
                     onDateChange = viewModel::onDateChange,
                     onDescriptionChange = viewModel::onDescriptionChange,
@@ -112,6 +118,7 @@ fun ExpensesView(viewModel: ExpenseViewModel) {
                 items(state.expenses, key = { it.id }) { expense ->
                     ExpenseCardItem(
                         expense = expense,
+                        currency = currency,
                         onEditClick = { viewModel.startEditing(expense) },
                         onDeleteClick = { viewModel.requestDeleteExpense(expense) }
                     )
@@ -148,6 +155,7 @@ fun ExpensesView(viewModel: ExpenseViewModel) {
         if (editState != null) {
             EditExpenseDialog(
                 editState = editState,
+                currency = currency,
                 onAmountChange = viewModel::onEditAmountChange,
                 onDateChange = viewModel::onEditDateChange,
                 onDescriptionChange = viewModel::onEditDescriptionChange,

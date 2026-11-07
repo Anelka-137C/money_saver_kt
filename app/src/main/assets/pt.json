@@ -51,6 +51,10 @@
       "title": "Idioma",
       "description": "Selecione o idioma do aplicativo"
     },
+    "currency_section": {
+      "title": "Moeda de preferência",
+      "description": "Selecione a moeda para exibir os valores"
+    },
     "languages": {
       "es": "Español",
       "en": "English",

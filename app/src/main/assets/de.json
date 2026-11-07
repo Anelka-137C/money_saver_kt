@@ -51,6 +51,10 @@
       "title": "Sprache",
       "description": "Anwendungssprache auswählen"
     },
+    "currency_section": {
+      "title": "Bevorzugte Währung",
+      "description": "Wählen Sie die Währung für die Beträge aus"
+    },
     "languages": {
       "es": "Español",
       "en": "English",

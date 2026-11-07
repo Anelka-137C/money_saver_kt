@@ -51,6 +51,10 @@
       "title": "Language",
       "description": "Select application language"
     },
+    "currency_section": {
+      "title": "Preferred Currency",
+      "description": "Select the currency to display amounts"
+    },
     "languages": {
       "es": "Español",
       "en": "English",

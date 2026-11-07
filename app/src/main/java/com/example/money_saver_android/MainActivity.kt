@@ -5,10 +5,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.room.Room
+import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.local.AppDatabase
+import com.example.money_saver_android.data.local.ConfigDatabase
 import com.example.money_saver_android.data.repository.RoomCategoryRepository
+import com.example.money_saver_android.data.repository.RoomCurrencyRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
+import com.example.money_saver_android.data.repository.SharedPrefsCurrencyRepository
 import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
@@ -32,8 +38,32 @@ class MainActivity : ComponentActivity() {
         SharedPrefsLanguageRepository(prefs)
     }
 
+    private val configDatabase by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            ConfigDatabase::class.java,
+            "config.db"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
+    }
+
+    private val currencyRepository by lazy {
+        RoomCurrencyRepository(configDatabase.currencyDao())
+    }
+
+    private val currencyPreferenceRepository by lazy {
+        val prefs = applicationContext.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+        SharedPrefsCurrencyRepository(prefs)
+    }
+
     private val settingsViewModel by lazy {
-        SettingsViewModel(languageRepository, i18nManager)
+        SettingsViewModel(
+            languageRepository = languageRepository,
+            i18nManager = i18nManager,
+            currencyRepository = currencyRepository,
+            currencyPreferenceRepository = currencyPreferenceRepository
+        )
     }
 
     private val database by lazy {
@@ -71,11 +101,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Money_saver_androidTheme {
+                val settingsState by settingsViewModel.uiState.collectAsState()
+                val activeCurrency = settingsState.availableCurrencies.find { it.code == settingsState.selectedCurrency }
+                    ?: defaultCurrencies.first()
+
                 MainContainer(
                     settingsViewModel = settingsViewModel,
                     i18nManager = i18nManager,
                     expensesContent = {
-                        ExpensesView(viewModel = viewModel)
+                        ExpensesView(
+                            viewModel = viewModel,
+                            currency = activeCurrency
+                        )
                     }
                 )
             }
