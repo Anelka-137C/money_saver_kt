@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 interface IncomeRepository {
     fun getIncomesByPeriod(periodId: Long): Flow<List<Income>>
     suspend fun insertIncome(income: Income): Long
+    suspend fun updateIncome(income: Income)
     suspend fun deleteIncome(id: Long)
     fun getAllCategories(): Flow<List<Category>>
     suspend fun insertCategory(category: Category)
@@ -37,6 +38,10 @@ class RoomIncomeRepository(
 
     override suspend fun insertIncome(income: Income): Long {
         return incomeDao.insert(income.toEntity())
+    }
+
+    override suspend fun updateIncome(income: Income) {
+        incomeDao.update(income.toEntity())
     }
 
     override suspend fun deleteIncome(id: Long) {

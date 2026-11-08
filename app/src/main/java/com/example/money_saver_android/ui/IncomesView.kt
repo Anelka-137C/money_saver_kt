@@ -22,7 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,11 +63,15 @@ import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.incomes.AddIncomeCard
+import com.example.money_saver_android.ui.components.incomes.AddIncomeDialog
+import com.example.money_saver_android.ui.components.incomes.DeleteIncomeConfirmationDialog
+import com.example.money_saver_android.ui.components.incomes.EditIncomeDialog
 import com.example.money_saver_android.ui.components.incomes.IncomeAllocationCard
 import com.example.money_saver_android.ui.components.incomes.IncomeOverviewCard
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.DarkBackground
+import com.example.money_saver_android.ui.theme.ErrorRed
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
@@ -91,12 +99,25 @@ fun IncomesView(
     var periodMenuExpanded by remember { mutableStateOf(false) }
     var showAddForm by remember { mutableStateOf(false) }
     var showCategorySheet by remember { mutableStateOf(false) }
+    var showEditCategorySheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.toastMessage) {
         state.toastMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             incomeViewModel.clearToastMessage()
             showAddForm = false
+        }
+    }
+
+    LaunchedEffect(state.errorMessage) {
+        if (state.errorMessage != null) {
+            showCategorySheet = false
+        }
+    }
+
+    LaunchedEffect(state.editingIncome?.errorMessage) {
+        if (state.editingIncome?.errorMessage != null) {
+            showEditCategorySheet = false
         }
     }
 
@@ -204,44 +225,28 @@ fun IncomesView(
                 currency = currency
             )
 
-            // 4. Add Income Action / Form
-            if (!showAddForm) {
-                Button(
-                    onClick = { showAddForm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("btn_toggle_add_income"),
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = t("incomes.header.add_button"),
-                        color = Color.Black,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            } else {
-                AddIncomeCard(
-                    state = state,
-                    currency = currency,
-                    onAmountChange = incomeViewModel::onAmountChange,
-                    onDateTimeChange = incomeViewModel::onDateTimeChange,
-                    onDescriptionChange = incomeViewModel::onDescriptionChange,
-                    onSelectCategoryClick = { showCategorySheet = true },
-                    onSaveClick = {
-                        hideKeyboard(context, view, keyboardController, focusManager)
-                        incomeViewModel.saveIncome()
-                    },
-                    onCloseClick = { showAddForm = false }
+            // 4. Add Income Action Button
+            Button(
+                onClick = { showAddForm = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("btn_toggle_add_income"),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = t("incomes.header.add_button"),
+                    color = Color.Black,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -284,9 +289,14 @@ fun IncomesView(
                     }
                 } else {
                     state.incomes.forEach { income ->
+                        val category = state.categories.find { it.name.equals(income.category, ignoreCase = true) }
+                        val categoryColor = category?.color?.let { parseHexColor(it) } ?: GreenAccent
                         IncomeListItem(
                             income = income,
-                            currency = currency
+                            currency = currency,
+                            categoryColor = categoryColor,
+                            onEditClick = { incomeViewModel.startEditing(income) },
+                            onDeleteClick = { incomeViewModel.requestDeleteIncome(income) }
                         )
                     }
                 }
@@ -294,24 +304,90 @@ fun IncomesView(
         }
     }
 
+    if (showAddForm) {
+        AddIncomeDialog(
+            state = state,
+            currency = currency,
+            onAmountChange = incomeViewModel::onAmountChange,
+            onDateTimeChange = incomeViewModel::onDateTimeChange,
+            onDescriptionChange = incomeViewModel::onDescriptionChange,
+            onSelectCategoryClick = { showCategorySheet = true },
+            onSaveClick = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                incomeViewModel.saveIncome()
+            },
+            onCloseClick = {
+                incomeViewModel.clearErrorMessage()
+                showAddForm = false
+            }
+        )
+    }
+
     if (showCategorySheet) {
         CategorySelectionSheet(
             categories = state.categories,
-            newCategoryName = "",
-            selectedColorHex = "#4E73DF",
-            categoryError = null,
-            newSubcategoryName = "",
-            subcategoryError = null,
-            onCategoryNameChange = {},
-            onColorSelect = {},
-            onCreateCategory = {},
-            onSubcategoryNameChange = {},
-            onCreateSubcategory = {},
+            newCategoryName = state.newCategoryNameInput,
+            selectedColorHex = state.selectedColorHex,
+            categoryError = state.categoryError,
+            newSubcategoryName = state.newSubcategoryNameInput,
+            subcategoryError = state.subcategoryError,
+            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
+            onColorSelect = incomeViewModel::onColorSelect,
+            onCreateCategory = incomeViewModel::createCategory,
+            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
+            onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
             onDeleteCategory = { incomeViewModel.deleteCategory(it) },
             onDismiss = { showCategorySheet = false },
             onCategorySelected = { cat, sub ->
                 incomeViewModel.onCategorySelected(cat, sub)
                 showCategorySheet = false
+            }
+        )
+    }
+
+    state.editingIncome?.let { editState ->
+        EditIncomeDialog(
+            editState = editState,
+            currency = currency,
+            onAmountChange = incomeViewModel::onEditAmountChange,
+            onDateTimeChange = incomeViewModel::onEditDateTimeChange,
+            onDescriptionChange = incomeViewModel::onEditDescriptionChange,
+            onSelectCategoryClick = { showEditCategorySheet = true },
+            onConfirm = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                incomeViewModel.confirmEdit()
+            },
+            onDismiss = { incomeViewModel.cancelEditing() }
+        )
+    }
+
+    state.incomeToDelete?.let { incomeToDelete ->
+        DeleteIncomeConfirmationDialog(
+            income = incomeToDelete,
+            currency = currency,
+            onConfirm = { incomeViewModel.confirmDeleteIncome() },
+            onDismiss = { incomeViewModel.dismissDeleteConfirmation() }
+        )
+    }
+
+    if (showEditCategorySheet) {
+        CategorySelectionSheet(
+            categories = state.categories,
+            newCategoryName = state.newCategoryNameInput,
+            selectedColorHex = state.selectedColorHex,
+            categoryError = state.categoryError,
+            newSubcategoryName = state.newSubcategoryNameInput,
+            subcategoryError = state.subcategoryError,
+            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
+            onColorSelect = incomeViewModel::onColorSelect,
+            onCreateCategory = incomeViewModel::createCategory,
+            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
+            onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
+            onDeleteCategory = { incomeViewModel.deleteCategory(it) },
+            onDismiss = { showEditCategorySheet = false },
+            onCategorySelected = { cat, sub ->
+                incomeViewModel.onEditCategoryChange(cat, sub)
+                showEditCategorySheet = false
             }
         )
     }
@@ -321,6 +397,9 @@ fun IncomesView(
 fun IncomeListItem(
     income: Income,
     currency: Currency,
+    categoryColor: Color = GreenAccent,
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -338,17 +417,20 @@ fun IncomeListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF143026)),
+                        .background(categoryColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "$",
-                        color = GreenAccent,
+                        text = currency.symbol,
+                        color = categoryColor,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -363,11 +445,19 @@ fun IncomeListItem(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                    if (income.subcategory.isNotBlank() && income.subcategory != income.category) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = income.category,
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${income.category} • ${income.dateTime}",
+                        text = income.dateTime,
                         color = TextSecondary,
-                        fontSize = 12.sp
+                        fontSize = 11.sp
                     )
                 }
             }
@@ -379,8 +469,60 @@ fun IncomeListItem(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(">", color = TextSecondary, fontSize = 14.sp)
+
+                Box {
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("btn_options_income_${income.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Opciones",
+                            tint = TextSecondary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        modifier = Modifier
+                            .background(CardBackground)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(t("incomes.options.edit"), color = TextPrimary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = TextSecondary
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onEditClick()
+                            },
+                            modifier = Modifier.testTag("btn_edit_income_${income.id}")
+                        )
+                        DropdownMenuItem(
+                            text = { Text(t("incomes.options.delete"), color = ErrorRed) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = ErrorRed
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDeleteClick()
+                            },
+                            modifier = Modifier.testTag("btn_delete_income_${income.id}")
+                        )
+                    }
+                }
             }
         }
     }

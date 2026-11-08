@@ -117,15 +117,37 @@
       "save_button": "✓ Einkommen speichern"
     },
     "breakdown": {
-      "title": "Einkommensaufteilung",
+      "title": "Einkommensverlauf",
       "main_income": "Haupteinkommen"
     },
     "history": {
+      "title": "Einkommensverlauf",
       "empty_message": "Keine Einkommenseinträge in diesem Zeitraum"
     },
     "date_time_picker": {
       "cancel": "Abbrechen",
       "ok": "OK"
+    },
+    "edit_dialog": {
+      "title": "Einkommen bearbeiten",
+      "amount_label": "Betrag",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Datum und Uhrzeit",
+      "category_label": "Kategorie",
+      "select_category": "Kategorie auswählen",
+      "description_label": "Notiz (optional)",
+      "description_placeholder": "Beschreibung hinzufügen...",
+      "cancel_button": "Abbrechen",
+      "save_button": "Speichern"
+    },
+    "delete_dialog": {
+      "title": "Dieses Einkommen löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
+      "cancel_button": "Abbrechen"
+    },
+    "options": {
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
     }
   }
 }

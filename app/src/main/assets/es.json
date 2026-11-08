@@ -117,15 +117,37 @@
       "save_button": "✓ Guardar Ingreso"
     },
     "breakdown": {
-      "title": "Desglose de Ingresos",
+      "title": "Historial de ingresos",
       "main_income": "Ingreso principal"
     },
     "history": {
+      "title": "Historial de ingresos",
       "empty_message": "No hay ingresos registrados en este período"
     },
     "date_time_picker": {
       "cancel": "Cancelar",
       "ok": "Aceptar"
+    },
+    "edit_dialog": {
+      "title": "Modificar Ingreso",
+      "amount_label": "Monto",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Fecha y hora",
+      "category_label": "Categoría",
+      "select_category": "Seleccionar categoría",
+      "description_label": "Nota (opcional)",
+      "description_placeholder": "Agregar una descripción...",
+      "cancel_button": "Cancelar",
+      "save_button": "Guardar"
+    },
+    "delete_dialog": {
+      "title": "¿Eliminar este ingreso?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
     }
   }
 }

@@ -117,15 +117,37 @@
       "save_button": "✓ Save Income"
     },
     "breakdown": {
-      "title": "Income Breakdown",
+      "title": "Income History",
       "main_income": "Main income"
     },
     "history": {
+      "title": "Income History",
       "empty_message": "No income records in this period"
     },
     "date_time_picker": {
       "cancel": "Cancel",
       "ok": "OK"
+    },
+    "edit_dialog": {
+      "title": "Edit Income",
+      "amount_label": "Amount",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Date and time",
+      "category_label": "Category",
+      "select_category": "Select category",
+      "description_label": "Note (optional)",
+      "description_placeholder": "Add a description...",
+      "cancel_button": "Cancel",
+      "save_button": "Save"
+    },
+    "delete_dialog": {
+      "title": "Delete this income?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
+    },
+    "options": {
+      "edit": "Edit",
+      "delete": "Delete"
     }
   }
 }

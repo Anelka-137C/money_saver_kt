@@ -37,6 +37,10 @@ class FakeIncomeRepository : IncomeRepository {
         return newId
     }
 
+    override suspend fun updateIncome(income: Income) {
+        _incomes.value = _incomes.value.map { if (it.id == income.id) income else it }
+    }
+
     override suspend fun deleteIncome(id: Long) {
         _incomes.value = _incomes.value.filter { it.id != id }
     }

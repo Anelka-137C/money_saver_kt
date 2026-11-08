@@ -15,6 +15,17 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class EditIncomeState(
+    val incomeId: Long = 0,
+    val amount: String = "",
+    val dateTime: String = "",
+    val description: String = "",
+    val category: String = "",
+    val subcategory: String = "",
+    val periodId: Long = 0,
+    val errorMessage: String? = null
+)
+
 data class IncomeUiState(
     val amountInput: String = "",
     val dateTimeInput: String = "",
@@ -25,8 +36,15 @@ data class IncomeUiState(
     val incomes: List<Income> = emptyList(),
     val categories: List<Category> = emptyList(),
     val totalIncome: Double = 0.0,
+    val newCategoryNameInput: String = "",
+    val selectedColorHex: String = "#4E73DF",
+    val categoryError: String? = null,
+    val newSubcategoryNameInput: String = "",
+    val subcategoryError: String? = null,
     val errorMessage: String? = null,
-    val toastMessage: String? = null
+    val toastMessage: String? = null,
+    val editingIncome: EditIncomeState? = null,
+    val incomeToDelete: Income? = null
 )
 
 class IncomeViewModel(
@@ -135,5 +153,179 @@ class IncomeViewModel(
 
     fun clearToastMessage() {
         _uiState.update { it.copy(toastMessage = null) }
+    }
+
+    fun onNewCategoryNameChange(name: String) {
+        _uiState.update { it.copy(newCategoryNameInput = name, categoryError = null) }
+    }
+
+    fun onColorSelect(colorHex: String) {
+        _uiState.update { it.copy(selectedColorHex = colorHex) }
+    }
+
+    fun createCategory() {
+        val current = _uiState.value
+        viewModelScope.launch {
+            when (val result = incomeUseCase.createCategory(
+                nameInput = current.newCategoryNameInput,
+                colorInput = current.selectedColorHex
+            )) {
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(categoryError = result.message) }
+                }
+                is IncomeResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            newCategoryNameInput = "",
+                            selectedColorHex = "#4E73DF",
+                            categoryError = null,
+                            toastMessage = "Categoría creada exitosamente"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun onNewSubcategoryNameChange(name: String) {
+        _uiState.update { it.copy(newSubcategoryNameInput = name, subcategoryError = null) }
+    }
+
+    fun createSubcategory(categoryName: String) {
+        val current = _uiState.value
+        viewModelScope.launch {
+            when (val result = incomeUseCase.createSubcategory(
+                categoryName = categoryName,
+                subcategoryNameInput = current.newSubcategoryNameInput
+            )) {
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(subcategoryError = result.message) }
+                }
+                is IncomeResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            newSubcategoryNameInput = "",
+                            subcategoryError = null,
+                            toastMessage = "Subcategoría creada exitosamente"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun startEditing(income: Income) {
+        val amountStr = if (income.amount % 1.0 == 0.0) {
+            income.amount.toLong().toString()
+        } else {
+            income.amount.toString()
+        }
+        _uiState.update {
+            it.copy(
+                editingIncome = EditIncomeState(
+                    incomeId = income.id,
+                    amount = amountStr,
+                    dateTime = income.dateTime,
+                    description = income.description,
+                    category = income.category,
+                    subcategory = income.subcategory,
+                    periodId = income.periodId
+                )
+            )
+        }
+    }
+
+    fun onEditAmountChange(amount: String) {
+        _uiState.update { state ->
+            state.copy(editingIncome = state.editingIncome?.copy(amount = amount, errorMessage = null))
+        }
+    }
+
+    fun onEditDateTimeChange(dateTime: String) {
+        _uiState.update { state ->
+            state.copy(editingIncome = state.editingIncome?.copy(dateTime = dateTime))
+        }
+    }
+
+    fun onEditDescriptionChange(description: String) {
+        _uiState.update { state ->
+            state.copy(editingIncome = state.editingIncome?.copy(description = description))
+        }
+    }
+
+    fun onEditCategoryChange(category: String, subcategory: String) {
+        _uiState.update { state ->
+            state.copy(
+                editingIncome = state.editingIncome?.copy(
+                    category = category,
+                    subcategory = subcategory,
+                    errorMessage = null
+                )
+            )
+        }
+    }
+
+    fun confirmEdit() {
+        val editState = _uiState.value.editingIncome ?: return
+        viewModelScope.launch {
+            when (val result = incomeUseCase.updateIncome(
+                id = editState.incomeId,
+                amountInput = editState.amount,
+                dateTimeInput = editState.dateTime,
+                categoryInput = editState.category,
+                subcategoryInput = editState.subcategory,
+                descriptionInput = editState.description,
+                periodId = editState.periodId
+            )) {
+                is IncomeResult.Error -> {
+                    _uiState.update { state ->
+                        state.copy(
+                            editingIncome = state.editingIncome?.copy(
+                                errorMessage = result.message
+                            )
+                        )
+                    }
+                }
+                is IncomeResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            editingIncome = null,
+                            toastMessage = "Ingreso guardado exitosamente"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun cancelEditing() {
+        _uiState.update { it.copy(editingIncome = null) }
+    }
+
+    fun requestDeleteIncome(income: Income) {
+        _uiState.update { it.copy(incomeToDelete = income) }
+    }
+
+    fun dismissDeleteConfirmation() {
+        _uiState.update { it.copy(incomeToDelete = null) }
+    }
+
+    fun confirmDeleteIncome() {
+        val income = _uiState.value.incomeToDelete ?: return
+        viewModelScope.launch {
+            when (incomeUseCase.deleteIncome(income.id)) {
+                is IncomeResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            incomeToDelete = null,
+                            toastMessage = "Ingreso eliminado exitosamente"
+                        )
+                    }
+                }
+                is IncomeResult.Error -> {
+                    // No-op
+                }
+            }
+        }
     }
 }
