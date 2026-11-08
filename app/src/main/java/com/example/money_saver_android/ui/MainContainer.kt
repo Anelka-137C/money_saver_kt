@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -17,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,11 +30,13 @@ import com.example.money_saver_android.ui.theme.DarkBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import com.example.money_saver_android.viewmodel.PeriodViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
 
 enum class AppTab {
     EXPENSES,
-    SETTINGS
+    SETTINGS,
+    PERIOD
 }
 
 @Composable
@@ -40,11 +44,19 @@ fun MainContainer(
     settingsViewModel: SettingsViewModel,
     i18nManager: I18nManager,
     modifier: Modifier = Modifier,
+    periodViewModel: PeriodViewModel? = null,
     expensesContent: @Composable () -> Unit
 ) {
     // Observe language changes to re-render texts in real-time
     val settingsState by settingsViewModel.uiState.collectAsState()
-    var currentTab by rememberSaveable { mutableStateOf(AppTab.EXPENSES) }
+    val periodState = periodViewModel?.uiState?.collectAsState()?.value
+    val isPeriodLocked = periodState?.let { !it.isPeriodConfigured } ?: false
+
+    var currentTab by rememberSaveable {
+        mutableStateOf(if (isPeriodLocked) AppTab.PERIOD else AppTab.EXPENSES)
+    }
+
+    val activeTab = if (isPeriodLocked) AppTab.PERIOD else currentTab
 
     CompositionLocalProvider(LocalI18nManager provides i18nManager) {
         Scaffold(
@@ -57,8 +69,12 @@ fun MainContainer(
                 ) {
                     NavigationBarItem(
                         modifier = Modifier.testTag("tab_expenses"),
-                        selected = currentTab == AppTab.EXPENSES,
-                        onClick = { currentTab = AppTab.EXPENSES },
+                        selected = activeTab == AppTab.EXPENSES,
+                        onClick = {
+                            if (!isPeriodLocked) {
+                                currentTab = AppTab.EXPENSES
+                            }
+                        },
                         icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = i18nManager.t("navigation.tab_expenses")) },
                         label = { Text(i18nManager.t("navigation.tab_expenses")) },
                         colors = NavigationBarItemDefaults.colors(
@@ -71,10 +87,28 @@ fun MainContainer(
                     )
                     NavigationBarItem(
                         modifier = Modifier.testTag("tab_settings"),
-                        selected = currentTab == AppTab.SETTINGS,
-                        onClick = { currentTab = AppTab.SETTINGS },
+                        selected = activeTab == AppTab.SETTINGS,
+                        onClick = {
+                            if (!isPeriodLocked) {
+                                currentTab = AppTab.SETTINGS
+                            }
+                        },
                         icon = { Icon(Icons.Default.Settings, contentDescription = i18nManager.t("navigation.tab_settings")) },
                         label = { Text(i18nManager.t("navigation.tab_settings")) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = GreenAccent,
+                            selectedTextColor = GreenAccent,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
+                            indicatorColor = CardBackground
+                        )
+                    )
+                    NavigationBarItem(
+                        modifier = Modifier.testTag("tab_period"),
+                        selected = activeTab == AppTab.PERIOD,
+                        onClick = { currentTab = AppTab.PERIOD },
+                        icon = { Icon(Icons.Default.DateRange, contentDescription = i18nManager.t("navigation.tab_period")) },
+                        label = { Text(i18nManager.t("navigation.tab_period")) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GreenAccent,
                             selectedTextColor = GreenAccent,
@@ -91,12 +125,20 @@ fun MainContainer(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                when (currentTab) {
+                when (activeTab) {
                     AppTab.EXPENSES -> expensesContent()
                     AppTab.SETTINGS -> SettingsView(
                         settingsViewModel = settingsViewModel,
                         i18nManager = i18nManager
                     )
+                    AppTab.PERIOD -> {
+                        periodViewModel?.let {
+                            PeriodView(
+                                periodViewModel = it,
+                                i18nManager = i18nManager
+                            )
+                        }
+                    }
                 }
             }
         }

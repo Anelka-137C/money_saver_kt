@@ -1,27 +1,60 @@
-# Story #5: Configurar moneda de preferencia con entidad de base de datos y formato ISO 4217
+# Story #6: Configuración obligatoria y gestión de período financiero en pestaña dedicada
 
 ## Story
-Como usuario, quiero configurar mi moneda de preferencia desde la pantalla de Configuración a partir de las divisas disponibles en el sistema, para ver reflejados todos los importes de gastos con su símbolo y formato numérico estándar ISO 4217.
+Como usuario, quiero una pestaña dedicada para configurar las fechas de inicio y fin de mi período financiero mediante selectores de calendario en formato ISO, ver el período actual y el histórico de períodos, y poder modificarlos mediante un popup centrado o eliminarlos con un menú de opciones de 3 puntos; además la aplicación me obliga a definir un período si no existe uno vigente para la fecha actual.
 
 ## Acceptance criteria
-- [ ] Given que el usuario se encuentra en la pantalla de Configuración, when accede a la sección de moneda, then visualiza el listado de divisas disponibles (Pesos colombianos, Reales brasileños, Euros y Dólares) y puede seleccionar una de ellas como la divisa activa.
-- [ ] Given que el usuario configuró una moneda de preferencia, when consulta el historial de gastos o interactúa con los campos de importe (registro y edición), then los montos se muestran con el símbolo y el formato numérico (decimales) correspondiente según el estándar ISO 4217.
-- [ ] Given que se configuró una moneda de preferencia, when el usuario reinicia la aplicación, then la moneda seleccionada se mantiene activa y todos los montos conservan dicho formato.
+- [x] Given que el usuario abre la aplicación y no existe un período financiero que cubra la fecha actual (formato ISO YYYY-MM-DD), when se inicia la app, then se le sitúa obligatoriamente en la pestaña de Período y se bloquea el acceso a las demás pestañas hasta registrar uno válido.
+- [x] Given que el usuario está configurando las fechas del período financiero, when ingresa un rango de fechas inválido (fecha de fin anterior a la de inicio, o un rango que no incluya el día actual), then el sistema muestra un mensaje de validación y restringe el guardado.
+- [x] Given que el usuario guarda un período financiero válido en formato ISO, when se confirma el guardado o se reinicia la aplicación, then se desbloquea la navegación por todas las pestañas y la pestaña de Período muestra el rango de fechas activo con opción de modificarlo.
+- [x] Given que el usuario registra un nuevo período financiero, when se guarda con éxito, then los campos de entrada quedan limpios/vacíos para un nuevo registro.
+- [x] Given que existen períodos guardados, when el usuario visualiza la pestaña de Período, then se muestra el período activo en la parte superior y debajo el listado histórico de períodos registrados.
+- [x] Given una tarjeta de período en la lista o vista activa, when el usuario pulsa el botón de 3 puntos, then se despliega un menú contextual con las opciones "Editar" y "Eliminar".
+- [x] Given que el usuario selecciona "Editar" en el menú de 3 puntos, when se abre la acción, then se muestra un popup modal centrado con selectores de calendario para modificar las fechas y guardar los cambios con validaciones activas.
+- [x] Given que el usuario selecciona "Eliminar" en el menú de 3 puntos, when se confirma la acción, then el período se elimina del repositorio y se actualiza el estado del período activo y la navegación.
 
 ## Plan
-- [ ] Crear la entidad y acceso a base de datos para almacenar las divisas (identificador, nombre, símbolo y formato numérico ISO 4217), con precarga inicial de COP, BRL, EUR y USD.
-- [ ] Implementar la persistencia de la divisa de preferencia activa seleccionada por el usuario.
-- [ ] Incorporar en la pantalla de Configuración la lista de divisas obtenida de la base de datos, marcando la opción seleccionada.
-- [ ] Aplicar el formato numérico y símbolo de la divisa activa en las tarjetas del historial de gastos.
-- [ ] Adaptar los indicadores de moneda en el formulario de registro y en el modal de edición de gastos.
+- [x] Crear la entidad de período financiero con fechas en formato ISO (YYYY-MM-DD) en la base de datos de configuración con su consulta por fecha actual.
+- [x] Agregar la pestaña de período financiero en las últimas posiciones de la barra de navegación principal.
+- [x] Diseñar la vista de la pestaña de período con selectores de fecha en formato ISO y calendarios interactivos (`DatePickerDialog`).
+- [x] Implementar validaciones de coherencia del rango (fecha fin posterior a inicio y cobertura del día actual) con mensajes informativos.
+- [x] Habilitar el bloqueo y redirección obligatoria a la pestaña de período al iniciar la app si no existe un período vigente para la fecha actual.
+- [x] Incorporar consulta de historial (`getAllPeriods()`) y eliminación (`deletePeriod(id: Long)`) en DAO, Repositorio y ViewModel.
+- [x] Limpiar los campos del formulario de creación tras guardar un período con éxito.
+- [x] Mostrar en la pantalla el período actual arriba y abajo el historial de períodos guardados.
+- [x] Agregar botón de 3 puntos (`MoreVert`) con menú contextual (opciones "Editar" y "Eliminar") en las tarjetas de período.
+- [x] Implementar el diálogo centrado (`AlertDialog`) para editar fechas y el flujo de eliminación de períodos.
+- [x] Extraer lógica de negocio y validaciones a `PeriodUseCase` (sin solapamiento de fechas, permitir meses pasados y restringir fechas futuras/no actuales).
+- [x] Desacoplar ViewModel para depender exclusivamente de `PeriodUseCase`.
+- [x] Homogeneizar el menú de 3 puntos de períodos con el estilo y opciones de gastos.
+- [x] Configurar el botón central de períodos para crear siempre nuevos registros.
+
+## Test list (TDD)
+- [x] `test_financial_period_dao_insert_and_get_period_covering_date` (Repositorio / Room DB)
+- [x] `test_period_validation_rejects_end_date_before_start_date` (ViewModel)
+- [x] `test_period_validation_rejects_range_not_covering_current_date` (ViewModel)
+- [x] `test_save_valid_period_persists_and_updates_active_period` (ViewModel)
+- [x] `test_app_starts_on_period_tab_and_locks_navigation_when_no_active_period` (UI / Navegación)
+- [x] `test_saving_valid_period_unlocks_navigation_and_shows_active_period_with_edit_option` (UI / Pantalla y Navegación)
+- [x] `test_period_screen_shows_validation_error_when_dates_are_invalid` (UI / Pantalla)
+- [x] `test_clicking_start_date_opens_date_picker_dialog` (UI / Pantalla)
+- [x] `test_selecting_date_in_picker_updates_iso_date_field` (UI / Pantalla)
+- [x] `test_date_picker_selection_preserves_validations` (UI / Pantalla)
+- [x] `test_get_all_periods_and_delete_period` (Repositorio / Room DB)
+- [x] `test_save_period_clears_form_inputs_and_updates_period_list` (ViewModel)
+- [x] `test_delete_period_removes_it_and_updates_active_period_state` (ViewModel)
+- [x] `test_period_screen_displays_active_period_and_history_list` (UI / Pantalla)
+- [x] `test_clicking_three_dots_menu_displays_edit_and_delete_options` (UI / Pantalla)
+- [x] `test_selecting_edit_opens_dialog_and_saving_updates_period` (UI / Pantalla)
+- [x] `test_edit_dialog_date_pickers_open_and_update_fields` (UI / Pantalla)
+- [x] `test_clicking_delete_in_menu_opens_slide_confirmation_dialog` (UI / Pantalla)
+- [x] `test_confirming_slide_to_delete_removes_period` (UI / Pantalla)
+- [x] `test_period_use_case_allows_past_periods_and_rejects_invalid_ranges` (Dominio / UseCase)
+- [x] `test_period_use_case_rejects_overlapping_dates_with_existing_period` (Dominio / UseCase)
+- [x] `test_main_period_button_always_creates_new_period` (UI / Pantalla)
+- [x] `test_three_dots_menu_styling_and_options_match_expenses` (UI / Pantalla)
 
 ## Out of scope
-- Interfaz de usuario para crear, modificar o eliminar monedas del catálogo (se precargan las 4 divisas solicitadas).
-- Conversión de divisas o recálculo de montos históricos con tasas de cambio.
-- Divisas adicionales fuera de las 4 iniciales (COP, BRL, EUR, USD).
-- Personalización manual de separadores numéricos fuera de la definición estándar ISO 4217 de cada moneda.
-
-## Suggestions (your call)
-- **Definición de campos de la entidad**: Definir los campos de la tabla como: `id` (clave primaria con el código ISO ej. "COP", "BRL", "EUR", "USD"), `name` ("Peso colombiano", "Real brasileño", "Euro", "Dólar"), `symbol` ("$", "R$", "€", "$") y `decimalDigits` (0 para COP; 2 para BRL, EUR y USD según la norma ISO 4217).
-- **Sembrado (Pre-populating)**: Cargar las 4 divisas iniciales en la base de datos mediante la inicialización del repositorio o callback de Room al crear la base de datos, asegurando que estén disponibles al primer inicio.
-- **Persistencia de preferencia**: Guardar el identificador de la divisa elegida en almacenamiento local liviano (`SharedPreferences`) y exponer la divisa activa reactivamente para que la pantalla de gastos actualice sus formatos inmediatamente.
+- Opciones de configuración o edición de períodos dentro de la pestaña de Configuración.
+- Generación automática o rollover desatendido de períodos futuros sin confirmación.
+- Asociación o imputación de ingresos, presupuestos o gastos a este período (alcance de las historias #7, #8 y #9).

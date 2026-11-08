@@ -1,7 +1,8 @@
 {
   "navigation": {
     "tab_expenses": "Expenses",
-    "tab_settings": "Settings"
+    "tab_settings": "Settings",
+    "tab_period": "Period"
   },
   "expenses": {
     "header": {
@@ -60,6 +61,25 @@
       "en": "English",
       "de": "Deutsch",
       "pt": "Português (Brasil)"
+    }
+  },
+  "period": {
+    "title": "Financial Period",
+    "active_period_title": "Active period",
+    "history_title": "Period history",
+    "start_date": "Start date",
+    "end_date": "End date",
+    "save_button": "Save period",
+    "edit_button": "Modify period",
+    "menu_edit": "Edit",
+    "menu_delete": "Delete",
+    "edit_dialog_title": "Edit period",
+    "edit_dialog_save": "Save",
+    "edit_dialog_cancel": "Cancel",
+    "delete_dialog": {
+      "title": "Delete this period?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
     }
   }
 }

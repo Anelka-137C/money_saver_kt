@@ -1,7 +1,8 @@
 {
   "navigation": {
     "tab_expenses": "Ausgaben",
-    "tab_settings": "Einstellungen"
+    "tab_settings": "Einstellungen",
+    "tab_period": "Zeitraum"
   },
   "expenses": {
     "header": {
@@ -60,6 +61,25 @@
       "en": "English",
       "de": "Deutsch",
       "pt": "Português (Brasil)"
+    }
+  },
+  "period": {
+    "title": "Finanzzeitraum",
+    "active_period_title": "Aktiver Zeitraum",
+    "history_title": "Periodenverlauf",
+    "start_date": "Startdatum",
+    "end_date": "Enddatum",
+    "save_button": "Zeitraum speichern",
+    "edit_button": "Zeitraum bearbeiten",
+    "menu_edit": "Bearbeiten",
+    "menu_delete": "Löschen",
+    "edit_dialog_title": "Zeitraum bearbeiten",
+    "edit_dialog_save": "Speichern",
+    "edit_dialog_cancel": "Abbrechen",
+    "delete_dialog": {
+      "title": "Diesen Zeitraum löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
+      "cancel_button": "Abbrechen"
     }
   }
 }

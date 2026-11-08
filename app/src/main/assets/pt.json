@@ -1,7 +1,8 @@
 {
   "navigation": {
     "tab_expenses": "Despesas",
-    "tab_settings": "Configurações"
+    "tab_settings": "Configurações",
+    "tab_period": "Período"
   },
   "expenses": {
     "header": {
@@ -60,6 +61,25 @@
       "en": "English",
       "de": "Deutsch",
       "pt": "Português (Brasil)"
+    }
+  },
+  "period": {
+    "title": "Período Financeiro",
+    "active_period_title": "Período ativo",
+    "history_title": "Histórico de períodos",
+    "start_date": "Data de início",
+    "end_date": "Data de fim",
+    "save_button": "Salvar período",
+    "edit_button": "Modificar período",
+    "menu_edit": "Editar",
+    "menu_delete": "Excluir",
+    "edit_dialog_title": "Editar período",
+    "edit_dialog_save": "Salvar",
+    "edit_dialog_cancel": "Cancelar",
+    "delete_dialog": {
+      "title": "Excluir este período?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
     }
   }
 }

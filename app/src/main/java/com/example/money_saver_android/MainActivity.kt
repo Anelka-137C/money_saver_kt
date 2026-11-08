@@ -14,15 +14,18 @@ import com.example.money_saver_android.data.local.ConfigDatabase
 import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomCurrencyRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
+import com.example.money_saver_android.data.repository.RoomFinancialPeriodRepository
 import com.example.money_saver_android.data.repository.SharedPrefsCurrencyRepository
 import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
+import com.example.money_saver_android.domain.usecase.PeriodUseCase
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.ui.ExpensesView
 import com.example.money_saver_android.ui.MainContainer
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
+import com.example.money_saver_android.viewmodel.PeriodViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
@@ -50,6 +53,18 @@ class MainActivity : ComponentActivity() {
 
     private val currencyRepository by lazy {
         RoomCurrencyRepository(configDatabase.currencyDao())
+    }
+
+    private val periodRepository by lazy {
+        RoomFinancialPeriodRepository(configDatabase.financialPeriodDao())
+    }
+
+    private val periodUseCase by lazy {
+        PeriodUseCase(periodRepository)
+    }
+
+    private val periodViewModel by lazy {
+        PeriodViewModel(periodUseCase)
     }
 
     private val currencyPreferenceRepository by lazy {
@@ -107,6 +122,7 @@ class MainActivity : ComponentActivity() {
 
                 MainContainer(
                     settingsViewModel = settingsViewModel,
+                    periodViewModel = periodViewModel,
                     i18nManager = i18nManager,
                     expensesContent = {
                         ExpensesView(
