@@ -15,16 +15,20 @@ import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomCurrencyRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
 import com.example.money_saver_android.data.repository.RoomFinancialPeriodRepository
+import com.example.money_saver_android.data.repository.RoomIncomeRepository
 import com.example.money_saver_android.data.repository.SharedPrefsCurrencyRepository
 import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
+import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import com.example.money_saver_android.domain.usecase.PeriodUseCase
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.ui.ExpensesView
+import com.example.money_saver_android.ui.IncomesView
 import com.example.money_saver_android.ui.MainContainer
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
+import com.example.money_saver_android.viewmodel.IncomeViewModel
 import com.example.money_saver_android.viewmodel.PeriodViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
 
@@ -111,6 +115,18 @@ class MainActivity : ComponentActivity() {
         ExpenseViewModel(expenseUseCase, categoryUseCase)
     }
 
+    private val incomeRepository by lazy {
+        RoomIncomeRepository(database.incomeDao(), database.incomeCategoryDao())
+    }
+
+    private val incomeUseCase by lazy {
+        IncomeUseCase(incomeRepository)
+    }
+
+    private val incomeViewModel by lazy {
+        IncomeViewModel(incomeUseCase)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -119,11 +135,24 @@ class MainActivity : ComponentActivity() {
                 val settingsState by settingsViewModel.uiState.collectAsState()
                 val activeCurrency = settingsState.availableCurrencies.find { it.code == settingsState.selectedCurrency }
                     ?: defaultCurrencies.first()
+                val periodState by periodViewModel.uiState.collectAsState()
 
                 MainContainer(
                     settingsViewModel = settingsViewModel,
                     periodViewModel = periodViewModel,
                     i18nManager = i18nManager,
+                    incomesContent = {
+                        IncomesView(
+                            incomeViewModel = incomeViewModel,
+                            allPeriods = periodState.allPeriods,
+                            selectedPeriodId = periodState.activePeriod?.id,
+                            onPeriodSelected = { periodId ->
+                                incomeViewModel.onPeriodSelected(periodId)
+                            },
+                            i18nManager = i18nManager,
+                            currency = activeCurrency
+                        )
+                    },
                     expensesContent = {
                         ExpensesView(
                             viewModel = viewModel,

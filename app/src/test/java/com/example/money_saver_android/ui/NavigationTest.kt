@@ -43,6 +43,7 @@ class NavigationTest {
             {
               "navigation": {
                 "tab_expenses": "Gastos",
+                "tab_incomes": "Ingresos",
                 "tab_settings": "Configuración",
                 "tab_period": "Período"
               },
@@ -71,6 +72,7 @@ class NavigationTest {
             {
               "navigation": {
                 "tab_expenses": "Expenses",
+                "tab_incomes": "Incomes",
                 "tab_settings": "Settings",
                 "tab_period": "Period"
               },
@@ -231,5 +233,41 @@ class NavigationTest {
         // Switch back to Period
         composeTestRule.onNodeWithTag("tab_period").performClick()
         composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_incomes_tab_navigation_and_lock_when_no_active_period() {
+        val fakePeriodRepo = FakeFinancialPeriodRepository(initialPeriod = null)
+        val periodUseCase = PeriodUseCase(fakePeriodRepo, currentDateProvider = { "2026-11-07" })
+        val periodViewModel = PeriodViewModel(periodUseCase)
+
+        composeTestRule.setContent {
+            MainContainer(
+                settingsViewModel = settingsViewModel,
+                periodViewModel = periodViewModel,
+                i18nManager = i18nManager,
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Ingresos")
+                },
+                expensesContent = {
+                    androidx.compose.material3.Text("Vista de Gastos")
+                }
+            )
+        }
+
+        // 1. Without active period: app starts on Period and navigation is locked
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Vista de Ingresos").assertDoesNotExist()
+
+        // 2. Configure active period
+        composeTestRule.onNodeWithTag("input_start_date").performTextInput("2026-11-01")
+        composeTestRule.onNodeWithTag("input_end_date").performTextInput("2026-11-30")
+        composeTestRule.onNodeWithTag("btn_save_period").performClick()
+
+        // 3. Navigation is unlocked: navigate to Incomes tab
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithText("Vista de Ingresos").assertIsDisplayed()
     }
 }

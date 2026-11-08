@@ -1,6 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Expenses",
+    "tab_incomes": "Incomes",
     "tab_settings": "Settings",
     "tab_period": "Period"
   },
@@ -80,6 +81,51 @@
       "title": "Delete this period?",
       "warning_message": "This action cannot be undone. Slide the button to confirm.",
       "cancel_button": "Cancel"
+    }
+  },
+  "incomes": {
+    "header": {
+      "title": "Incomes",
+      "add_button": "Add Income",
+      "select_period": "Select period"
+    },
+    "overview": {
+      "title": "Income Overview",
+      "total_income": "Total income",
+      "trend": "↑ +12% vs Apr",
+      "used": "Used",
+      "available_banner_title": "You have %s available",
+      "available_banner_subtitle": "%s of your income is still available to allocate."
+    },
+    "allocation": {
+      "title": "Income Allocation",
+      "details": "Details >",
+      "budgeted": "Budgeted",
+      "savings": "Savings",
+      "spent": "Spent",
+      "available": "Available"
+    },
+    "add_card": {
+      "title": "Add Income",
+      "amount_label": "Amount",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Date & Time",
+      "category_label": "Category",
+      "select_category": "Select a category",
+      "description_label": "Note (optional)",
+      "description_placeholder": "Add a description...",
+      "save_button": "✓ Save Income"
+    },
+    "breakdown": {
+      "title": "Income Breakdown",
+      "main_income": "Main income"
+    },
+    "history": {
+      "empty_message": "No income records in this period"
+    },
+    "date_time_picker": {
+      "cancel": "Cancel",
+      "ok": "OK"
     }
   }
 }

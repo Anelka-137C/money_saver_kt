@@ -1,6 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Gastos",
+    "tab_incomes": "Ingresos",
     "tab_settings": "Configuración",
     "tab_period": "Período"
   },
@@ -80,6 +81,51 @@
       "title": "¿Eliminar este período?",
       "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
       "cancel_button": "Cancelar"
+    }
+  },
+  "incomes": {
+    "header": {
+      "title": "Ingresos",
+      "add_button": "Registrar Ingreso",
+      "select_period": "Seleccionar período"
+    },
+    "overview": {
+      "title": "Resumen de Ingresos",
+      "total_income": "Ingreso total",
+      "trend": "↑ +12% vs mes ant.",
+      "used": "Usado",
+      "available_banner_title": "Tienes %s disponible",
+      "available_banner_subtitle": "%s de tus ingresos sigue disponible para asignar."
+    },
+    "allocation": {
+      "title": "Asignación de Ingresos",
+      "details": "Detalles >",
+      "budgeted": "Presupuestado",
+      "savings": "Ahorros",
+      "spent": "Gastado",
+      "available": "Disponible"
+    },
+    "add_card": {
+      "title": "Registrar Ingreso",
+      "amount_label": "Monto",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Fecha y hora",
+      "category_label": "Categoría",
+      "select_category": "Seleccionar categoría",
+      "description_label": "Nota (opcional)",
+      "description_placeholder": "Agregar una descripción...",
+      "save_button": "✓ Guardar Ingreso"
+    },
+    "breakdown": {
+      "title": "Desglose de Ingresos",
+      "main_income": "Ingreso principal"
+    },
+    "history": {
+      "empty_message": "No hay ingresos registrados en este período"
+    },
+    "date_time_picker": {
+      "cancel": "Cancelar",
+      "ok": "Aceptar"
     }
   }
 }

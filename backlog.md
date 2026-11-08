@@ -11,8 +11,8 @@ Expensive decisions: Offline-first con backups a Google Drive; multi-idioma; mon
 - [*] **#3** Como usuario, quiero eliminar un gasto registrado, para mantener mi historial actualizado. Requires: #1
 - [*] **#4** Como usuario, quiero cambiar el idioma de la aplicación, para interactuar con ella en mi lengua de preferencia en todas las pantallas.
 - [*] **#5** Como usuario, quiero configurar mi moneda de preferencia, para ver reflejados todos los importes en la divisa que elija.
-- [ ] **#6** Como usuario, quiero configurar las fechas de inicio y fin de mi período financiero según mi cobro o nómina, para establecer el marco temporal de mis finanzas.
-- [ ] **#7** Como usuario, quiero registrar mis ingresos asignando o gestionando categorías y subcategorías dentro de mi período financiero, para estructurar mis fuentes de dinero. Requires: #6
+- [*] **#6** Como usuario, quiero configurar las fechas de inicio y fin de mi período financiero según mi cobro o nómina, para establecer el marco temporal de mis finanzas.
+- [*] **#7** Como usuario, quiero registrar mis ingresos asignando o gestionando categorías y subcategorías dentro de mi período financiero, para estructurar mis fuentes de dinero. Requires: #6
 - [ ] **#8** Como usuario, quiero definir mi presupuesto por categorías a partir de los ingresos registrados en el período, para planificar y limitar mis gastos por rubro. Requires: #7
 - [ ] **#9** Como usuario, quiero que el registro de gastos quede condicionado a tener un presupuesto activo en el período, para asegurar que mis gastos se ajusten a lo presupuestado. Requires: #8
 - [ ] **#10** Como usuario, quiero apartar dinero de mis ingresos hacia ahorros clasificados por categoría o meta dentro del período, para reservar fondos ordenadamente hacia objetivos específicos. Requires: #7

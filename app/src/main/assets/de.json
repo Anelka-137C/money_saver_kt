@@ -1,6 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Ausgaben",
+    "tab_incomes": "Einkommen",
     "tab_settings": "Einstellungen",
     "tab_period": "Zeitraum"
   },
@@ -80,6 +81,51 @@
       "title": "Diesen Zeitraum löschen?",
       "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
       "cancel_button": "Abbrechen"
+    }
+  },
+  "incomes": {
+    "header": {
+      "title": "Einkommen",
+      "add_button": "Einkommen hinzufügen",
+      "select_period": "Zeitraum auswählen"
+    },
+    "overview": {
+      "title": "Einkommensübersicht",
+      "total_income": "Gesamteinkommen",
+      "trend": "↑ +12% ggü. Vormonat",
+      "used": "Verwendet",
+      "available_banner_title": "Sie haben %s verfügbar",
+      "available_banner_subtitle": "%s Ihres Einkommens steht noch zur Zuweisung bereit."
+    },
+    "allocation": {
+      "title": "Einkommenszuweisung",
+      "details": "Details >",
+      "budgeted": "Budgetiert",
+      "savings": "Ersparnisse",
+      "spent": "Ausgegeben",
+      "available": "Verfügbar"
+    },
+    "add_card": {
+      "title": "Einkommen hinzufügen",
+      "amount_label": "Betrag",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Datum & Uhrzeit",
+      "category_label": "Kategorie",
+      "select_category": "Kategorie auswählen",
+      "description_label": "Notiz (optional)",
+      "description_placeholder": "Beschreibung hinzufügen...",
+      "save_button": "✓ Einkommen speichern"
+    },
+    "breakdown": {
+      "title": "Einkommensaufteilung",
+      "main_income": "Haupteinkommen"
+    },
+    "history": {
+      "empty_message": "Keine Einkommenseinträge in diesem Zeitraum"
+    },
+    "date_time_picker": {
+      "cancel": "Abbrechen",
+      "ok": "OK"
     }
   }
 }

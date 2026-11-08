@@ -1,6 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Despesas",
+    "tab_incomes": "Rendas",
     "tab_settings": "Configurações",
     "tab_period": "Período"
   },
@@ -80,6 +81,51 @@
       "title": "Excluir este período?",
       "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
       "cancel_button": "Cancelar"
+    }
+  },
+  "incomes": {
+    "header": {
+      "title": "Rendas",
+      "add_button": "Registar Renda",
+      "select_period": "Selecionar período"
+    },
+    "overview": {
+      "title": "Visão Geral de Rendas",
+      "total_income": "Renda total",
+      "trend": "↑ +12% vs mês ant.",
+      "used": "Utilizado",
+      "available_banner_title": "Tem %s disponível",
+      "available_banner_subtitle": "%s da sua renda ainda está disponível para alocar."
+    },
+    "allocation": {
+      "title": "Alocação de Rendas",
+      "details": "Detalhes >",
+      "budgeted": "Orçado",
+      "savings": "Poupanças",
+      "spent": "Gasto",
+      "available": "Disponível"
+    },
+    "add_card": {
+      "title": "Registar Renda",
+      "amount_label": "Montante",
+      "amount_placeholder": "0.00",
+      "date_time_label": "Data e hora",
+      "category_label": "Categoria",
+      "select_category": "Selecionar categoria",
+      "description_label": "Nota (opcional)",
+      "description_placeholder": "Adicionar uma descrição...",
+      "save_button": "✓ Guardar Renda"
+    },
+    "breakdown": {
+      "title": "Detalhamento de Rendas",
+      "main_income": "Renda principal"
+    },
+    "history": {
+      "empty_message": "Não há registos de renda neste período"
+    },
+    "date_time_picker": {
+      "cancel": "Cancelar",
+      "ok": "OK"
     }
   }
 }

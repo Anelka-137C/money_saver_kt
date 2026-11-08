@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -92,6 +94,7 @@ fun CategorySelectionSheet(
     onCreateCategory: () -> Unit,
     onSubcategoryNameChange: (String) -> Unit,
     onCreateSubcategory: (categoryName: String) -> Unit,
+    onDeleteCategory: ((categoryName: String) -> Unit)? = null,
     onDismiss: () -> Unit,
     onCategorySelected: (category: String, subcategory: String) -> Unit
 ) {
@@ -245,13 +248,17 @@ fun CategorySelectionSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(FieldBackground)
-                                .clickable { selectedCategoryName = category.name }
-                                .padding(16.dp),
+                                .background(FieldBackground),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedCategoryName = category.name }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .size(12.dp)
@@ -268,7 +275,33 @@ fun CategorySelectionSheet(
                                     color = TextPrimary
                                 )
                             }
-                            Text(text = ">", fontSize = 16.sp, color = TextSecondary)
+                            Row(
+                                modifier = Modifier.padding(end = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (onDeleteCategory != null) {
+                                    IconButton(
+                                        onClick = { onDeleteCategory(category.name) },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .testTag("btn_delete_category_${category.name}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Eliminar categoría",
+                                            tint = ErrorRed,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                Text(
+                                    text = ">",
+                                    fontSize = 16.sp,
+                                    color = TextSecondary,
+                                    modifier = Modifier.clickable { selectedCategoryName = category.name }
+                                )
+                            }
                         }
                     }
                 }
