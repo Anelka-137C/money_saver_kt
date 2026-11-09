@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -265,9 +266,16 @@ fun IncomesView(
             }
 
             // Incomes List
+            val historyScrollState = rememberScrollState()
+            LaunchedEffect(state.selectedPeriodId) {
+                historyScrollState.scrollTo(0)
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(historyScrollState)
                     .testTag("list_income_breakdown"),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {

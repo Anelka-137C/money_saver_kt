@@ -112,7 +112,13 @@ fun DeleteIncomeConfirmationDialog(
                         )
                     }
                     Text(
-                        text = "${income.category} • ${income.dateTime}",
+                        text = income.category,
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = income.dateTime,
                         fontSize = 12.sp,
                         color = TextSecondary
                     )

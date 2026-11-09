@@ -176,6 +176,7 @@ class IncomesViewTest {
         composeTestRule.onNodeWithTag("period_option_2").performClick()
 
         // Now period 2 is selected: item 2 is shown and item 1 is not in this period
+        composeTestRule.onNodeWithTag("list_income_breakdown").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("income_item_2").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("income_item_1").assertDoesNotExist()
     }
@@ -239,5 +240,75 @@ class IncomesViewTest {
         // "Gastado" / "Spent" section must NOT be displayed in allocation card
         composeTestRule.onNode(hasAnyAncestor(hasTestTag("card_income_allocation")) and hasText("Gastado"))
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun test_delete_income_flow_from_incomes_view_opens_dialog_with_date_below_category() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Open options menu on income item 1
+        composeTestRule.onNodeWithTag("list_income_breakdown").performScrollTo()
+        composeTestRule.onNodeWithTag("btn_options_income_1").performScrollTo().performClick()
+
+        // Click delete option
+        composeTestRule.onNodeWithTag("btn_delete_income_1").performClick()
+
+        // Confirmation dialog is displayed
+        composeTestRule.onNodeWithTag("dialog_delete_income").assertIsDisplayed()
+
+        // Category and Date are displayed separately, not combined with bullet
+        composeTestRule.onNode(hasAnyAncestor(hasTestTag("dialog_delete_income")) and hasText("Employment")).assertIsDisplayed()
+        composeTestRule.onNode(hasAnyAncestor(hasTestTag("dialog_delete_income")) and hasText("2026-05-15 10:00")).assertIsDisplayed()
+        composeTestRule.onNode(hasAnyAncestor(hasTestTag("dialog_delete_income")) and hasText("Employment • 2026-05-15 10:00")).assertDoesNotExist()
+    }
+
+    @Test
+    fun test_incomes_history_displays_within_scrollable_container_with_multiple_items() {
+        runBlocking {
+            for (i in 2..6) {
+                incomeRepository.insertIncome(
+                    Income(
+                        id = i.toLong(),
+                        amount = 100.0 * i,
+                        dateTime = "2026-05-1$i 10:00",
+                        category = "Employment",
+                        subcategory = "Bonus $i",
+                        description = "Bonus number $i",
+                        periodId = 1L
+                    )
+                )
+            }
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Scroll to the income breakdown list
+        composeTestRule.onNodeWithTag("list_income_breakdown").performScrollTo().assertIsDisplayed()
+
+        // First item is displayed
+        composeTestRule.onNodeWithTag("income_item_1").assertIsDisplayed()
+
+        // Add income button remains readily accessible above the list
+        composeTestRule.onNodeWithTag("btn_toggle_add_income").performScrollTo().assertIsDisplayed()
     }
 }
