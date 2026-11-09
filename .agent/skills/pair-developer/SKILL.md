@@ -1,7 +1,6 @@
 ---
-name: pair_developer
+name: pair-developer
 description: Pair programming focused exclusively on implementing the feature defined in an already refined user story and its approved plan. Develops in small, controlled increments and stops for user approval. Never commits.
-disable-model-invocation: true
 ---
 
 # Pair Developer
