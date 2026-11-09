@@ -345,9 +345,17 @@ fun IncomesView(
             onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
             onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
             onDeleteCategory = { incomeViewModel.deleteCategory(it) },
-            onDismiss = { showCategorySheet = false },
+            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteSubcategory(cat, sub) },
+            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
+            onDismiss = {
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
+                showCategorySheet = false
+            },
             onCategorySelected = { cat, sub ->
                 incomeViewModel.onCategorySelected(cat, sub)
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
                 showCategorySheet = false
             }
         )
@@ -392,9 +400,17 @@ fun IncomesView(
             onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
             onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
             onDeleteCategory = { incomeViewModel.deleteCategory(it) },
-            onDismiss = { showEditCategorySheet = false },
+            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteSubcategory(cat, sub) },
+            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
+            onDismiss = {
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
+                showEditCategorySheet = false
+            },
             onCategorySelected = { cat, sub ->
                 incomeViewModel.onEditCategoryChange(cat, sub)
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
                 showEditCategorySheet = false
             }
         )

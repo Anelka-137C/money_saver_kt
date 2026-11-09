@@ -65,6 +65,20 @@ class FakeIncomeRepository : IncomeRepository {
         return _incomes.value.count { it.category == categoryName }
     }
 
+    override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name == categoryName) {
+                cat.copy(subcategories = cat.subcategories.filter { it.name != subcategoryName })
+            } else {
+                cat
+            }
+        }
+    }
+
+    override suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int {
+        return _incomes.value.count { it.category == categoryName && it.subcategory == subcategoryName }
+    }
+
     override suspend fun preloadDefaultCategoriesIfNeeded() {
         if (_categories.value.isEmpty()) {
             _categories.value = listOf(
@@ -248,5 +262,36 @@ class IncomeViewModelTest {
         assertEquals("Categoría eliminada exitosamente", viewModel.uiState.value.toastMessage)
         val categories = repository.getAllCategories().first()
         assertTrue(categories.none { it.name == "Investments" })
+    }
+
+    @Test
+    fun test_viewmodel_delete_subcategory_updates_state_and_handles_error() = runTest {
+        repository.insertCategory(
+            Category(name = "Employment", icon = "💼", color = "#4E73DF", subcategories = listOf(Subcategory("Salary"), Subcategory("Bonus")))
+        )
+        advanceUntilIdle()
+
+        // 1. Rejected when incomes are associated
+        repository.insertIncome(
+            Income(amount = 2323.0, dateTime = "2026-05-15 10:00", category = "Employment", subcategory = "Salary", periodId = 1L)
+        )
+
+        viewModel.deleteSubcategory("Employment", "Salary")
+        advanceUntilIdle()
+
+        assertEquals("No se puede eliminar la subcategoría porque tiene ingresos asociados", viewModel.uiState.value.subcategoryError)
+        var categories = repository.getAllCategories().first()
+        var employment = categories.first { it.name == "Employment" }
+        assertTrue(employment.subcategories.any { it.name == "Salary" })
+
+        // 2. Succeeds when no incomes are associated
+        viewModel.deleteSubcategory("Employment", "Bonus")
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.subcategoryError)
+        assertEquals("Subcategoría eliminada exitosamente", viewModel.uiState.value.toastMessage)
+        categories = repository.getAllCategories().first()
+        employment = categories.first { it.name == "Employment" }
+        assertTrue(employment.subcategories.none { it.name == "Bonus" })
     }
 }

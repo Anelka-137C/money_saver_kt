@@ -133,8 +133,14 @@ class IncomeViewModel(
         viewModelScope.launch {
             when (val result = incomeUseCase.deleteCategory(categoryName)) {
                 is IncomeResult.Success -> {
-                    _uiState.update {
-                        it.copy(
+                    val trimmed = categoryName.trim()
+                    _uiState.update { current ->
+                        val shouldClearForm = current.categoryInput.equals(trimmed, ignoreCase = true)
+                        val shouldClearEdit = current.editingIncome?.category?.equals(trimmed, ignoreCase = true) == true
+                        current.copy(
+                            categoryInput = if (shouldClearForm) "" else current.categoryInput,
+                            subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
+                            editingIncome = if (shouldClearEdit) current.editingIncome?.copy(category = "", subcategory = "") else current.editingIncome,
                             errorMessage = null,
                             toastMessage = "Categoría eliminada exitosamente"
                         )
@@ -147,12 +153,48 @@ class IncomeViewModel(
         }
     }
 
+    fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        viewModelScope.launch {
+            when (val result = incomeUseCase.deleteSubcategory(categoryName, subcategoryName)) {
+                is IncomeResult.Success -> {
+                    val trimmedCategory = categoryName.trim()
+                    val trimmedSubcategory = subcategoryName.trim()
+                    _uiState.update { current ->
+                        val shouldClearForm = current.categoryInput.equals(trimmedCategory, ignoreCase = true) &&
+                                current.subcategoryInput.equals(trimmedSubcategory, ignoreCase = true)
+                        val shouldClearEdit = current.editingIncome?.let { edit ->
+                            edit.category.equals(trimmedCategory, ignoreCase = true) &&
+                                    edit.subcategory.equals(trimmedSubcategory, ignoreCase = true)
+                        } == true
+                        current.copy(
+                            subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
+                            editingIncome = if (shouldClearEdit) current.editingIncome?.copy(subcategory = "") else current.editingIncome,
+                            subcategoryError = null,
+                            toastMessage = "Subcategoría eliminada exitosamente"
+                        )
+                    }
+                }
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(subcategoryError = result.message) }
+                }
+            }
+        }
+    }
+
     fun clearErrorMessage() {
         _uiState.update { it.copy(errorMessage = null) }
     }
 
     fun clearToastMessage() {
         _uiState.update { it.copy(toastMessage = null) }
+    }
+
+    fun clearCategoryError() {
+        _uiState.update { it.copy(categoryError = null) }
+    }
+
+    fun clearSubcategoryError() {
+        _uiState.update { it.copy(subcategoryError = null) }
     }
 
     fun onNewCategoryNameChange(name: String) {

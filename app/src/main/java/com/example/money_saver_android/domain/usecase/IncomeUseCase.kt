@@ -6,6 +6,8 @@ import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.domain.model.Income
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 sealed class IncomeResult {
     object Success : IncomeResult()
@@ -15,6 +17,7 @@ sealed class IncomeResult {
 class IncomeUseCase(
     private val repository: IncomeRepository
 ) {
+    private val deletionMutex = Mutex()
     fun getIncomesByPeriod(periodId: Long): Flow<List<Income>> {
         return repository.getIncomesByPeriod(periodId)
     }
@@ -91,13 +94,31 @@ class IncomeUseCase(
         return IncomeResult.Success
     }
 
-    suspend fun deleteCategory(categoryName: String): IncomeResult {
-        val count = repository.countIncomesForCategory(categoryName)
-        if (count > 0) {
-            return IncomeResult.Error("No se puede eliminar la categoría porque tiene ingresos asociados")
+    suspend fun deleteCategory(categoryName: String): IncomeResult = deletionMutex.withLock {
+        val trimmedCategory = categoryName.trim()
+        if (trimmedCategory.isEmpty()) {
+            return@withLock IncomeResult.Error("El nombre de la categoría no puede estar vacío")
         }
-        repository.deleteCategory(categoryName)
-        return IncomeResult.Success
+        val count = repository.countIncomesForCategory(trimmedCategory)
+        if (count > 0) {
+            return@withLock IncomeResult.Error("No se puede eliminar la categoría porque tiene ingresos asociados")
+        }
+        repository.deleteCategory(trimmedCategory)
+        IncomeResult.Success
+    }
+
+    suspend fun deleteSubcategory(categoryName: String, subcategoryName: String): IncomeResult = deletionMutex.withLock {
+        val trimmedCategory = categoryName.trim()
+        val trimmedSubcategory = subcategoryName.trim()
+        if (trimmedCategory.isEmpty() || trimmedSubcategory.isEmpty()) {
+            return@withLock IncomeResult.Error("El nombre no puede estar vacío")
+        }
+        val count = repository.countIncomesForSubcategory(trimmedCategory, trimmedSubcategory)
+        if (count > 0) {
+            return@withLock IncomeResult.Error("No se puede eliminar la subcategoría porque tiene ingresos asociados")
+        }
+        repository.deleteSubcategory(trimmedCategory, trimmedSubcategory)
+        IncomeResult.Success
     }
 
     suspend fun saveIncome(

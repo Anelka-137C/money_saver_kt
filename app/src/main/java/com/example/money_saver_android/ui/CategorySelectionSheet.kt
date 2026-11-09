@@ -95,6 +95,8 @@ fun CategorySelectionSheet(
     onSubcategoryNameChange: (String) -> Unit,
     onCreateSubcategory: (categoryName: String) -> Unit,
     onDeleteCategory: ((categoryName: String) -> Unit)? = null,
+    onDeleteSubcategory: ((categoryName: String, subcategoryName: String) -> Unit)? = null,
+    onClearSubcategoryError: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onCategorySelected: (category: String, subcategory: String) -> Unit
 ) {
@@ -105,7 +107,10 @@ fun CategorySelectionSheet(
     val selectedCategoryColor = parseHexColor(selectedColorHex)
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            onClearSubcategoryError?.invoke()
+            onDismiss()
+        },
         containerColor = CardBackground,
         contentColor = TextPrimary
     ) {
@@ -123,7 +128,10 @@ fun CategorySelectionSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (selectedCategory != null) {
-                    IconButton(onClick = { selectedCategoryName = null }) {
+                    IconButton(onClick = {
+                        onClearSubcategoryError?.invoke()
+                        selectedCategoryName = null
+                    }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
@@ -137,7 +145,10 @@ fun CategorySelectionSheet(
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = {
+                    onClearSubcategoryError?.invoke()
+                    onDismiss()
+                }) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Cerrar",
@@ -255,7 +266,10 @@ fun CategorySelectionSheet(
                             Row(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable { selectedCategoryName = category.name }
+                                    .clickable {
+                                        onClearSubcategoryError?.invoke()
+                                        selectedCategoryName = category.name
+                                    }
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -299,7 +313,10 @@ fun CategorySelectionSheet(
                                     text = ">",
                                     fontSize = 16.sp,
                                     color = TextSecondary,
-                                    modifier = Modifier.clickable { selectedCategoryName = category.name }
+                                    modifier = Modifier.clickable {
+                                        onClearSubcategoryError?.invoke()
+                                        selectedCategoryName = category.name
+                                    }
                                 )
                             }
                         }
@@ -382,21 +399,55 @@ fun CategorySelectionSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(FieldBackground)
-                                .clickable {
-                                    onCategorySelected(selectedCategory.name, sub.name)
-                                }
-                                .padding(16.dp),
+                                .background(FieldBackground),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = sub.name,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextPrimary
-                            )
-                            Text(text = "✓", fontSize = 16.sp, color = GreenAccent)
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        onCategorySelected(selectedCategory.name, sub.name)
+                                    }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = sub.name,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextPrimary
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.padding(end = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (onDeleteSubcategory != null) {
+                                    IconButton(
+                                        onClick = { onDeleteSubcategory(selectedCategory.name, sub.name) },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .testTag("btn_delete_subcategory_${sub.name}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Eliminar subcategoría",
+                                            tint = ErrorRed,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                Text(
+                                    text = "✓",
+                                    fontSize = 16.sp,
+                                    color = GreenAccent,
+                                    modifier = Modifier.clickable {
+                                        onCategorySelected(selectedCategory.name, sub.name)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

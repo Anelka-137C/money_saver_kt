@@ -22,6 +22,8 @@ interface IncomeRepository {
     suspend fun insertSubcategory(categoryName: String, subcategory: Subcategory)
     suspend fun deleteCategory(categoryName: String)
     suspend fun countIncomesForCategory(categoryName: String): Int
+    suspend fun deleteSubcategory(categoryName: String, subcategoryName: String)
+    suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int
     suspend fun preloadDefaultCategoriesIfNeeded()
 }
 
@@ -98,6 +100,14 @@ class RoomIncomeRepository(
 
     override suspend fun countIncomesForCategory(categoryName: String): Int {
         return incomeDao.countIncomesForCategory(categoryName)
+    }
+
+    override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        categoryDao.deleteSubcategoryByName(categoryName, subcategoryName)
+    }
+
+    override suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int {
+        return incomeDao.countIncomesForSubcategory(categoryName, subcategoryName)
     }
 
     override suspend fun preloadDefaultCategoriesIfNeeded() {

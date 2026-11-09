@@ -57,6 +57,20 @@ class FakeIncomeRepoForUseCase : IncomeRepository {
         return _incomes.value.count { it.category == categoryName }
     }
 
+    override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name == categoryName) {
+                cat.copy(subcategories = cat.subcategories.filter { it.name != subcategoryName })
+            } else {
+                cat
+            }
+        }
+    }
+
+    override suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int {
+        return _incomes.value.count { it.category == categoryName && it.subcategory == subcategoryName }
+    }
+
     override suspend fun preloadDefaultCategoriesIfNeeded() {
         if (_categories.value.isEmpty()) {
             _categories.value = listOf(
@@ -196,5 +210,41 @@ class IncomeUseCaseTest {
 
         categories = useCase.getCategories().first()
         assertTrue(categories.none { it.name == "Freelance" })
+    }
+
+    @Test
+    fun deleteSubcategory_whenIncomesAssociated_returnsErrorAndDoesNotDelete() = runBlocking {
+        useCase.insertCategory(Category(name = "Employment", icon = "💼", color = "#4E73DF", subcategories = listOf(Subcategory("Salary"))))
+        useCase.saveIncome(
+            amountInput = "1000",
+            dateTimeInput = "2026-05-01 10:00",
+            categoryInput = "Employment",
+            subcategoryInput = "Salary",
+            descriptionInput = "",
+            periodId = 1L
+        )
+
+        val errorResult = useCase.deleteSubcategory("Employment", "Salary")
+        assertTrue(errorResult is IncomeResult.Error)
+        assertEquals("No se puede eliminar la subcategoría porque tiene ingresos asociados", (errorResult as IncomeResult.Error).message)
+
+        val categories = useCase.getCategories().first()
+        val employment = categories.first { it.name == "Employment" }
+        assertTrue(employment.subcategories.any { it.name == "Salary" })
+    }
+
+    @Test
+    fun deleteSubcategory_whenNoIncomesAssociated_deletesSuccessfully() = runBlocking {
+        useCase.insertCategory(Category(name = "Freelance", icon = "💻", color = "#1CC88A", subcategories = listOf(Subcategory("Web"))))
+        val initialCategories = useCase.getCategories().first()
+        val initialFreelance = initialCategories.first { it.name == "Freelance" }
+        assertTrue(initialFreelance.subcategories.any { it.name == "Web" })
+
+        val successResult = useCase.deleteSubcategory("Freelance", "Web")
+        assertTrue(successResult is IncomeResult.Success)
+
+        val categories = useCase.getCategories().first()
+        val freelance = categories.first { it.name == "Freelance" }
+        assertTrue(freelance.subcategories.none { it.name == "Web" })
     }
 }

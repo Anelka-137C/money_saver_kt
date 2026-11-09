@@ -105,4 +105,27 @@ class IncomeRepositoryTest {
         categories = repository.getAllCategories().first()
         assertTrue(categories.none { it.name == "Investments" })
     }
+
+    @Test
+    fun test_income_category_dao_delete_subcategory_by_name() = runBlocking {
+        val category = Category(
+            name = "Employment",
+            icon = "💼",
+            color = "#4E73DF",
+            subcategories = listOf(Subcategory("Salary"), Subcategory("Bonus"))
+        )
+        repository.insertCategory(category)
+
+        var categories = repository.getAllCategories().first()
+        var empCategory = categories.first { it.name == "Employment" }
+        assertEquals(2, empCategory.subcategories.size)
+
+        repository.deleteSubcategory("Employment", "Bonus")
+
+        categories = repository.getAllCategories().first()
+        empCategory = categories.first { it.name == "Employment" }
+        assertEquals(1, empCategory.subcategories.size)
+        assertTrue(empCategory.subcategories.none { it.name == "Bonus" })
+        assertTrue(empCategory.subcategories.any { it.name == "Salary" })
+    }
 }

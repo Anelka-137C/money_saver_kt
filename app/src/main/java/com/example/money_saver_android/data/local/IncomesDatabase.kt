@@ -77,6 +77,9 @@ interface IncomeDao {
 
     @Query("SELECT COUNT(*) FROM incomes WHERE category = :categoryName")
     suspend fun countIncomesForCategory(categoryName: String): Int
+
+    @Query("SELECT COUNT(*) FROM incomes WHERE category = :categoryName AND subcategory = :subcategoryName")
+    suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int
 }
 
 @Dao
@@ -96,6 +99,9 @@ interface IncomeCategoryDao {
 
     @Query("DELETE FROM incomes_category WHERE name = :name")
     suspend fun deleteCategoryByName(name: String)
+
+    @Query("DELETE FROM incomes_subcategory WHERE categoryName = :categoryName AND name = :subcategoryName")
+    suspend fun deleteSubcategoryByName(categoryName: String, subcategoryName: String)
 
     @Query("SELECT COUNT(*) FROM incomes_category")
     suspend fun getCategoryCount(): Int
