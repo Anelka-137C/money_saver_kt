@@ -1,29 +1,35 @@
-# Story #7: Eliminación de subcategorías de ingresos
+# Story #8: Definición y modificación de presupuesto por categorías
 
 ## Story
-Como usuario, quiero eliminar una subcategoría de ingresos que ya no utilice, para mantener mi catálogo de subcategorías limpio y organizado.
+Como usuario, quiero definir y modificar mi presupuesto por categorías a partir de mis ingresos y visualizar el total presupuestado en la pantalla de ingresos mediante pestañas superiores, utilizando mi moneda configurada y sin necesidad de indicar fechas, para planificar mis límites de gasto y monitorear la asignación de mi dinero.
 
 ## Acceptance criteria
-- [x] Given que el usuario visualiza las subcategorías de una categoría y una subcategoría no tiene ingresos asociados, when pulsa el botón para eliminarla, then la subcategoría se elimina y deja de mostrarse en la lista.
-- [x] Given que una subcategoría tiene uno o más ingresos asociados, when el usuario intenta eliminarla, then la subcategoría no se elimina y se muestra un mensaje de error indicando que tiene ingresos asociados.
+- [x] Given que el usuario se encuentra en la pestaña "Presupuesto" de un período financiero con ingresos disponibles, when registra un presupuesto seleccionando una categoría e ingresando el monto (mostrado según la moneda configurada y sin solicitar fecha), then el presupuesto se guarda, se muestra en la lista y, al regresar a la vista de "Ingresos", la tarjeta de asignación refleja el monto real efectivamente presupuestado y su porcentaje.
+- [x] Given que existe un presupuesto registrado para una categoría en el período, when el usuario selecciona la opción de modificar y actualiza su monto por un nuevo valor válido, then el presupuesto refleja el nuevo valor y se recalcula el saldo disponible y el total presupuestado tanto en la vista de presupuesto como en la de ingresos.
+- [x] Given que el usuario intenta registrar o modificar un presupuesto con un monto que sobrepasa el total de ingresos disponibles del período o un valor menor o igual a cero, when pulsa guardar, then el sistema muestra un mensaje de advertencia indicando el error y no aplica los cambios.
 
 ## Plan
-- [x] Agregar la consulta para verificar ingresos vinculados y la operación para borrar la subcategoría en la base de datos local.
-- [x] Implementar la validación en la lógica de negocio para permitir el borrado únicamente si no hay ingresos asociados.
-- [x] Exponer la acción de eliminar subcategoría y su estado de error en la capa de presentación.
-- [x] Añadir el botón de eliminar junto a cada subcategoría en la hoja de selección y mostrar el mensaje de error si la validación falla.
+- [x] Crear la persistencia local para guardar y actualizar asignaciones de presupuesto (monto y categoría) vinculadas al período financiero, sin almacenar fechas individuales.
+- [x] Implementar la lógica de negocio para calcular el total presupuestado real, el saldo de ingresos disponible y validar que las asignaciones no sobrepasen dicho total.
+- [x] Exponer en la capa de presentación el estado de presupuesto (total presupuestado real, disponible, listado y edición) y la moneda de preferencia para ambas vistas.
+- [x] Incorporar pestañas de navegación superiores en la pantalla para alternar de forma fluida entre ingresos y presupuesto compartiendo el contexto del período activo.
+- [x] Construir la interfaz de presupuesto (diálogo unificado de creación/edición y listado) y actualizar la tarjeta de asignación en la vista de ingresos con el total presupuestado real.
 
 ## Test list (TDD)
-- [x] `test_income_category_dao_delete_subcategory_by_name` (Repositorio / Room DB)
-- [x] `test_delete_subcategory_when_incomes_associated_returns_error_and_does_not_delete` (UseCase)
-- [x] `test_delete_subcategory_when_no_incomes_associated_deletes_successfully` (UseCase)
-- [x] `test_viewmodel_delete_subcategory_updates_state_and_handles_error` (ViewModel)
-- [x] `test_category_sheet_displays_delete_button_for_subcategories_and_triggers_deletion` (UI / Componente)
+- [x] `test_budget_dao_save_and_update_budget_by_category_and_period` (Repositorio / Room DB)
+- [x] `test_budget_use_case_calculates_available_income_and_validates_exceeding_budget` (UseCase)
+- [x] `test_budget_use_case_returns_total_budgeted_for_period` (UseCase)
+- [x] `test_viewmodel_create_and_edit_budget_updates_budgeted_total_and_reflects_in_income_state` (ViewModel)
+- [x] `test_incomes_view_top_tabs_switch_between_income_and_budget_and_updates_allocation_card` (UI / Compose)
 
 ## Out of scope
-- Eliminación en cascada de ingresos al borrar una subcategoría.
-- Edición o renombramiento de subcategorías.
-- Borrado de subcategorías en la sección de gastos (este alcance es específico para ingresos).
+- Eliminación de asignaciones de presupuesto (se abordará en una historia posterior).
+- Condicionamiento del registro de gastos a la existencia de un presupuesto activo (corresponde a la Historia #9).
+- Asignación de fondos para ahorros o metas (corresponde a la Historia #10).
+- Históricos comparativos de presupuestos entre diferentes períodos (corresponde a la Historia #11).
 
 ## Suggestions (your call)
-- Reutilizar el mismo estilo visual del botón de eliminar categoría (ícono de papelera con color de advertencia/error) junto al nombre de la subcategoría para mantener consistencia en la interfaz.
+- Reemplazar el valor presupuestado simulado actual (`34%`) en `IncomeAllocationCard` por el cálculo dinámico basado en la suma de los presupuestos reales del período seleccionado.
+- Reutilizar el diálogo de ingresos adaptándolo para presupuesto (sin selector de fecha/hora y aplicando el símbolo y formato de la moneda configurada).
+- Utilizar las categorías de gastos existentes mediante `CategorySelectionSheet` para que el presupuesto se asigne directamente a los rubros donde luego se registrarán los gastos.
+- Proponer para el backlog: *#8.1: Como usuario, quiero eliminar un presupuesto asignado a una categoría, para liberar saldo disponible hacia otros rubros.*

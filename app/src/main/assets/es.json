@@ -84,6 +84,10 @@
     }
   },
   "incomes": {
+    "tabs": {
+      "incomes": "Ingresos",
+      "budget": "Presupuesto"
+    },
     "header": {
       "title": "Ingresos",
       "add_button": "Registrar Ingreso",
@@ -148,6 +152,39 @@
     "options": {
       "edit": "Modificar",
       "delete": "Eliminar"
+    }
+  },
+  "budget": {
+    "header": {
+      "title": "Presupuesto",
+      "add_button": "Registrar Presupuesto"
+    },
+    "overview": {
+      "title": "Resumen de Presupuesto",
+      "total_budgeted": "Total presupuestado",
+      "available_banner_title": "Tienes %s disponible",
+      "available_banner_subtitle": "%s de tus ingresos sigue disponible para presupuestar."
+    },
+    "add_dialog": {
+      "title": "Registrar Presupuesto",
+      "edit_title": "Modificar Presupuesto",
+      "amount_label": "Monto",
+      "amount_placeholder": "0.00",
+      "category_label": "Categoría",
+      "select_category": "Seleccionar categoría",
+      "save_button": "✓ Guardar Presupuesto",
+      "edit_save_button": "✓ Guardar Cambios"
+    },
+    "breakdown": {
+      "title": "Desglose de presupuestos"
+    },
+    "history": {
+      "empty_message": "No hay presupuestos registrados en este período"
+    },
+    "delete_category_dialog": {
+      "title": "¿Eliminar esta categoría?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
     }
   }
 }

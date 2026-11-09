@@ -84,6 +84,10 @@
     }
   },
   "incomes": {
+    "tabs": {
+      "incomes": "Rendas",
+      "budget": "Orçamento"
+    },
     "header": {
       "title": "Rendas",
       "add_button": "Registar Renda",
@@ -148,6 +152,39 @@
     "options": {
       "edit": "Modificar",
       "delete": "Eliminar"
+    }
+  },
+  "budget": {
+    "header": {
+      "title": "Orçamento",
+      "add_button": "Registar Orçamento"
+    },
+    "overview": {
+      "title": "Resumo do Orçamento",
+      "total_budgeted": "Total orçado",
+      "available_banner_title": "Tem %s disponível",
+      "available_banner_subtitle": "%s das suas rendas continua disponível para orçamentar."
+    },
+    "add_dialog": {
+      "title": "Registar Orçamento",
+      "edit_title": "Modificar Orçamento",
+      "amount_label": "Montante",
+      "amount_placeholder": "0.00",
+      "category_label": "Categoria",
+      "select_category": "Selecionar categoria",
+      "save_button": "✓ Guardar Orçamento",
+      "edit_save_button": "✓ Guardar Alterações"
+    },
+    "breakdown": {
+      "title": "Discriminação de orçamentos"
+    },
+    "history": {
+      "empty_message": "Não há orçamentos registados neste período"
+    },
+    "delete_category_dialog": {
+      "title": "Excluir esta categoria?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
     }
   }
 }

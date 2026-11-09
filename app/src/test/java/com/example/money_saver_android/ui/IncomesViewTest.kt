@@ -15,16 +15,21 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
+import com.example.money_saver_android.domain.FakeBudgetRepository
 import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.model.Income
+import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.viewmodel.FakeFinancialPeriodRepository
 import com.example.money_saver_android.viewmodel.FakeIncomeRepository
+import com.example.money_saver_android.viewmodel.FinanceTopTab
 import com.example.money_saver_android.viewmodel.IncomeViewModel
 import com.example.money_saver_android.viewmodel.PeriodViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +45,7 @@ class IncomesViewTest {
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     private lateinit var incomeRepository: FakeIncomeRepository
+    private lateinit var budgetRepository: FakeBudgetRepository
     private lateinit var periodRepository: FakeFinancialPeriodRepository
     private lateinit var incomeViewModel: IncomeViewModel
     private lateinit var i18nManager: I18nManager
@@ -50,6 +56,7 @@ class IncomesViewTest {
     @Before
     fun setup() {
         incomeRepository = FakeIncomeRepository()
+        budgetRepository = FakeBudgetRepository()
         periodRepository = FakeFinancialPeriodRepository(initialPeriod = period1)
         runBlocking {
             periodRepository.savePeriod(period2)
@@ -59,6 +66,14 @@ class IncomesViewTest {
                     icon = "💼",
                     color = "#4E73DF",
                     subcategories = listOf(Subcategory("Salary"))
+                )
+            )
+            budgetRepository.insertCategory(
+                Category(
+                    name = "Food & Dining",
+                    icon = "🍔",
+                    color = "#1CC88A",
+                    subcategories = listOf(Subcategory("Supermarket"))
                 )
             )
             incomeRepository.insertIncome(
@@ -73,18 +88,28 @@ class IncomesViewTest {
                 )
             )
         }
-        incomeViewModel = IncomeViewModel(incomeRepository)
+        val incomeUseCase = IncomeUseCase(incomeRepository, budgetRepository)
+        incomeViewModel = IncomeViewModel(incomeUseCase)
         incomeViewModel.onPeriodSelected(1L)
 
         i18nManager = I18nManager()
         val esJson = """
             {
               "incomes": {
+                "tabs": { "incomes": "Ingresos", "budget": "Presupuesto" },
                 "header": { "title": "Ingresos", "add_button": "Registrar Ingreso", "select_period": "Seleccionar período" },
                 "overview": { "title": "Resumen de Ingresos", "total_income": "Ingreso total", "trend": "↑ +12% vs mes ant.", "used": "Usado" },
-                "allocation": { "title": "Asignación de Ingresos", "details": "Detalles >", "budgeted": "Presupuestado", "savings": "Ahorros", "spent": "Gastado", "available": "Disponible" },
+                "allocation": { "title": "Asignación de Ingresos", "details": "Detalles >", "budgeted": "Presupuestado", "savings": "Ahorros", "spent": "Spent", "available": "Disponible" },
                 "breakdown": { "title": "Desglose de Ingresos" },
                 "history": { "empty_message": "No hay ingresos registrados en este período" }
+              },
+              "budget": {
+                "header": { "title": "Presupuesto", "add_button": "Registrar Presupuesto" },
+                "overview": { "title": "Resumen de Presupuesto", "total_budgeted": "Total presupuestado", "available_banner_title": "Tienes %s disponible", "available_banner_subtitle": "%s disponible para presupuestar." },
+                "add_dialog": { "title": "Registrar Presupuesto", "edit_title": "Modificar Presupuesto", "amount_label": "Monto", "amount_placeholder": "0.00", "category_label": "Categoría", "select_category": "Seleccionar categoría", "save_button": "✓ Guardar Presupuesto", "edit_save_button": "✓ Guardar Cambios" },
+                "breakdown": { "title": "Desglose de presupuestos" },
+                "history": { "empty_message": "No hay presupuestos registrados en este período" },
+                "delete_category_dialog": { "title": "¿Eliminar esta categoría?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" }
               }
             }
         """.trimIndent()
@@ -310,5 +335,136 @@ class IncomesViewTest {
 
         // Add income button remains readily accessible above the list
         composeTestRule.onNodeWithTag("btn_toggle_add_income").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun test_incomes_view_top_tabs_switch_between_income_and_budget_and_updates_allocation_card() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Top navigation tabs row and buttons are displayed
+        composeTestRule.onNodeWithTag("row_finance_top_tabs").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_top_incomes").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_top_budget").assertIsDisplayed()
+
+        // In Incomes tab: Allocation card is present
+        composeTestRule.onNodeWithTag("card_income_allocation").assertExists()
+
+        // Switch to Budget tab
+        composeTestRule.onNodeWithTag("tab_top_budget").performClick()
+        composeTestRule.waitForIdle()
+
+        // Budget container and overview card exist
+        composeTestRule.onNodeWithTag("container_budget_view").assertExists()
+        composeTestRule.onNodeWithTag("card_budget_overview").assertExists()
+
+        // Incomes breakdown is not displayed in budget tab
+        composeTestRule.onNodeWithTag("list_income_breakdown").assertDoesNotExist()
+
+        // Open Add Budget Dialog
+        composeTestRule.onNodeWithTag("btn_toggle_add_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify Dialog is open
+        composeTestRule.onNodeWithTag("card_add_edit_budget").assertIsDisplayed()
+
+        // Enter amount and select category
+        composeTestRule.onNodeWithTag("input_budget_amount").performTextInput("500")
+        incomeViewModel.onBudgetCategorySelected("Food & Dining", "Supermarket")
+
+        // Save budget
+        composeTestRule.onNodeWithTag("btn_save_budget").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify saved budget item is in the breakdown list
+        composeTestRule.onNodeWithTag("budget_item_1").assertExists()
+        composeTestRule.onNodeWithTag("text_budget_amount_1").assertExists()
+
+        // Scroll to list and edit the budget item
+        composeTestRule.onNodeWithTag("list_budget_breakdown").performScrollTo()
+        composeTestRule.onNodeWithTag("btn_edit_budget_1").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("card_add_edit_budget").assertIsDisplayed()
+
+        // Update amount to 750
+        incomeViewModel.onEditBudgetAmountChange("750")
+        composeTestRule.onNodeWithTag("btn_save_budget").performClick()
+        composeTestRule.waitForIdle()
+
+        // Switch back to Incomes tab
+        composeTestRule.onNodeWithTag("tab_top_incomes").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("card_income_allocation").assertExists()
+
+        // Switch to Budget tab and test error validation (exceeds available income)
+        composeTestRule.onNodeWithTag("tab_top_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_toggle_add_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("input_budget_amount").performTextInput("9999")
+        incomeViewModel.onBudgetCategorySelected("Food & Dining", "Supermarket")
+        composeTestRule.onNodeWithTag("btn_save_budget").performClick()
+        composeTestRule.waitForIdle()
+
+        // Error message displayed
+        composeTestRule.onNodeWithTag("text_budget_error").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_budget_category_deletion_triggers_slide_to_confirm_dialog() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        incomeViewModel.onTopTabSelected(FinanceTopTab.BUDGET)
+        composeTestRule.waitForIdle()
+
+        // 1. Request deletion of budget category triggers confirmation dialog
+        incomeViewModel.requestDeleteBudgetCategory("Food & Dining")
+        composeTestRule.waitForIdle()
+
+        // Confirmation dialog with slide-to-confirm is displayed
+        composeTestRule.onNodeWithTag("dialog_delete_budget_category").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_slide_to_confirm_delete_budget_category").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_cancel_delete_budget_category").assertIsDisplayed()
+
+        // 2. Cancel dismissal
+        composeTestRule.onNodeWithTag("btn_cancel_delete_budget_category").performClick()
+        composeTestRule.waitForIdle()
+
+        // Dialog is closed
+        composeTestRule.onNodeWithTag("dialog_delete_budget_category").assertDoesNotExist()
+
+        // 3. Request again and confirm deletion
+        incomeViewModel.requestDeleteBudgetCategory("Food & Dining")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_delete_budget_category").assertIsDisplayed()
+
+        incomeViewModel.confirmDeleteBudgetCategory()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("dialog_delete_budget_category").assertDoesNotExist()
+        runBlocking {
+            val categories = budgetRepository.getAllCategories().first()
+            assertTrue(categories.none { it.name == "Food & Dining" })
+        }
     }
 }

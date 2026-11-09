@@ -84,6 +84,10 @@
     }
   },
   "incomes": {
+    "tabs": {
+      "incomes": "Einnahmen",
+      "budget": "Budget"
+    },
     "header": {
       "title": "Einkommen",
       "add_button": "Einkommen hinzufügen",
@@ -148,6 +152,39 @@
     "options": {
       "edit": "Bearbeiten",
       "delete": "Löschen"
+    }
+  },
+  "budget": {
+    "header": {
+      "title": "Budget",
+      "add_button": "Budget registrieren"
+    },
+    "overview": {
+      "title": "Budgetübersicht",
+      "total_budgeted": "Budget gesamt",
+      "available_banner_title": "Sie haben %s verfügbar",
+      "available_banner_subtitle": "%s Ihres Einkommens steht noch für Budgets zur Verfügung."
+    },
+    "add_dialog": {
+      "title": "Budget erfassen",
+      "edit_title": "Budget bearbeiten",
+      "amount_label": "Betrag",
+      "amount_placeholder": "0.00",
+      "category_label": "Kategorie",
+      "select_category": "Kategorie auswählen",
+      "save_button": "✓ Budget speichern",
+      "edit_save_button": "✓ Änderungen speichern"
+    },
+    "breakdown": {
+      "title": "Budgetaufschlüsselung"
+    },
+    "history": {
+      "empty_message": "In diesem Zeitraum sind keine Budgets erfasst"
+    },
+    "delete_category_dialog": {
+      "title": "Diese Kategorie löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Schieberegler zur Bestätigung.",
+      "cancel_button": "Abbrechen"
     }
   }
 }

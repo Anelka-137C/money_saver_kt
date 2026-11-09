@@ -39,10 +39,13 @@ import com.example.money_saver_android.ui.theme.TextSecondary
 @Composable
 fun IncomeAllocationCard(
     totalIncome: Double,
+    totalBudgeted: Double = 0.0,
     currency: Currency = defaultCurrencies.first(),
     modifier: Modifier = Modifier
 ) {
-    val budgeted = totalIncome * 0.34
+    val budgeted = totalBudgeted
+    val budgetedPercent = if (totalIncome > 0) ((budgeted / totalIncome) * 100).toInt() else 0
+    val budgetedProgress = if (totalIncome > 0) (budgeted / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
     val savings = totalIncome * 0.21
 
     Card(
@@ -89,8 +92,8 @@ fun IncomeAllocationCard(
                     icon = "📋",
                     label = t("incomes.allocation.budgeted"),
                     amount = CurrencyFormatter.format(budgeted, currency),
-                    percent = "34%",
-                    progress = 0.34f,
+                    percent = "$budgetedPercent%",
+                    progress = budgetedProgress,
                     accentColor = Color(0xFF1CC88A)
                 )
 

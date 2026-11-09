@@ -10,7 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.room.Room
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.local.AppDatabase
+import com.example.money_saver_android.data.local.BudgetDatabase
 import com.example.money_saver_android.data.local.ConfigDatabase
+import com.example.money_saver_android.data.repository.RoomBudgetRepository
 import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomCurrencyRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
@@ -119,8 +121,22 @@ class MainActivity : ComponentActivity() {
         RoomIncomeRepository(database.incomeDao(), database.incomeCategoryDao())
     }
 
+    private val budgetDatabase by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            BudgetDatabase::class.java,
+            "budgets.db"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
+    }
+
+    private val budgetRepository by lazy {
+        RoomBudgetRepository(budgetDatabase.budgetDao(), budgetDatabase.budgetCategoryDao())
+    }
+
     private val incomeUseCase by lazy {
-        IncomeUseCase(incomeRepository)
+        IncomeUseCase(incomeRepository, budgetRepository)
     }
 
     private val incomeViewModel by lazy {

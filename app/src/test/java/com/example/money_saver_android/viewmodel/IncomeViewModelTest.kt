@@ -3,7 +3,10 @@ package com.example.money_saver_android.viewmodel
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.IncomeRepository
+import com.example.money_saver_android.domain.FakeBudgetRepository
+import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Income
+import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +21,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -293,5 +297,104 @@ class IncomeViewModelTest {
         categories = repository.getAllCategories().first()
         employment = categories.first { it.name == "Employment" }
         assertTrue(employment.subcategories.none { it.name == "Bonus" })
+    }
+
+    @Test
+    fun test_viewmodel_create_and_edit_budget_updates_budgeted_total_and_reflects_in_income_state() = runTest {
+        val fakeBudgetRepo = FakeBudgetRepository()
+        val incomeUseCase = IncomeUseCase(repository, fakeBudgetRepo)
+        val vm = IncomeViewModel(incomeUseCase)
+
+        val periodId = 1L
+        repository.insertIncome(
+            Income(amount = 1000.0, dateTime = "2026-05-15 10:00", category = "Employment", subcategory = "Salary", periodId = periodId)
+        )
+        vm.onPeriodSelected(periodId)
+        advanceUntilIdle()
+
+        assertEquals(1000.0, vm.uiState.value.totalIncome, 0.001)
+        assertEquals(0.0, vm.uiState.value.totalBudgeted, 0.001)
+        assertEquals(1000.0, vm.uiState.value.availableIncome, 0.001)
+
+        // Switch to Budget top tab
+        vm.onTopTabSelected(FinanceTopTab.BUDGET)
+        assertEquals(FinanceTopTab.BUDGET, vm.uiState.value.selectedTopTab)
+
+        // Try to save budget that exceeds available income (1200 > 1000)
+        vm.onBudgetAmountChange("1200")
+        vm.onBudgetCategorySelected("Food & Dining", "Supermarket")
+        vm.saveBudget()
+        advanceUntilIdle()
+
+        assertEquals("El monto supera el ingreso disponible", vm.uiState.value.budgetErrorMessage)
+        assertEquals(0, vm.uiState.value.budgets.size)
+
+        // Save valid budget (400)
+        vm.onBudgetAmountChange("400")
+        vm.saveBudget()
+        advanceUntilIdle()
+
+        assertEquals(null, vm.uiState.value.budgetErrorMessage)
+        assertEquals("Presupuesto guardado exitosamente", vm.uiState.value.budgetToastMessage)
+        assertEquals(1, vm.uiState.value.budgets.size)
+        assertEquals(400.0, vm.uiState.value.totalBudgeted, 0.001)
+        assertEquals(600.0, vm.uiState.value.availableIncome, 0.001)
+
+        // Switch back to Incomes tab and verify totals reflect
+        vm.onTopTabSelected(FinanceTopTab.INCOMES)
+        assertEquals(400.0, vm.uiState.value.totalBudgeted, 0.001)
+        assertEquals(600.0, vm.uiState.value.availableIncome, 0.001)
+
+        // Edit budget: change 400 to 700
+        val savedBudget = vm.uiState.value.budgets.first()
+        vm.startEditingBudget(savedBudget)
+        assertNotNull(vm.uiState.value.editingBudget)
+        assertEquals(savedBudget.id, vm.uiState.value.editingBudget?.budgetId)
+
+        vm.onEditBudgetAmountChange("700")
+        vm.saveEditedBudget()
+        advanceUntilIdle()
+
+        assertEquals(null, vm.uiState.value.editingBudget)
+        assertEquals("Presupuesto actualizado exitosamente", vm.uiState.value.budgetToastMessage)
+        assertEquals(1, vm.uiState.value.budgets.size)
+        assertEquals(700.0, vm.uiState.value.totalBudgeted, 0.001)
+        assertEquals(300.0, vm.uiState.value.availableIncome, 0.001)
+    }
+
+    @Test
+    fun test_budget_category_delete_flow_with_confirmation() = runTest {
+        val fakeBudgetRepo = FakeBudgetRepository()
+        fakeBudgetRepo.insertCategory(
+            Category(name = "Entertainment", icon = "🎬", color = "#F6C23E", subcategories = emptyList())
+        )
+        val incomeUseCase = IncomeUseCase(
+            repository = repository,
+            budgetRepository = fakeBudgetRepo
+        )
+        val vm = IncomeViewModel(incomeUseCase)
+        advanceUntilIdle()
+
+        // 1. Initially budgetCategoryToDelete is null
+        assertNull(vm.uiState.value.budgetCategoryToDelete)
+
+        // 2. Request delete sets budgetCategoryToDelete
+        vm.requestDeleteBudgetCategory("Entertainment")
+        assertNotNull(vm.uiState.value.budgetCategoryToDelete)
+        assertEquals("Entertainment", vm.uiState.value.budgetCategoryToDelete?.name)
+
+        // 3. Dismiss clears budgetCategoryToDelete without deleting
+        vm.dismissDeleteBudgetCategoryConfirmation()
+        assertNull(vm.uiState.value.budgetCategoryToDelete)
+        assertEquals(1, fakeBudgetRepo.getAllCategories().first().size)
+
+        // 4. Request again and confirm deletion
+        vm.requestDeleteBudgetCategory("Entertainment")
+        vm.confirmDeleteBudgetCategory()
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.budgetCategoryToDelete)
+        assertEquals(0, fakeBudgetRepo.getAllCategories().first().size)
+        assertEquals("Categoría eliminada exitosamente", vm.uiState.value.budgetToastMessage)
     }
 }

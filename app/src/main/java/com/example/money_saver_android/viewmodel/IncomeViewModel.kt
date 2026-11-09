@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.IncomeRepository
+import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Income
+import com.example.money_saver_android.domain.usecase.BudgetResult
 import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +16,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+enum class FinanceTopTab {
+    INCOMES,
+    BUDGET
+}
+
+data class EditBudgetState(
+    val budgetId: Long = 0,
+    val amount: String = "",
+    val category: String = "",
+    val subcategory: String = "",
+    val periodId: Long = 0,
+    val errorMessage: String? = null
+)
 
 data class EditIncomeState(
     val incomeId: Long = 0,
@@ -44,7 +60,19 @@ data class IncomeUiState(
     val errorMessage: String? = null,
     val toastMessage: String? = null,
     val editingIncome: EditIncomeState? = null,
-    val incomeToDelete: Income? = null
+    val incomeToDelete: Income? = null,
+    val selectedTopTab: FinanceTopTab = FinanceTopTab.INCOMES,
+    val budgets: List<Budget> = emptyList(),
+    val budgetCategories: List<Category> = emptyList(),
+    val totalBudgeted: Double = 0.0,
+    val availableIncome: Double = 0.0,
+    val budgetAmountInput: String = "",
+    val budgetCategoryInput: String = "",
+    val budgetSubcategoryInput: String = "",
+    val budgetErrorMessage: String? = null,
+    val budgetToastMessage: String? = null,
+    val editingBudget: EditBudgetState? = null,
+    val budgetCategoryToDelete: Category? = null
 )
 
 class IncomeViewModel(
@@ -61,8 +89,16 @@ class IncomeViewModel(
             incomeUseCase.preloadDefaultCategoriesIfNeeded()
         }
         viewModelScope.launch {
+            incomeUseCase.preloadDefaultBudgetCategoriesIfNeeded()
+        }
+        viewModelScope.launch {
             incomeUseCase.getCategories().collect { list ->
                 _uiState.update { it.copy(categories = list) }
+            }
+        }
+        viewModelScope.launch {
+            incomeUseCase.getBudgetCategories().collect { list ->
+                _uiState.update { it.copy(budgetCategories = list) }
             }
         }
     }
@@ -93,11 +129,25 @@ class IncomeViewModel(
                     .catch { emit(emptyList()) }
                     .collect { incomeList ->
                         val total = incomeUseCase.calculateTotalIncome(incomeList)
-                        _uiState.update { it.copy(incomes = incomeList, totalIncome = total) }
+                        _uiState.update { current ->
+                            val available = incomeUseCase.calculateAvailableIncome(total, current.totalBudgeted)
+                            current.copy(incomes = incomeList, totalIncome = total, availableIncome = available)
+                        }
+                    }
+            }
+            viewModelScope.launch {
+                incomeUseCase.getBudgetsByPeriod(periodId)
+                    .catch { emit(emptyList()) }
+                    .collect { budgetList ->
+                        val totalBudgeted = incomeUseCase.calculateTotalBudgeted(budgetList)
+                        _uiState.update { current ->
+                            val available = incomeUseCase.calculateAvailableIncome(current.totalIncome, totalBudgeted)
+                            current.copy(budgets = budgetList, totalBudgeted = totalBudgeted, availableIncome = available)
+                        }
                     }
             }
         } else {
-            _uiState.update { it.copy(incomes = emptyList(), totalIncome = 0.0) }
+            _uiState.update { it.copy(incomes = emptyList(), totalIncome = 0.0, budgets = emptyList(), totalBudgeted = 0.0, availableIncome = 0.0) }
         }
     }
 
@@ -366,6 +416,226 @@ class IncomeViewModel(
                 }
                 is IncomeResult.Error -> {
                     // No-op
+                }
+            }
+        }
+    }
+
+    fun onTopTabSelected(tab: FinanceTopTab) {
+        _uiState.update { it.copy(selectedTopTab = tab) }
+    }
+
+    fun onBudgetAmountChange(value: String) {
+        _uiState.update { it.copy(budgetAmountInput = value, budgetErrorMessage = null) }
+    }
+
+    fun onBudgetCategorySelected(category: String, subcategory: String) {
+        _uiState.update {
+            it.copy(budgetCategoryInput = category, budgetSubcategoryInput = subcategory, budgetErrorMessage = null)
+        }
+    }
+
+    fun clearBudgetErrorMessage() {
+        _uiState.update { it.copy(budgetErrorMessage = null) }
+    }
+
+    fun clearBudgetToastMessage() {
+        _uiState.update { it.copy(budgetToastMessage = null) }
+    }
+
+    fun saveBudget() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            when (val result = incomeUseCase.saveBudget(
+                amountInput = state.budgetAmountInput,
+                categoryInput = state.budgetCategoryInput,
+                subcategoryInput = state.budgetSubcategoryInput,
+                periodId = state.selectedPeriodId
+            )) {
+                is BudgetResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            budgetAmountInput = "",
+                            budgetCategoryInput = "",
+                            budgetSubcategoryInput = "",
+                            budgetErrorMessage = null,
+                            budgetToastMessage = "Presupuesto guardado exitosamente"
+                        )
+                    }
+                }
+                is BudgetResult.Error -> {
+                    _uiState.update { it.copy(budgetErrorMessage = result.message) }
+                }
+            }
+        }
+    }
+
+    fun startEditingBudget(budget: Budget) {
+        _uiState.update {
+            it.copy(
+                editingBudget = EditBudgetState(
+                    budgetId = budget.id,
+                    amount = if (budget.amount % 1.0 == 0.0) budget.amount.toLong().toString() else budget.amount.toString(),
+                    category = budget.category,
+                    subcategory = budget.subcategory,
+                    periodId = budget.periodId
+                )
+            )
+        }
+    }
+
+    fun cancelEditingBudget() {
+        _uiState.update { it.copy(editingBudget = null) }
+    }
+
+    fun onEditBudgetAmountChange(value: String) {
+        _uiState.update { current ->
+            current.copy(editingBudget = current.editingBudget?.copy(amount = value, errorMessage = null))
+        }
+    }
+
+    fun onEditBudgetCategorySelected(category: String, subcategory: String) {
+        _uiState.update { current ->
+            current.copy(editingBudget = current.editingBudget?.copy(category = category, subcategory = subcategory, errorMessage = null))
+        }
+    }
+
+    fun saveEditedBudget() {
+        val editing = _uiState.value.editingBudget ?: return
+        viewModelScope.launch {
+            when (val result = incomeUseCase.updateBudget(
+                id = editing.budgetId,
+                amountInput = editing.amount,
+                categoryInput = editing.category,
+                subcategoryInput = editing.subcategory,
+                periodId = editing.periodId
+            )) {
+                is BudgetResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            editingBudget = null,
+                            budgetToastMessage = "Presupuesto actualizado exitosamente"
+                        )
+                    }
+                }
+                is BudgetResult.Error -> {
+                    _uiState.update { current ->
+                        current.copy(editingBudget = current.editingBudget?.copy(errorMessage = result.message))
+                    }
+                }
+            }
+        }
+    }
+
+    fun createBudgetCategory() {
+        val state = _uiState.value
+        createBudgetCategory(state.newCategoryNameInput, state.selectedColorHex)
+    }
+
+    fun createBudgetCategory(name: String, color: String, icon: String = "💰") {
+        viewModelScope.launch {
+            when (val result = incomeUseCase.createBudgetCategory(name, color, icon)) {
+                is IncomeResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            newCategoryNameInput = "",
+                            categoryError = null,
+                            budgetToastMessage = "Categoría creada exitosamente"
+                        )
+                    }
+                }
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(categoryError = result.message) }
+                }
+            }
+        }
+    }
+
+    fun createBudgetSubcategory(parentCategory: String) {
+        val state = _uiState.value
+        createBudgetSubcategory(parentCategory, state.newSubcategoryNameInput)
+    }
+
+    fun createBudgetSubcategory(parentCategory: String, name: String) {
+        viewModelScope.launch {
+            when (val result = incomeUseCase.createBudgetSubcategory(parentCategory, name)) {
+                is IncomeResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            newSubcategoryNameInput = "",
+                            subcategoryError = null,
+                            budgetToastMessage = "Subcategoría creada exitosamente"
+                        )
+                    }
+                }
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(subcategoryError = result.message) }
+                }
+            }
+        }
+    }
+
+    fun deleteBudgetCategory(categoryName: String) {
+        viewModelScope.launch {
+            when (val result = incomeUseCase.deleteBudgetCategory(categoryName)) {
+                is IncomeResult.Success -> {
+                    val trimmed = categoryName.trim()
+                    _uiState.update { current ->
+                        val shouldClear = current.budgetCategoryInput.equals(trimmed, ignoreCase = true)
+                        val shouldClearEdit = current.editingBudget?.category?.equals(trimmed, ignoreCase = true) == true
+                        current.copy(
+                            budgetCategoryInput = if (shouldClear) "" else current.budgetCategoryInput,
+                            budgetSubcategoryInput = if (shouldClear) "" else current.budgetSubcategoryInput,
+                            editingBudget = if (shouldClearEdit) current.editingBudget?.copy(category = "", subcategory = "") else current.editingBudget,
+                            budgetToastMessage = "Categoría eliminada exitosamente"
+                        )
+                    }
+                }
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(categoryError = result.message) }
+                }
+            }
+        }
+    }
+
+    fun requestDeleteBudgetCategory(category: Category) {
+        _uiState.update { it.copy(budgetCategoryToDelete = category) }
+    }
+
+    fun requestDeleteBudgetCategory(categoryName: String) {
+        val trimmed = categoryName.trim()
+        val category = _uiState.value.budgetCategories.find { it.name.equals(trimmed, ignoreCase = true) }
+            ?: Category(name = trimmed, icon = "📁", color = "#4E73DF", subcategories = emptyList())
+        requestDeleteBudgetCategory(category)
+    }
+
+    fun dismissDeleteBudgetCategoryConfirmation() {
+        _uiState.update { it.copy(budgetCategoryToDelete = null) }
+    }
+
+    fun confirmDeleteBudgetCategory() {
+        val category = _uiState.value.budgetCategoryToDelete ?: return
+        _uiState.update { it.copy(budgetCategoryToDelete = null) }
+        deleteBudgetCategory(category.name)
+    }
+
+    fun deleteBudgetSubcategory(categoryName: String, subcategoryName: String) {
+        viewModelScope.launch {
+            when (val result = incomeUseCase.deleteBudgetSubcategory(categoryName, subcategoryName)) {
+                is IncomeResult.Success -> {
+                    val trimmedSub = subcategoryName.trim()
+                    _uiState.update { current ->
+                        val shouldClear = current.budgetSubcategoryInput.equals(trimmedSub, ignoreCase = true)
+                        val shouldClearEdit = current.editingBudget?.subcategory?.equals(trimmedSub, ignoreCase = true) == true
+                        current.copy(
+                            budgetSubcategoryInput = if (shouldClear) "" else current.budgetSubcategoryInput,
+                            editingBudget = if (shouldClearEdit) current.editingBudget?.copy(subcategory = "") else current.editingBudget,
+                            budgetToastMessage = "Subcategoría eliminada exitosamente"
+                        )
+                    }
+                }
+                is IncomeResult.Error -> {
+                    _uiState.update { it.copy(subcategoryError = result.message) }
                 }
             }
         }

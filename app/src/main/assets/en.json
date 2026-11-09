@@ -84,6 +84,10 @@
     }
   },
   "incomes": {
+    "tabs": {
+      "incomes": "Incomes",
+      "budget": "Budget"
+    },
     "header": {
       "title": "Incomes",
       "add_button": "Add Income",
@@ -148,6 +152,39 @@
     "options": {
       "edit": "Edit",
       "delete": "Delete"
+    }
+  },
+  "budget": {
+    "header": {
+      "title": "Budget",
+      "add_button": "Add Budget"
+    },
+    "overview": {
+      "title": "Budget Overview",
+      "total_budgeted": "Total budgeted",
+      "available_banner_title": "You have %s available",
+      "available_banner_subtitle": "%s of your income remains available to budget."
+    },
+    "add_dialog": {
+      "title": "Add Budget",
+      "edit_title": "Edit Budget",
+      "amount_label": "Amount",
+      "amount_placeholder": "0.00",
+      "category_label": "Category",
+      "select_category": "Select category",
+      "save_button": "✓ Save Budget",
+      "edit_save_button": "✓ Save Changes"
+    },
+    "breakdown": {
+      "title": "Budget breakdown"
+    },
+    "history": {
+      "empty_message": "No budgets registered in this period"
+    },
+    "delete_category_dialog": {
+      "title": "Delete this category?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
     }
   }
 }

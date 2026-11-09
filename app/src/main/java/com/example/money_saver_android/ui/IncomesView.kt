@@ -58,15 +58,20 @@ import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
+import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.budget.AddEditBudgetDialog
+import com.example.money_saver_android.ui.components.budget.BudgetOverviewCard
+import com.example.money_saver_android.ui.components.budget.DeleteBudgetCategoryConfirmationDialog
 import com.example.money_saver_android.ui.components.incomes.AddIncomeCard
 import com.example.money_saver_android.ui.components.incomes.AddIncomeDialog
 import com.example.money_saver_android.ui.components.incomes.DeleteIncomeConfirmationDialog
 import com.example.money_saver_android.ui.components.incomes.EditIncomeDialog
+import com.example.money_saver_android.ui.components.incomes.FinanceTopTabs
 import com.example.money_saver_android.ui.components.incomes.IncomeAllocationCard
 import com.example.money_saver_android.ui.components.incomes.IncomeOverviewCard
 import com.example.money_saver_android.ui.theme.BorderColor
@@ -77,6 +82,7 @@ import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import com.example.money_saver_android.viewmodel.FinanceTopTab
 import com.example.money_saver_android.viewmodel.IncomeViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -102,11 +108,23 @@ fun IncomesView(
     var showCategorySheet by remember { mutableStateOf(false) }
     var showEditCategorySheet by remember { mutableStateOf(false) }
 
+    var showAddBudgetDialog by remember { mutableStateOf(false) }
+    var showBudgetCategorySheet by remember { mutableStateOf(false) }
+    var showBudgetEditCategorySheet by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.toastMessage) {
         state.toastMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             incomeViewModel.clearToastMessage()
             showAddForm = false
+        }
+    }
+
+    LaunchedEffect(state.budgetToastMessage) {
+        state.budgetToastMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            incomeViewModel.clearBudgetToastMessage()
+            showAddBudgetDialog = false
         }
     }
 
@@ -116,9 +134,21 @@ fun IncomesView(
         }
     }
 
+    LaunchedEffect(state.budgetErrorMessage) {
+        if (state.budgetErrorMessage != null) {
+            showBudgetCategorySheet = false
+        }
+    }
+
     LaunchedEffect(state.editingIncome?.errorMessage) {
         if (state.editingIncome?.errorMessage != null) {
             showEditCategorySheet = false
+        }
+    }
+
+    LaunchedEffect(state.editingBudget?.errorMessage) {
+        if (state.editingBudget?.errorMessage != null) {
+            showBudgetEditCategorySheet = false
         }
     }
 
@@ -150,6 +180,12 @@ fun IncomesView(
                 .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            // 0. Top Navigation Tabs (Ingresos / Presupuesto)
+            FinanceTopTabs(
+                selectedTab = state.selectedTopTab,
+                onTabSelected = incomeViewModel::onTopTabSelected
+            )
+
             // 1. Period Selector Header
             Box(
                 modifier = Modifier.fillMaxWidth(),
@@ -214,98 +250,202 @@ fun IncomesView(
                 }
             }
 
-            // 2. Income Overview Card
-            IncomeOverviewCard(
-                totalIncome = state.totalIncome,
-                currency = currency
-            )
+            when (state.selectedTopTab) {
+                FinanceTopTab.INCOMES -> {
+                    // 2. Income Overview Card
+                    IncomeOverviewCard(
+                        totalIncome = state.totalIncome,
+                        currency = currency
+                    )
 
-            // 3. Income Allocation Card
-            IncomeAllocationCard(
-                totalIncome = state.totalIncome,
-                currency = currency
-            )
+                    // 3. Income Allocation Card
+                    IncomeAllocationCard(
+                        totalIncome = state.totalIncome,
+                        totalBudgeted = state.totalBudgeted,
+                        currency = currency
+                    )
 
-            // 4. Add Income Action Button
-            Button(
-                onClick = { showAddForm = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("btn_toggle_add_income"),
-                colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = t("incomes.header.add_button"),
-                    color = Color.Black,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // 5. Income Breakdown Section
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = t("incomes.breakdown.title"),
-                    color = TextPrimary,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            // Incomes List
-            val historyScrollState = rememberScrollState()
-            LaunchedEffect(state.selectedPeriodId) {
-                historyScrollState.scrollTo(0)
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp)
-                    .verticalScroll(historyScrollState)
-                    .testTag("list_income_breakdown"),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (state.incomes.isEmpty()) {
-                    Box(
+                    // 4. Add Income Action Button
+                    Button(
+                        onClick = { showAddForm = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(CardBackground)
-                            .border(1.dp, BorderColor, RoundedCornerShape(16.dp))
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
+                            .height(48.dp)
+                            .testTag("btn_toggle_add_income"),
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = t("incomes.history.empty_message"),
-                            color = TextSecondary,
-                            fontSize = 14.sp
+                            text = t("incomes.header.add_button"),
+                            color = Color.Black,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                } else {
-                    state.incomes.forEach { income ->
-                        val category = state.categories.find { it.name.equals(income.category, ignoreCase = true) }
-                        val categoryColor = category?.color?.let { parseHexColor(it) } ?: GreenAccent
-                        IncomeListItem(
-                            income = income,
-                            currency = currency,
-                            categoryColor = categoryColor,
-                            onEditClick = { incomeViewModel.startEditing(income) },
-                            onDeleteClick = { incomeViewModel.requestDeleteIncome(income) }
+
+                    // 5. Income Breakdown Section
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = t("incomes.breakdown.title"),
+                            color = TextPrimary,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
+                    }
+
+                    // Incomes List
+                    val historyScrollState = rememberScrollState()
+                    LaunchedEffect(state.selectedPeriodId) {
+                        historyScrollState.scrollTo(0)
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(historyScrollState)
+                            .testTag("list_income_breakdown"),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (state.incomes.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(CardBackground)
+                                    .border(1.dp, BorderColor, RoundedCornerShape(16.dp))
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = t("incomes.history.empty_message"),
+                                    color = TextSecondary,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        } else {
+                            state.incomes.forEach { income ->
+                                val category = state.categories.find { it.name.equals(income.category, ignoreCase = true) }
+                                val categoryColor = category?.color?.let { parseHexColor(it) } ?: GreenAccent
+                                IncomeListItem(
+                                    income = income,
+                                    currency = currency,
+                                    categoryColor = categoryColor,
+                                    onEditClick = { incomeViewModel.startEditing(income) },
+                                    onDeleteClick = { incomeViewModel.requestDeleteIncome(income) }
+                                )
+                            }
+                        }
+                    }
+                }
+                FinanceTopTab.BUDGET -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("container_budget_view"),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        // 1. Budget Overview Card
+                        BudgetOverviewCard(
+                            totalBudgeted = state.totalBudgeted,
+                            totalIncome = state.totalIncome,
+                            availableIncome = state.availableIncome,
+                            currency = currency
+                        )
+
+                        // 2. Add Budget Action Button
+                        Button(
+                            onClick = { showAddBudgetDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("btn_toggle_add_budget"),
+                            colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = t("budget.header.add_button"),
+                                color = Color.Black,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // 3. Budget Breakdown Section Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = t("budget.breakdown.title"),
+                                color = TextPrimary,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // 4. Budgets List
+                        val budgetHistoryScrollState = rememberScrollState()
+                        LaunchedEffect(state.selectedPeriodId) {
+                            budgetHistoryScrollState.scrollTo(0)
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 360.dp)
+                                .verticalScroll(budgetHistoryScrollState)
+                                .testTag("list_budget_breakdown"),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (state.budgets.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(CardBackground)
+                                        .border(1.dp, BorderColor, RoundedCornerShape(16.dp))
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = t("budget.history.empty_message"),
+                                        color = TextSecondary,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            } else {
+                                state.budgets.forEach { budget ->
+                                    val category = state.budgetCategories.find { it.name.equals(budget.category, ignoreCase = true) }
+                                    val categoryColor = category?.color?.let { parseHexColor(it) } ?: GreenAccent
+                                    BudgetListItem(
+                                        budget = budget,
+                                        currency = currency,
+                                        categoryColor = categoryColor,
+                                        onEditClick = { incomeViewModel.startEditingBudget(budget) }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -413,6 +553,115 @@ fun IncomesView(
                 incomeViewModel.clearSubcategoryError()
                 showEditCategorySheet = false
             }
+        )
+    }
+
+    if (showAddBudgetDialog) {
+        AddEditBudgetDialog(
+            isEditing = false,
+            amount = state.budgetAmountInput,
+            category = state.budgetCategoryInput,
+            subcategory = state.budgetSubcategoryInput,
+            errorMessage = state.budgetErrorMessage,
+            currency = currency,
+            onAmountChange = incomeViewModel::onBudgetAmountChange,
+            onSelectCategoryClick = { showBudgetCategorySheet = true },
+            onSaveClick = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                incomeViewModel.saveBudget()
+            },
+            onCloseClick = {
+                incomeViewModel.clearBudgetErrorMessage()
+                showAddBudgetDialog = false
+            }
+        )
+    }
+
+    state.editingBudget?.let { editing ->
+        AddEditBudgetDialog(
+            isEditing = true,
+            amount = editing.amount,
+            category = editing.category,
+            subcategory = editing.subcategory,
+            errorMessage = editing.errorMessage,
+            currency = currency,
+            onAmountChange = incomeViewModel::onEditBudgetAmountChange,
+            onSelectCategoryClick = { showBudgetEditCategorySheet = true },
+            onSaveClick = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                incomeViewModel.saveEditedBudget()
+            },
+            onCloseClick = {
+                incomeViewModel.cancelEditingBudget()
+            }
+        )
+    }
+
+    if (showBudgetCategorySheet) {
+        CategorySelectionSheet(
+            categories = state.budgetCategories,
+            newCategoryName = state.newCategoryNameInput,
+            selectedColorHex = state.selectedColorHex,
+            categoryError = state.categoryError,
+            newSubcategoryName = state.newSubcategoryNameInput,
+            subcategoryError = state.subcategoryError,
+            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
+            onColorSelect = incomeViewModel::onColorSelect,
+            onCreateCategory = incomeViewModel::createBudgetCategory,
+            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
+            onCreateSubcategory = { parentName -> incomeViewModel.createBudgetSubcategory(parentName) },
+            onDeleteCategory = { incomeViewModel.requestDeleteBudgetCategory(it) },
+            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteBudgetSubcategory(cat, sub) },
+            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
+            onDismiss = {
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
+                showBudgetCategorySheet = false
+            },
+            onCategorySelected = { cat, sub ->
+                incomeViewModel.onBudgetCategorySelected(cat, sub)
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
+                showBudgetCategorySheet = false
+            }
+        )
+    }
+
+    if (showBudgetEditCategorySheet) {
+        CategorySelectionSheet(
+            categories = state.budgetCategories,
+            newCategoryName = state.newCategoryNameInput,
+            selectedColorHex = state.selectedColorHex,
+            categoryError = state.categoryError,
+            newSubcategoryName = state.newSubcategoryNameInput,
+            subcategoryError = state.subcategoryError,
+            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
+            onColorSelect = incomeViewModel::onColorSelect,
+            onCreateCategory = incomeViewModel::createBudgetCategory,
+            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
+            onCreateSubcategory = { parentName -> incomeViewModel.createBudgetSubcategory(parentName) },
+            onDeleteCategory = { incomeViewModel.requestDeleteBudgetCategory(it) },
+            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteBudgetSubcategory(cat, sub) },
+            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
+            onDismiss = {
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
+                showBudgetEditCategorySheet = false
+            },
+            onCategorySelected = { cat, sub ->
+                incomeViewModel.onEditBudgetCategorySelected(cat, sub)
+                incomeViewModel.clearCategoryError()
+                incomeViewModel.clearSubcategoryError()
+                showBudgetEditCategorySheet = false
+            }
+        )
+    }
+
+    state.budgetCategoryToDelete?.let { categoryToDelete ->
+        DeleteBudgetCategoryConfirmationDialog(
+            category = categoryToDelete,
+            onConfirm = { incomeViewModel.confirmDeleteBudgetCategory() },
+            onDismiss = { incomeViewModel.dismissDeleteBudgetCategoryConfirmation() }
         )
     }
 }
@@ -546,6 +795,90 @@ fun IncomeListItem(
                             modifier = Modifier.testTag("btn_delete_income_${income.id}")
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BudgetListItem(
+    budget: Budget,
+    currency: Currency,
+    categoryColor: Color,
+    onEditClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("budget_item_${budget.id}"),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(categoryColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "📋",
+                        fontSize = 18.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column {
+                    Text(
+                        text = budget.category,
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (budget.subcategory.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = budget.subcategory,
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = CurrencyFormatter.format(budget.amount, currency),
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.testTag("text_budget_amount_${budget.id}")
+                )
+
+                IconButton(
+                    onClick = onEditClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("btn_edit_budget_${budget.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Modificar",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
