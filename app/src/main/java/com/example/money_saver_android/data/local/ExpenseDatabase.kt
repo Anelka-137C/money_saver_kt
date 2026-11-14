@@ -23,7 +23,7 @@ data class ExpenseEntity(
     val date: String,
     val description: String,
     val category: String,
-    val subcategory: String
+    val subcategory: String? = null
 )
 
 @Entity(tableName = "expenses_categories")
@@ -121,7 +121,7 @@ interface CategoryDao {
         IncomeCategoryEntity::class,
         IncomeSubcategoryEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

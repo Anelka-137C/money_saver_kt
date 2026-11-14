@@ -6,5 +6,5 @@ data class Expense(
     val date: String,
     val description: String,
     val category: String,
-    val subcategory: String
+    val subcategory: String = ""
 )

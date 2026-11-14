@@ -147,7 +147,7 @@ class IncomeUseCaseTest {
     }
 
     @Test
-    fun saveIncome_withoutCategoryOrSubcategory_returnsError() = runBlocking {
+    fun saveIncome_withoutCategory_returnsError() = runBlocking {
         val resultNoCategory = useCase.saveIncome(
             amountInput = "500",
             dateTimeInput = "2026-05-15 10:00",
@@ -157,8 +157,11 @@ class IncomeUseCaseTest {
             periodId = 1L
         )
         assertTrue(resultNoCategory is IncomeResult.Error)
-        assertEquals("Debes seleccionar una categoría y subcategoría", (resultNoCategory as IncomeResult.Error).message)
+        assertEquals("Debes seleccionar una categoría", (resultNoCategory as IncomeResult.Error).message)
+    }
 
+    @Test
+    fun saveIncome_withoutSubcategory_returnsSuccessAndInserts() = runBlocking {
         val resultNoSubcategory = useCase.saveIncome(
             amountInput = "500",
             dateTimeInput = "2026-05-15 10:00",
@@ -167,8 +170,38 @@ class IncomeUseCaseTest {
             descriptionInput = "",
             periodId = 1L
         )
-        assertTrue(resultNoSubcategory is IncomeResult.Error)
-        assertEquals("Debes seleccionar una categoría y subcategoría", (resultNoSubcategory as IncomeResult.Error).message)
+        assertTrue(resultNoSubcategory is IncomeResult.Success)
+        val list = useCase.getIncomesByPeriod(1L).first()
+        assertEquals(1, list.size)
+        assertEquals("Employment", list.first().category)
+        assertEquals("", list.first().subcategory)
+    }
+
+    @Test
+    fun updateIncome_withoutSubcategory_returnsSuccessAndUpdates() = runBlocking {
+        useCase.saveIncome(
+            amountInput = "500",
+            dateTimeInput = "2026-05-15 10:00",
+            categoryInput = "Employment",
+            subcategoryInput = "Salary",
+            descriptionInput = "",
+            periodId = 1L
+        )
+        val saved = useCase.getIncomesByPeriod(1L).first().first()
+
+        val updateResult = useCase.updateIncome(
+            id = saved.id,
+            amountInput = "600",
+            dateTimeInput = "2026-05-15 10:00",
+            categoryInput = "Employment",
+            subcategoryInput = "",
+            descriptionInput = "",
+            periodId = 1L
+        )
+        assertTrue(updateResult is IncomeResult.Success)
+        val updated = useCase.getIncomesByPeriod(1L).first().first()
+        assertEquals(600.0, updated.amount, 0.0)
+        assertEquals("", updated.subcategory)
     }
 
     @Test

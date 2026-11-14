@@ -147,6 +147,43 @@ class ExpenseUseCaseTest {
     }
 
     @Test
+    fun saveExpense_withoutSubcategory_returnsSuccessAndInserts() = runBlocking {
+        val result = useCase.saveExpense(
+            amountInput = "80.0",
+            dateInput = "2026-11-06",
+            descriptionInput = "Mercado",
+            categoryInput = "Alimentación",
+            subcategoryInput = ""
+        )
+
+        assertTrue(result is ExpenseResult.Success)
+        val list = useCase.getExpenses().first()
+        assertEquals(1, list.size)
+        assertEquals("Alimentación", list.first().category)
+        assertEquals("", list.first().subcategory)
+    }
+
+    @Test
+    fun updateExpense_withoutSubcategory_returnsSuccessAndUpdates() = runBlocking {
+        val initial = Expense(id = 5L, amount = 40.0, date = "2026-11-01", description = "Uber", category = "Transporte", subcategory = "Taxi")
+        repository.insertExpense(initial)
+
+        val result = useCase.updateExpense(
+            id = 5L,
+            amountInput = "55.0",
+            dateInput = "2026-11-02",
+            descriptionInput = "Transporte general",
+            categoryInput = "Transporte",
+            subcategoryInput = ""
+        )
+
+        assertTrue(result is ExpenseResult.Success)
+        val updated = useCase.getExpenses().first().first()
+        assertEquals("Transporte", updated.category)
+        assertEquals("", updated.subcategory)
+    }
+
+    @Test
     fun deleteExpense_callsRepositoryAndReturnsSuccess() = runBlocking {
         val initial = Expense(id = 7L, amount = 20.0, date = "2026-11-06", description = "Snack", category = "Alimentación", subcategory = "Snack")
         repository.insertExpense(initial)

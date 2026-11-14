@@ -16,7 +16,7 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
                     date = entity.date,
                     description = entity.description,
                     category = entity.category,
-                    subcategory = entity.subcategory
+                    subcategory = entity.subcategory.orEmpty()
                 )
             }
         }
@@ -30,7 +30,7 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
                 date = expense.date,
                 description = expense.description,
                 category = expense.category,
-                subcategory = expense.subcategory
+                subcategory = expense.subcategory.takeIf { it.isNotBlank() }
             )
         )
     }
@@ -43,7 +43,7 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
                 date = expense.date,
                 description = expense.description,
                 category = expense.category,
-                subcategory = expense.subcategory
+                subcategory = expense.subcategory.takeIf { it.isNotBlank() }
             )
         )
     }

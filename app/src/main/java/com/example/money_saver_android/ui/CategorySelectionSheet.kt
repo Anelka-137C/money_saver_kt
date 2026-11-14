@@ -324,6 +324,47 @@ fun CategorySelectionSheet(
                 }
             } else {
                 val parentCategoryColor = parseHexColor(selectedCategory.color)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(parentCategoryColor.copy(alpha = 0.15f))
+                        .border(1.dp, parentCategoryColor, RoundedCornerShape(12.dp))
+                        .clickable {
+                            onCategorySelected(selectedCategory.name, "")
+                        }
+                        .testTag("btn_select_category_without_subcategory")
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = selectedCategory.icon, fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Continuar sin subcategoría",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Usar solo ${selectedCategory.name}",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                    Text(
+                        text = "✓",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GreenAccent
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()

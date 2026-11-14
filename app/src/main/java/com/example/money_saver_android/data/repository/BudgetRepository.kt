@@ -144,7 +144,7 @@ fun BudgetEntity.toDomain(): Budget = Budget(
     id = id,
     amount = amount,
     category = category,
-    subcategory = subcategory,
+    subcategory = subcategory.orEmpty(),
     periodId = periodId
 )
 
@@ -152,6 +152,6 @@ fun Budget.toEntity(): BudgetEntity = BudgetEntity(
     id = id,
     amount = amount,
     category = category,
-    subcategory = subcategory,
+    subcategory = subcategory.takeIf { it.isNotBlank() },
     periodId = periodId
 )

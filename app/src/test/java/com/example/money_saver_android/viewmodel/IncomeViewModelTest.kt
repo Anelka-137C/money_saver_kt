@@ -148,28 +148,30 @@ class IncomeViewModelTest {
     }
 
     @Test
-    fun test_income_validation_rejects_missing_category_or_subcategory() = runTest {
+    fun test_income_validation_rejects_missing_category_and_allows_empty_subcategory() = runTest {
         viewModel.onPeriodSelected(1L)
         viewModel.onAmountChange("1500.0")
         viewModel.onDateTimeChange("2026-05-15 10:00")
 
-        // 1. Without category or subcategory
+        // 1. Without category
         viewModel.onCategorySelected("", "")
         viewModel.saveIncome()
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.errorMessage)
-        assertEquals("Debes seleccionar una categoría y subcategoría", viewModel.uiState.value.errorMessage)
+        assertEquals("Debes seleccionar una categoría", viewModel.uiState.value.errorMessage)
         assertTrue(repository.getIncomesByPeriod(1L).first().isEmpty())
 
-        // 2. With category but without subcategory
+        // 2. With category and without subcategory -> succeeds
         viewModel.onCategorySelected("Employment", "")
         viewModel.saveIncome()
         advanceUntilIdle()
 
-        assertNotNull(viewModel.uiState.value.errorMessage)
-        assertEquals("Debes seleccionar una categoría y subcategoría", viewModel.uiState.value.errorMessage)
-        assertTrue(repository.getIncomesByPeriod(1L).first().isEmpty())
+        assertNull(viewModel.uiState.value.errorMessage)
+        val savedIncomes = repository.getIncomesByPeriod(1L).first()
+        assertEquals(1, savedIncomes.size)
+        assertEquals("Employment", savedIncomes.first().category)
+        assertEquals("", savedIncomes.first().subcategory)
     }
 
     @Test

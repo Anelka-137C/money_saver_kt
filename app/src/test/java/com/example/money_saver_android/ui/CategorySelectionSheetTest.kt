@@ -139,4 +139,45 @@ class CategorySelectionSheetTest {
 
         assertEquals(true, clearCalled)
     }
+
+    @Test
+    fun test_category_sheet_allows_selecting_category_without_subcategory() {
+        var selectedPair: Pair<String, String>? = null
+        val testCategories = listOf(
+            Category(name = "Employment", icon = "💼", color = "#4E73DF", subcategories = listOf(Subcategory("Salary")))
+        )
+
+        composeTestRule.setContent {
+            CategorySelectionSheet(
+                categories = testCategories,
+                newCategoryName = "",
+                selectedColorHex = "#4E73DF",
+                categoryError = null,
+                newSubcategoryName = "",
+                subcategoryError = null,
+                onCategoryNameChange = {},
+                onColorSelect = {},
+                onCreateCategory = {},
+                onSubcategoryNameChange = {},
+                onCreateSubcategory = {},
+                onDeleteCategory = {},
+                onDeleteSubcategory = { _, _ -> },
+                onDismiss = {},
+                onCategorySelected = { cat, sub -> selectedPair = cat to sub }
+            )
+        }
+
+        // 1. Tap category "Employment" to enter subcategory view
+        composeTestRule.onNodeWithText("Employment").performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+
+        // 2. "Continuar sin subcategoría" option is displayed at the top
+        composeTestRule.onNodeWithTag("btn_select_category_without_subcategory").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Continuar sin subcategoría").assertIsDisplayed()
+
+        // 3. Clicking it selects the category with an empty subcategory
+        composeTestRule.onNodeWithTag("btn_select_category_without_subcategory")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals("Employment" to "", selectedPair)
+    }
 }

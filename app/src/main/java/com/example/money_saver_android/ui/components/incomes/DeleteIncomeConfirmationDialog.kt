@@ -111,11 +111,13 @@ fun DeleteIncomeConfirmationDialog(
                             color = TextSecondary
                         )
                     }
-                    Text(
-                        text = income.category,
-                        fontSize = 12.sp,
-                        color = TextSecondary
-                    )
+                    if (income.subcategory.isNotBlank() && income.subcategory != income.category) {
+                        Text(
+                            text = income.category,
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = income.dateTime,

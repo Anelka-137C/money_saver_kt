@@ -92,11 +92,18 @@ fun ExpenseCardItem(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
-                    Text(
-                        text = if (expense.description.isNotBlank()) expense.description else expense.category,
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
+                    val subtitle = when {
+                        expense.description.isNotBlank() -> expense.description
+                        expense.subcategory.isNotBlank() -> expense.category
+                        else -> ""
+                    }
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                    }
                 }
 
                 Text(

@@ -131,7 +131,7 @@ class RoomIncomeRepository(
         amount = amount,
         dateTime = dateTime,
         category = category,
-        subcategory = subcategory,
+        subcategory = subcategory.orEmpty(),
         description = description,
         periodId = periodId
     )
@@ -141,7 +141,7 @@ class RoomIncomeRepository(
         amount = amount,
         dateTime = dateTime,
         category = category,
-        subcategory = subcategory,
+        subcategory = subcategory.takeIf { it.isNotBlank() },
         description = description,
         periodId = periodId
     )

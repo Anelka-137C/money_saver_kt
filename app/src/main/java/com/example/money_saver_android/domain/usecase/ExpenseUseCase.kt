@@ -21,7 +21,7 @@ class ExpenseUseCase(
         dateInput: String,
         descriptionInput: String,
         categoryInput: String,
-        subcategoryInput: String
+        subcategoryInput: String = ""
     ): ExpenseResult {
         val amount = amountInput.toDoubleOrNull() ?: 0.0
         if (amount <= 0.0) {
@@ -49,7 +49,7 @@ class ExpenseUseCase(
         dateInput: String,
         descriptionInput: String,
         categoryInput: String,
-        subcategoryInput: String
+        subcategoryInput: String = ""
     ): ExpenseResult {
         val amount = amountInput.toDoubleOrNull() ?: 0.0
         if (amount <= 0.0) {

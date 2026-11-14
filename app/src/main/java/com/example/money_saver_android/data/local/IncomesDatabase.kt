@@ -23,7 +23,7 @@ data class IncomeEntity(
     val dateTime: String,
     val description: String = "",
     val category: String,
-    val subcategory: String,
+    val subcategory: String? = null,
     val periodId: Long
 )
 
@@ -113,7 +113,7 @@ interface IncomeCategoryDao {
         IncomeCategoryEntity::class,
         IncomeSubcategoryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class IncomesDatabase : RoomDatabase() {

@@ -21,7 +21,7 @@ data class BudgetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val amount: Double,
     val category: String,
-    val subcategory: String = "",
+    val subcategory: String? = null,
     val periodId: Long
 )
 
@@ -117,7 +117,7 @@ interface BudgetCategoryDao {
         BudgetCategoryEntity::class,
         BudgetSubcategoryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class BudgetDatabase : RoomDatabase() {

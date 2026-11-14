@@ -118,6 +118,24 @@ class ExpenseViewModelTest {
     }
 
     @Test
+    fun saveExpense_withoutSubcategory_persistsAndUpdatesList() = runTest(testDispatcher) {
+        viewModel.onAmountChange("95.0")
+        viewModel.onDateChange("2026-11-06")
+        viewModel.onDescriptionChange("Compra general")
+        viewModel.onCategoryChange("Alimentación", "")
+
+        viewModel.saveExpense()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.expenses.size)
+        val saved = state.expenses.first()
+        assertEquals(95.0, saved.amount, 0.0)
+        assertEquals("Alimentación", saved.category)
+        assertEquals("", saved.subcategory)
+    }
+
+    @Test
     fun saveExpense_withValidData_emitsToastMessageAndClearsForm() = runTest(testDispatcher) {
         viewModel.onAmountChange("150.0")
         viewModel.onDateChange("2026-11-06")

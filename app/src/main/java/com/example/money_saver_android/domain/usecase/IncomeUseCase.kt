@@ -144,7 +144,7 @@ class IncomeUseCase(
         amountInput: String,
         dateTimeInput: String,
         categoryInput: String,
-        subcategoryInput: String,
+        subcategoryInput: String = "",
         descriptionInput: String,
         periodId: Long?
     ): IncomeResult {
@@ -153,8 +153,8 @@ class IncomeUseCase(
             return IncomeResult.Error("El monto debe ser mayor a cero")
         }
 
-        if (categoryInput.isBlank() || subcategoryInput.isBlank()) {
-            return IncomeResult.Error("Debes seleccionar una categoría y subcategoría")
+        if (categoryInput.isBlank()) {
+            return IncomeResult.Error("Debes seleccionar una categoría")
         }
 
         if (periodId == null) {
@@ -179,7 +179,7 @@ class IncomeUseCase(
         amountInput: String,
         dateTimeInput: String,
         categoryInput: String,
-        subcategoryInput: String,
+        subcategoryInput: String = "",
         descriptionInput: String,
         periodId: Long?
     ): IncomeResult {
@@ -188,8 +188,8 @@ class IncomeUseCase(
             return IncomeResult.Error("El monto debe ser mayor a cero")
         }
 
-        if (categoryInput.isBlank() || subcategoryInput.isBlank()) {
-            return IncomeResult.Error("Debes seleccionar una categoría y subcategoría")
+        if (categoryInput.isBlank()) {
+            return IncomeResult.Error("Debes seleccionar una categoría")
         }
 
         if (periodId == null) {
