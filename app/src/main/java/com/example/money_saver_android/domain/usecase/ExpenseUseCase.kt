@@ -22,25 +22,14 @@ class ExpenseUseCase(
         descriptionInput: String,
         categoryInput: String,
         subcategoryInput: String = ""
-    ): ExpenseResult {
-        val amount = amountInput.toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
-            return ExpenseResult.Error("El monto debe ser mayor a cero")
-        }
-        if (categoryInput.isBlank()) {
-            return ExpenseResult.Error("Debes seleccionar una categoría")
-        }
-
-        repository.insertExpense(
-            Expense(
-                amount = amount,
-                date = dateInput,
-                description = descriptionInput,
-                category = categoryInput,
-                subcategory = subcategoryInput
-            )
-        )
-        return ExpenseResult.Success
+    ): ExpenseResult = withValidatedExpense(
+        amountInput = amountInput,
+        dateInput = dateInput,
+        descriptionInput = descriptionInput,
+        categoryInput = categoryInput,
+        subcategoryInput = subcategoryInput
+    ) { expense ->
+        repository.insertExpense(expense)
     }
 
     suspend fun updateExpense(
@@ -50,23 +39,43 @@ class ExpenseUseCase(
         descriptionInput: String,
         categoryInput: String,
         subcategoryInput: String = ""
+    ): ExpenseResult = withValidatedExpense(
+        id = id,
+        amountInput = amountInput,
+        dateInput = dateInput,
+        descriptionInput = descriptionInput,
+        categoryInput = categoryInput,
+        subcategoryInput = subcategoryInput
+    ) { expense ->
+        repository.updateExpense(expense)
+    }
+
+    private suspend fun withValidatedExpense(
+        id: Long = 0,
+        amountInput: String,
+        dateInput: String,
+        descriptionInput: String,
+        categoryInput: String,
+        subcategoryInput: String,
+        onValid: suspend (Expense) -> Unit
     ): ExpenseResult {
         val amount = amountInput.toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
+        if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return ExpenseResult.Error("El monto debe ser mayor a cero")
         }
-        if (categoryInput.isBlank()) {
+        val trimmedCategory = categoryInput.trim()
+        if (trimmedCategory.isEmpty()) {
             return ExpenseResult.Error("Debes seleccionar una categoría")
         }
 
-        repository.updateExpense(
+        onValid(
             Expense(
                 id = id,
                 amount = amount,
                 date = dateInput,
                 description = descriptionInput,
-                category = categoryInput,
-                subcategory = subcategoryInput
+                category = trimmedCategory,
+                subcategory = subcategoryInput.trim()
             )
         )
         return ExpenseResult.Success

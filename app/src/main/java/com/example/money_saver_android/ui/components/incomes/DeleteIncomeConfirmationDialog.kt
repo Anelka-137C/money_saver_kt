@@ -111,7 +111,9 @@ fun DeleteIncomeConfirmationDialog(
                             color = TextSecondary
                         )
                     }
-                    if (income.subcategory.isNotBlank() && income.subcategory != income.category) {
+                    if (income.subcategory.isNotBlank() &&
+                        !income.subcategory.trim().equals(income.category.trim(), ignoreCase = true)
+                    ) {
                         Text(
                             text = income.category,
                             fontSize = 12.sp,

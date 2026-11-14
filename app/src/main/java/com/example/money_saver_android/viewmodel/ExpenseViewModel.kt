@@ -68,7 +68,7 @@ class ExpenseViewModel(
     }
 
     fun onAmountChange(amount: String) {
-        _uiState.update { it.copy(amountInput = amount) }
+        _uiState.update { it.copy(amountInput = amount, errorMessage = null) }
     }
 
     fun onDateChange(date: String) {
@@ -80,7 +80,7 @@ class ExpenseViewModel(
     }
 
     fun onCategoryChange(category: String, subcategory: String) {
-        _uiState.update { it.copy(categoryInput = category, subcategoryInput = subcategory) }
+        _uiState.update { it.copy(categoryInput = category, subcategoryInput = subcategory, errorMessage = null) }
     }
 
     fun startEditing(expense: Expense) {
@@ -105,7 +105,7 @@ class ExpenseViewModel(
 
     fun onEditAmountChange(amount: String) {
         _uiState.update { state ->
-            state.copy(editingExpense = state.editingExpense?.copy(amount = amount))
+            state.copy(editingExpense = state.editingExpense?.copy(amount = amount, errorMessage = null))
         }
     }
 
@@ -126,7 +126,8 @@ class ExpenseViewModel(
             state.copy(
                 editingExpense = state.editingExpense?.copy(
                     category = category,
-                    subcategory = subcategory
+                    subcategory = subcategory,
+                    errorMessage = null
                 )
             )
         }

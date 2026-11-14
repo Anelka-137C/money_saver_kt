@@ -64,13 +64,15 @@ class RoomIncomeRepository(
     }
 
     override suspend fun insertCategory(category: Category) {
-        categoryDao.insertCategory(
-            IncomeCategoryEntity(
-                name = category.name,
-                icon = category.icon,
-                color = category.color
-            )
+        val entity = IncomeCategoryEntity(
+            name = category.name,
+            icon = category.icon,
+            color = category.color
         )
+        val rowId = categoryDao.insertCategory(entity)
+        if (rowId == -1L) {
+            categoryDao.updateCategory(entity)
+        }
         if (category.subcategories.isNotEmpty()) {
             categoryDao.insertSubcategories(
                 category.subcategories.map {

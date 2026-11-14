@@ -86,15 +86,18 @@ fun ExpenseCardItem(
                 Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
+                    val title = expense.subcategory.ifBlank { expense.category.ifBlank { "Gasto" } }
                     Text(
-                        text = expense.subcategory.ifBlank { expense.category.ifBlank { "Gasto" } },
+                        text = title,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     val subtitle = when {
-                        expense.description.isNotBlank() -> expense.description
-                        expense.subcategory.isNotBlank() -> expense.category
+                        expense.description.isNotBlank() &&
+                            !expense.description.trim().equals(title.trim(), ignoreCase = true) -> expense.description
+                        expense.subcategory.isNotBlank() &&
+                            !expense.subcategory.trim().equals(expense.category.trim(), ignoreCase = true) -> expense.category
                         else -> ""
                     }
                     if (subtitle.isNotBlank()) {

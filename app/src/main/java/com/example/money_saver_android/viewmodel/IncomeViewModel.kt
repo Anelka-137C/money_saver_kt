@@ -14,6 +14,7 @@ import com.example.money_saver_android.domain.usecase.CategoryBudgetItem
 import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,6 +90,9 @@ class IncomeViewModel(
     private val _uiState = MutableStateFlow(IncomeUiState())
     val uiState: StateFlow<IncomeUiState> = _uiState.asStateFlow()
 
+    private var incomesPeriodJob: Job? = null
+    private var budgetsPeriodJob: Job? = null
+
     init {
         viewModelScope.launch {
             incomeUseCase.preloadDefaultCategoriesIfNeeded()
@@ -132,9 +136,25 @@ class IncomeViewModel(
     }
 
     fun onPeriodSelected(periodId: Long?) {
-        _uiState.update { it.copy(selectedPeriodId = periodId) }
+        incomesPeriodJob?.cancel()
+        budgetsPeriodJob?.cancel()
+        val periodChanged = _uiState.value.selectedPeriodId != periodId
+        _uiState.update { current ->
+            if (periodId == null || periodChanged) {
+                current.copy(
+                    selectedPeriodId = periodId,
+                    incomes = emptyList(),
+                    totalIncome = 0.0,
+                    budgets = emptyList(),
+                    totalBudgeted = 0.0,
+                    availableIncome = 0.0
+                )
+            } else {
+                current.copy(selectedPeriodId = periodId)
+            }
+        }
         if (periodId != null) {
-            viewModelScope.launch {
+            incomesPeriodJob = viewModelScope.launch {
                 incomeUseCase.getIncomesByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { incomeList ->
@@ -145,7 +165,7 @@ class IncomeViewModel(
                         }
                     }
             }
-            viewModelScope.launch {
+            budgetsPeriodJob = viewModelScope.launch {
                 incomeUseCase.getBudgetsByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { budgetList ->
@@ -157,7 +177,8 @@ class IncomeViewModel(
                     }
             }
         } else {
-            _uiState.update { it.copy(incomes = emptyList(), totalIncome = 0.0, budgets = emptyList(), totalBudgeted = 0.0, availableIncome = 0.0) }
+            incomesPeriodJob = null
+            budgetsPeriodJob = null
         }
     }
 

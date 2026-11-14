@@ -88,8 +88,11 @@ interface IncomeCategoryDao {
     @Query("SELECT * FROM incomes_category ORDER BY name ASC")
     fun getCategoriesWithSubcategories(): Flow<List<IncomeCategoryWithSubcategories>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCategory(category: IncomeCategoryEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCategory(category: IncomeCategoryEntity): Long
+
+    @Update
+    suspend fun updateCategory(category: IncomeCategoryEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategories(categories: List<IncomeCategoryEntity>)

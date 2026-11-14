@@ -147,31 +147,15 @@ class IncomeUseCase(
         subcategoryInput: String = "",
         descriptionInput: String,
         periodId: Long?
-    ): IncomeResult {
-        val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
-            return IncomeResult.Error("El monto debe ser mayor a cero")
-        }
-
-        if (categoryInput.isBlank()) {
-            return IncomeResult.Error("Debes seleccionar una categoría")
-        }
-
-        if (periodId == null) {
-            return IncomeResult.Error("Período no seleccionado")
-        }
-
-        repository.insertIncome(
-            Income(
-                amount = amount,
-                dateTime = dateTimeInput,
-                category = categoryInput,
-                subcategory = subcategoryInput,
-                description = descriptionInput,
-                periodId = periodId
-            )
-        )
-        return IncomeResult.Success
+    ): IncomeResult = withValidatedIncome(
+        amountInput = amountInput,
+        dateTimeInput = dateTimeInput,
+        categoryInput = categoryInput,
+        subcategoryInput = subcategoryInput,
+        descriptionInput = descriptionInput,
+        periodId = periodId
+    ) { income ->
+        repository.insertIncome(income)
     }
 
     suspend fun updateIncome(
@@ -182,13 +166,35 @@ class IncomeUseCase(
         subcategoryInput: String = "",
         descriptionInput: String,
         periodId: Long?
+    ): IncomeResult = withValidatedIncome(
+        id = id,
+        amountInput = amountInput,
+        dateTimeInput = dateTimeInput,
+        categoryInput = categoryInput,
+        subcategoryInput = subcategoryInput,
+        descriptionInput = descriptionInput,
+        periodId = periodId
+    ) { income ->
+        repository.updateIncome(income)
+    }
+
+    private suspend fun withValidatedIncome(
+        id: Long = 0,
+        amountInput: String,
+        dateTimeInput: String,
+        categoryInput: String,
+        subcategoryInput: String,
+        descriptionInput: String,
+        periodId: Long?,
+        onValid: suspend (Income) -> Unit
     ): IncomeResult {
         val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
+        if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return IncomeResult.Error("El monto debe ser mayor a cero")
         }
 
-        if (categoryInput.isBlank()) {
+        val trimmedCategory = categoryInput.trim()
+        if (trimmedCategory.isEmpty()) {
             return IncomeResult.Error("Debes seleccionar una categoría")
         }
 
@@ -196,13 +202,13 @@ class IncomeUseCase(
             return IncomeResult.Error("Período no seleccionado")
         }
 
-        repository.updateIncome(
+        onValid(
             Income(
                 id = id,
                 amount = amount,
                 dateTime = dateTimeInput,
-                category = categoryInput,
-                subcategory = subcategoryInput,
+                category = trimmedCategory,
+                subcategory = subcategoryInput.trim(),
                 description = descriptionInput,
                 periodId = periodId
             )
