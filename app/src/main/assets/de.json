@@ -165,6 +165,13 @@
       "available_banner_title": "Sie haben %s verfügbar",
       "available_banner_subtitle": "%s Ihres Einkommens steht noch für Budgets zur Verfügung."
     },
+    "allocation": {
+      "title": "Budgetzuweisung",
+      "details": "Details >",
+      "budget_label": "Budget",
+      "remaining_label": "Verbleibend",
+      "empty_message": "In diesem Zeitraum sind keine Budgets zugewiesen"
+    },
     "add_dialog": {
       "title": "Budget erfassen",
       "edit_title": "Budget bearbeiten",

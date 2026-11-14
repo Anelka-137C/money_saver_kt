@@ -3,6 +3,8 @@ package com.example.money_saver_android.domain
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.IncomeRepository
+import com.example.money_saver_android.domain.model.Budget
+import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
@@ -246,5 +248,52 @@ class IncomeUseCaseTest {
         val categories = useCase.getCategories().first()
         val freelance = categories.first { it.name == "Freelance" }
         assertTrue(freelance.subcategories.none { it.name == "Web" })
+    }
+
+    @Test
+    fun test_calculate_category_budgets_consolidates_subcategories_into_single_category() {
+        val cats = listOf(Category(name = "Food & Dining", icon = "🍔", color = "#1CC88A", subcategories = emptyList()))
+        val budgets = listOf(
+            Budget(id = 1L, amount = 300.0, category = "Food & Dining", subcategory = "Supermarket", periodId = 1L),
+            Budget(id = 2L, amount = 200.0, category = "Food & Dining", subcategory = "Restaurants", periodId = 1L)
+        )
+        val result = useCase.calculateCategoryBudgets(budgets, cats, emptyList(), "2026-05-01", "2026-05-31")
+        assertEquals(1, result.size)
+        assertEquals("Food & Dining", result[0].categoryName)
+        assertEquals("#1CC88A", result[0].colorHex)
+        assertEquals(500.0, result[0].budgetAmount, 0.0)
+    }
+
+    @Test
+    fun test_calculate_category_budgets_with_zero_expenses_returns_full_budget_as_remaining_and_progress_1() {
+        val cats = listOf(Category(name = "Transport", icon = "🚗", color = "#E74A3B", subcategories = emptyList()))
+        val budgets = listOf(Budget(id = 1L, amount = 400.0, category = "Transport", periodId = 1L))
+        val result = useCase.calculateCategoryBudgets(budgets, cats, emptyList(), "2026-05-01", "2026-05-31")
+        assertEquals(400.0, result[0].remainingAmount, 0.0)
+        assertEquals(1.0f, result[0].progress, 0.001f)
+        assertEquals(100, result[0].percent)
+    }
+
+    @Test
+    fun test_calculate_category_budgets_with_partial_expenses_in_period_calculates_remaining_correctly() {
+        val cats = listOf(Category(name = "Food & Dining", icon = "🍔", color = "#1CC88A", subcategories = emptyList()))
+        val budgets = listOf(Budget(id = 1L, amount = 500.0, category = "Food & Dining", periodId = 1L))
+        val expenses = listOf(Expense(id = 1L, amount = 125.0, date = "2026-05-10", description = "Lunch", category = "Food & Dining", subcategory = "Restaurants"))
+        val result = useCase.calculateCategoryBudgets(budgets, cats, expenses, "2026-05-01", "2026-05-31")
+        assertEquals(375.0, result[0].remainingAmount, 0.0)
+        assertEquals(0.75f, result[0].progress, 0.001f)
+        assertEquals(75, result[0].percent)
+    }
+
+    @Test
+    fun test_calculate_category_budgets_ignores_expenses_outside_period_date_range() {
+        val cats = listOf(Category(name = "Food & Dining", icon = "🍔", color = "#1CC88A", subcategories = emptyList()))
+        val budgets = listOf(Budget(id = 1L, amount = 500.0, category = "Food & Dining", periodId = 1L))
+        val expenses = listOf(
+            Expense(id = 1L, amount = 200.0, date = "2026-06-05", description = "Next month", category = "Food & Dining", subcategory = "Coffee")
+        )
+        val result = useCase.calculateCategoryBudgets(budgets, cats, expenses, "2026-05-01", "2026-05-31")
+        assertEquals(500.0, result[0].remainingAmount, 0.0)
+        assertEquals(100, result[0].percent)
     }
 }

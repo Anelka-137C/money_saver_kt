@@ -65,6 +65,7 @@ import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.budget.AddEditBudgetDialog
+import com.example.money_saver_android.ui.components.budget.BudgetAllocationCard
 import com.example.money_saver_android.ui.components.budget.BudgetOverviewCard
 import com.example.money_saver_android.ui.components.budget.DeleteBudgetCategoryConfirmationDialog
 import com.example.money_saver_android.ui.components.incomes.AddIncomeCard
@@ -364,7 +365,21 @@ fun IncomesView(
                             currency = currency
                         )
 
-                        // 2. Add Budget Action Button
+                        // 2. Budget Allocation Card
+                        val categoryBudgets = remember(
+                            state.budgets,
+                            state.budgetCategories,
+                            state.expenses,
+                            activePeriod
+                        ) {
+                            incomeViewModel.calculateCategoryBudgets(activePeriod)
+                        }
+                        BudgetAllocationCard(
+                            categoryBudgets = categoryBudgets,
+                            currency = currency
+                        )
+
+                        // 3. Add Budget Action Button
                         Button(
                             onClick = { showAddBudgetDialog = true },
                             modifier = Modifier

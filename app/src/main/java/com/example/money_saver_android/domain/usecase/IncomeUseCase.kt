@@ -3,8 +3,10 @@ package com.example.money_saver_android.domain.usecase
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.BudgetRepository
+import com.example.money_saver_android.data.repository.ExpenseRepository
 import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.domain.model.Budget
+import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.Income
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -17,10 +19,22 @@ sealed class IncomeResult {
     data class Error(val message: String) : IncomeResult()
 }
 
+data class CategoryBudgetItem(
+    val categoryName: String,
+    val icon: String,
+    val colorHex: String,
+    val budgetAmount: Double,
+    val spentAmount: Double,
+    val remainingAmount: Double,
+    val progress: Float,
+    val percent: Int
+)
+
 class IncomeUseCase(
     private val repository: IncomeRepository,
     private val budgetRepository: BudgetRepository? = null,
-    private val budgetUseCase: BudgetUseCase? = budgetRepository?.let { BudgetUseCase(it, repository) }
+    private val budgetUseCase: BudgetUseCase? = budgetRepository?.let { BudgetUseCase(it, repository) },
+    private val expenseRepository: ExpenseRepository? = null
 ) {
     private val deletionMutex = Mutex()
     fun getIncomesByPeriod(periodId: Long): Flow<List<Income>> {
@@ -323,5 +337,42 @@ class IncomeUseCase(
         }
         repo.deleteSubcategory(trimmedCat, trimmedSub)
         return IncomeResult.Success
+    }
+
+    fun getExpenses(): Flow<List<Expense>> {
+        return expenseRepository?.getAllExpenses() ?: emptyFlow()
+    }
+
+    fun calculateCategoryBudgets(
+        budgets: List<Budget>,
+        categories: List<Category>,
+        expenses: List<Expense>,
+        periodStartDate: String?,
+        periodEndDate: String?
+    ): List<CategoryBudgetItem> {
+        if (budgets.isEmpty()) return emptyList()
+        return budgets.groupBy { it.category.trim().lowercase() }
+            .map { (_, catBudgets) ->
+                val rawName = catBudgets.first().category.trim()
+                val category = categories.find { it.name.equals(rawName, ignoreCase = true) }
+                val totalBudget = catBudgets.sumOf { it.amount }
+                val spent = expenses.filter { expense ->
+                    expense.category.trim().equals(rawName, ignoreCase = true) &&
+                        (periodStartDate == null || periodEndDate == null ||
+                            (expense.date >= periodStartDate && expense.date <= periodEndDate))
+                }.sumOf { it.amount }
+                val remaining = maxOf(0.0, totalBudget - spent)
+                val progress = if (totalBudget > 0.0) (remaining / totalBudget).toFloat().coerceIn(0f, 1f) else 0f
+                CategoryBudgetItem(
+                    categoryName = category?.name ?: rawName,
+                    icon = category?.icon?.ifBlank { "📋" } ?: "📋",
+                    colorHex = category?.color?.ifBlank { "#10B981" } ?: "#10B981",
+                    budgetAmount = totalBudget,
+                    spentAmount = spent,
+                    remainingAmount = remaining,
+                    progress = progress,
+                    percent = (progress * 100).toInt()
+                )
+            }
     }
 }

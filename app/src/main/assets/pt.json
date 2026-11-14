@@ -165,6 +165,13 @@
       "available_banner_title": "Tem %s disponível",
       "available_banner_subtitle": "%s das suas rendas continua disponível para orçamentar."
     },
+    "allocation": {
+      "title": "Alocação de Orçamento",
+      "details": "Detalhes >",
+      "budget_label": "Orçamento",
+      "remaining_label": "Restante",
+      "empty_message": "Não há orçamentos alocados para este período"
+    },
     "add_dialog": {
       "title": "Registar Orçamento",
       "edit_title": "Modificar Orçamento",

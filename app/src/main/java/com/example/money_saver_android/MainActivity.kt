@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val incomeUseCase by lazy {
-        IncomeUseCase(incomeRepository, budgetRepository)
+        IncomeUseCase(incomeRepository, budgetRepository, expenseRepository = repository)
     }
 
     private val incomeViewModel by lazy {

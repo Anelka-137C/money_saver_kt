@@ -1,10 +1,12 @@
 package com.example.money_saver_android.viewmodel
 
+import com.example.money_saver_android.FakeExpenseRepository
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.domain.FakeBudgetRepository
 import com.example.money_saver_android.domain.model.Budget
+import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import kotlinx.coroutines.Dispatchers
@@ -396,5 +398,16 @@ class IncomeViewModelTest {
         assertNull(vm.uiState.value.budgetCategoryToDelete)
         assertEquals(0, fakeBudgetRepo.getAllCategories().first().size)
         assertEquals("Categoría eliminada exitosamente", vm.uiState.value.budgetToastMessage)
+    }
+
+    @Test
+    fun test_income_viewmodel_collects_expenses_and_exposes_in_ui_state() = runTest {
+        val fakeExpenseRepo = FakeExpenseRepository()
+        val expense = Expense(1L, 120.0, "2026-05-10", "Groceries", "Food & Dining", "Supermarket")
+        fakeExpenseRepo.insertExpense(expense)
+        val incomeUseCase = IncomeUseCase(repository = repository, expenseRepository = fakeExpenseRepo)
+        val vm = IncomeViewModel(incomeUseCase)
+        advanceUntilIdle()
+        assertEquals(listOf(expense), vm.uiState.value.expenses)
     }
 }

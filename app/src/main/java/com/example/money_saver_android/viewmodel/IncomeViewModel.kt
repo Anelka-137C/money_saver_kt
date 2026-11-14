@@ -6,8 +6,11 @@ import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.domain.model.Budget
+import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.usecase.BudgetResult
+import com.example.money_saver_android.domain.usecase.CategoryBudgetItem
 import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import kotlinx.coroutines.Dispatchers
@@ -73,7 +76,8 @@ data class IncomeUiState(
     val budgetErrorMessage: String? = null,
     val budgetToastMessage: String? = null,
     val editingBudget: EditBudgetState? = null,
-    val budgetCategoryToDelete: Category? = null
+    val budgetCategoryToDelete: Category? = null,
+    val expenses: List<Expense> = emptyList()
 )
 
 class IncomeViewModel(
@@ -100,6 +104,11 @@ class IncomeViewModel(
         viewModelScope.launch {
             incomeUseCase.getBudgetCategories().collect { list ->
                 _uiState.update { it.copy(budgetCategories = list) }
+            }
+        }
+        viewModelScope.launch {
+            incomeUseCase.getExpenses().collect { list ->
+                _uiState.update { it.copy(expenses = list) }
             }
         }
     }
@@ -646,5 +655,16 @@ class IncomeViewModel(
                 }
             }
         }
+    }
+
+    fun calculateCategoryBudgets(activePeriod: FinancialPeriod?): List<CategoryBudgetItem> {
+        val current = _uiState.value
+        return incomeUseCase.calculateCategoryBudgets(
+            budgets = current.budgets,
+            categories = current.budgetCategories,
+            expenses = current.expenses,
+            periodStartDate = activePeriod?.startDate,
+            periodEndDate = activePeriod?.endDate
+        )
     }
 }

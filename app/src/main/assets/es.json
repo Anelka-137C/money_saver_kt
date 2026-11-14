@@ -165,6 +165,13 @@
       "available_banner_title": "Tienes %s disponible",
       "available_banner_subtitle": "%s de tus ingresos sigue disponible para presupuestar."
     },
+    "allocation": {
+      "title": "Asignación de Presupuesto",
+      "details": "Detalles >",
+      "budget_label": "Presupuesto",
+      "remaining_label": "Sobrante",
+      "empty_message": "No hay presupuestos asignados para este período"
+    },
     "add_dialog": {
       "title": "Registrar Presupuesto",
       "edit_title": "Modificar Presupuesto",

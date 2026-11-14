@@ -165,6 +165,13 @@
       "available_banner_title": "You have %s available",
       "available_banner_subtitle": "%s of your income remains available to budget."
     },
+    "allocation": {
+      "title": "Budget Allocation",
+      "details": "Details >",
+      "budget_label": "Budget",
+      "remaining_label": "Remaining",
+      "empty_message": "No budgets allocated for this period"
+    },
     "add_dialog": {
       "title": "Add Budget",
       "edit_title": "Edit Budget",

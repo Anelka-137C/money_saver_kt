@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasAnyAncestor
@@ -13,9 +14,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import com.example.money_saver_android.FakeExpenseRepository
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
+import com.example.money_saver_android.data.defaultCurrencies
+import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.FakeBudgetRepository
+import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
@@ -46,6 +51,7 @@ class IncomesViewTest {
 
     private lateinit var incomeRepository: FakeIncomeRepository
     private lateinit var budgetRepository: FakeBudgetRepository
+    private lateinit var expenseRepository: FakeExpenseRepository
     private lateinit var periodRepository: FakeFinancialPeriodRepository
     private lateinit var incomeViewModel: IncomeViewModel
     private lateinit var i18nManager: I18nManager
@@ -57,6 +63,7 @@ class IncomesViewTest {
     fun setup() {
         incomeRepository = FakeIncomeRepository()
         budgetRepository = FakeBudgetRepository()
+        expenseRepository = FakeExpenseRepository()
         periodRepository = FakeFinancialPeriodRepository(initialPeriod = period1)
         runBlocking {
             periodRepository.savePeriod(period2)
@@ -88,7 +95,7 @@ class IncomesViewTest {
                 )
             )
         }
-        val incomeUseCase = IncomeUseCase(incomeRepository, budgetRepository)
+        val incomeUseCase = IncomeUseCase(incomeRepository, budgetRepository, expenseRepository = expenseRepository)
         incomeViewModel = IncomeViewModel(incomeUseCase)
         incomeViewModel.onPeriodSelected(1L)
 
@@ -106,6 +113,7 @@ class IncomesViewTest {
               "budget": {
                 "header": { "title": "Presupuesto", "add_button": "Registrar Presupuesto" },
                 "overview": { "title": "Resumen de Presupuesto", "total_budgeted": "Total presupuestado", "available_banner_title": "Tienes %s disponible", "available_banner_subtitle": "%s disponible para presupuestar." },
+                "allocation": { "title": "Asignación de Presupuesto", "details": "Detalles >", "budget_label": "Presupuesto", "remaining_label": "Sobrante", "empty_message": "No hay presupuestos asignados para este período" },
                 "add_dialog": { "title": "Registrar Presupuesto", "edit_title": "Modificar Presupuesto", "amount_label": "Monto", "amount_placeholder": "0.00", "category_label": "Categoría", "select_category": "Seleccionar categoría", "save_button": "✓ Guardar Presupuesto", "edit_save_button": "✓ Guardar Cambios" },
                 "breakdown": { "title": "Desglose de presupuestos" },
                 "history": { "empty_message": "No hay presupuestos registrados en este período" },
@@ -466,5 +474,64 @@ class IncomesViewTest {
             val categories = budgetRepository.getAllCategories().first()
             assertTrue(categories.none { it.name == "Food & Dining" })
         }
+    }
+
+    @Test
+    fun test_budget_tab_displays_budget_allocation_card_with_categories_and_colors() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+        incomeViewModel.onTopTabSelected(FinanceTopTab.BUDGET)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("card_budget_allocation").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_budget_allocation_empty").performScrollTo().assertIsDisplayed()
+
+        incomeViewModel.onBudgetAmountChange("500")
+        incomeViewModel.onBudgetCategorySelected("Food & Dining", "Supermarket")
+        incomeViewModel.saveBudget()
+        composeTestRule.waitForIdle()
+
+        val expectedRemaining = CurrencyFormatter.format(500.0, defaultCurrencies.first())
+        composeTestRule.onNodeWithTag("mini_card_budget_Food & Dining").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_budget_remaining_Food & Dining").assertTextEquals(expectedRemaining)
+        composeTestRule.onNodeWithTag("progress_budget_Food & Dining").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasAnyAncestor(hasTestTag("mini_card_budget_Food & Dining")) and hasText("100%")).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun test_budget_allocation_card_updates_remaining_reactively_when_expense_is_added() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+        incomeViewModel.onTopTabSelected(FinanceTopTab.BUDGET)
+        incomeViewModel.onBudgetAmountChange("500")
+        incomeViewModel.onBudgetCategorySelected("Food & Dining", "Supermarket")
+        incomeViewModel.saveBudget()
+        composeTestRule.waitForIdle()
+
+        runBlocking {
+            expenseRepository.insertExpense(Expense(1L, 125.0, "2026-05-10", "Lunch", "Food & Dining", "Supermarket"))
+        }
+        composeTestRule.waitForIdle()
+
+        val expectedRemaining = CurrencyFormatter.format(375.0, defaultCurrencies.first())
+        composeTestRule.onNodeWithTag("text_budget_remaining_Food & Dining").performScrollTo().assertTextEquals(expectedRemaining)
+        composeTestRule.onNode(hasAnyAncestor(hasTestTag("mini_card_budget_Food & Dining")) and hasText("75%")).performScrollTo().assertIsDisplayed()
     }
 }
