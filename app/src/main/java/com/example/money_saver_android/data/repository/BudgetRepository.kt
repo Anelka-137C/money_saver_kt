@@ -73,13 +73,15 @@ class RoomBudgetRepository(
 
     override suspend fun insertCategory(category: Category) {
         val dao = categoryDao ?: return
-        dao.insertCategory(
-            BudgetCategoryEntity(
-                name = category.name,
-                icon = category.icon,
-                color = category.color
-            )
+        val entity = BudgetCategoryEntity(
+            name = category.name,
+            icon = category.icon,
+            color = category.color
         )
+        val rowId = dao.insertCategory(entity)
+        if (rowId == -1L) {
+            dao.updateCategory(entity)
+        }
         if (category.subcategories.isNotEmpty()) {
             dao.insertSubcategories(
                 category.subcategories.map {

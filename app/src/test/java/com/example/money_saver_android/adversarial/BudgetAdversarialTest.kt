@@ -438,6 +438,12 @@ class BudgetAdversarialTest {
             periodId = periodId
         )
 
+        assertTrue(
+            "Actualizar un ID inexistente debe retornar error 'Presupuesto no encontrado'",
+            updateResult is BudgetResult.Error
+        )
+        assertEquals("Presupuesto no encontrado", (updateResult as BudgetResult.Error).message)
+
         val budgetsInDb = budgetUseCase.getBudgetsByPeriod(periodId).first()
         assertTrue(
             "Un presupuesto inexistente no debe crearse ni aparecer en la lista mediante update",

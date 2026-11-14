@@ -10,6 +10,7 @@ import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.usecase.BudgetResult
 import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -257,7 +258,7 @@ class IncomeViewModel(
 
     fun createCategory() {
         val current = _uiState.value
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             when (val result = incomeUseCase.createCategory(
                 nameInput = current.newCategoryNameInput,
                 colorInput = current.selectedColorHex
@@ -623,13 +624,19 @@ class IncomeViewModel(
         viewModelScope.launch {
             when (val result = incomeUseCase.deleteBudgetSubcategory(categoryName, subcategoryName)) {
                 is IncomeResult.Success -> {
-                    val trimmedSub = subcategoryName.trim()
+                    val trimmedCategory = categoryName.trim()
+                    val trimmedSubcategory = subcategoryName.trim()
                     _uiState.update { current ->
-                        val shouldClear = current.budgetSubcategoryInput.equals(trimmedSub, ignoreCase = true)
-                        val shouldClearEdit = current.editingBudget?.subcategory?.equals(trimmedSub, ignoreCase = true) == true
+                        val shouldClearForm = current.budgetCategoryInput.equals(trimmedCategory, ignoreCase = true) &&
+                                current.budgetSubcategoryInput.equals(trimmedSubcategory, ignoreCase = true)
+                        val shouldClearEdit = current.editingBudget?.let { edit ->
+                            edit.category.equals(trimmedCategory, ignoreCase = true) &&
+                                    edit.subcategory.equals(trimmedSubcategory, ignoreCase = true)
+                        } == true
                         current.copy(
-                            budgetSubcategoryInput = if (shouldClear) "" else current.budgetSubcategoryInput,
+                            budgetSubcategoryInput = if (shouldClearForm) "" else current.budgetSubcategoryInput,
                             editingBudget = if (shouldClearEdit) current.editingBudget?.copy(subcategory = "") else current.editingBudget,
+                            subcategoryError = null,
                             budgetToastMessage = "Subcategoría eliminada exitosamente"
                         )
                     }

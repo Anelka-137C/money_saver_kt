@@ -5,6 +5,8 @@ import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.domain.model.Budget
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 sealed class BudgetResult {
     object Success : BudgetResult()
@@ -15,6 +17,7 @@ class BudgetUseCase(
     private val budgetRepository: BudgetRepository,
     private val incomeRepository: IncomeRepository
 ) {
+    private val budgetMutex = Mutex()
 
     fun getBudgetsByPeriod(periodId: Long): Flow<List<Budget>> {
         return budgetRepository.getBudgetsByPeriod(periodId)
@@ -39,7 +42,7 @@ class BudgetUseCase(
         }
 
         val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
+        if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return BudgetResult.Error("El monto debe ser mayor a cero")
         }
 
@@ -47,24 +50,26 @@ class BudgetUseCase(
             return BudgetResult.Error("Debes seleccionar una categoría")
         }
 
-        val totalIncome = incomeRepository.getIncomesByPeriod(periodId).first().sumOf { it.amount }
-        val currentBudgets = budgetRepository.getBudgetsByPeriod(periodId).first()
-        val totalBudgeted = currentBudgets.sumOf { it.amount }
-        val available = totalIncome - totalBudgeted
+        return budgetMutex.withLock {
+            val totalIncome = incomeRepository.getIncomesByPeriod(periodId).first().sumOf { it.amount }
+            val currentBudgets = budgetRepository.getBudgetsByPeriod(periodId).first()
+            val totalBudgeted = currentBudgets.sumOf { it.amount }
+            val available = totalIncome - totalBudgeted
 
-        if (amount > available) {
-            return BudgetResult.Error("El monto supera el ingreso disponible")
-        }
+            if (amount > available) {
+                return@withLock BudgetResult.Error("El monto supera el ingreso disponible")
+            }
 
-        budgetRepository.insertBudget(
-            Budget(
-                amount = amount,
-                category = categoryInput,
-                subcategory = subcategoryInput,
-                periodId = periodId
+            budgetRepository.insertBudget(
+                Budget(
+                    amount = amount,
+                    category = categoryInput,
+                    subcategory = subcategoryInput,
+                    periodId = periodId
+                )
             )
-        )
-        return BudgetResult.Success
+            BudgetResult.Success
+        }
     }
 
     suspend fun updateBudget(
@@ -79,7 +84,7 @@ class BudgetUseCase(
         }
 
         val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
-        if (amount <= 0.0) {
+        if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return BudgetResult.Error("El monto debe ser mayor a cero")
         }
 
@@ -87,27 +92,30 @@ class BudgetUseCase(
             return BudgetResult.Error("Debes seleccionar una categoría")
         }
 
-        val currentBudgets = budgetRepository.getBudgetsByPeriod(periodId).first()
-        val currentBudget = currentBudgets.find { it.id == id }
-        val currentBudgetAmount = currentBudget?.amount ?: 0.0
+        return budgetMutex.withLock {
+            val currentBudgets = budgetRepository.getBudgetsByPeriod(periodId).first()
+            val currentBudget = currentBudgets.find { it.id == id }
+                ?: return@withLock BudgetResult.Error("Presupuesto no encontrado")
+            val currentBudgetAmount = currentBudget.amount
 
-        val totalIncome = incomeRepository.getIncomesByPeriod(periodId).first().sumOf { it.amount }
-        val totalBudgetedWithoutCurrent = currentBudgets.sumOf { it.amount } - currentBudgetAmount
-        val availableForUpdate = totalIncome - totalBudgetedWithoutCurrent
+            val totalIncome = incomeRepository.getIncomesByPeriod(periodId).first().sumOf { it.amount }
+            val totalBudgetedWithoutCurrent = currentBudgets.sumOf { it.amount } - currentBudgetAmount
+            val availableForUpdate = totalIncome - totalBudgetedWithoutCurrent
 
-        if (amount > availableForUpdate) {
-            return BudgetResult.Error("El monto supera el ingreso disponible")
-        }
+            if (amount > availableForUpdate) {
+                return@withLock BudgetResult.Error("El monto supera el ingreso disponible")
+            }
 
-        budgetRepository.updateBudget(
-            Budget(
-                id = id,
-                amount = amount,
-                category = categoryInput,
-                subcategory = subcategoryInput,
-                periodId = periodId
+            budgetRepository.updateBudget(
+                Budget(
+                    id = id,
+                    amount = amount,
+                    category = categoryInput,
+                    subcategory = subcategoryInput,
+                    periodId = periodId
+                )
             )
-        )
-        return BudgetResult.Success
+            BudgetResult.Success
+        }
     }
 }

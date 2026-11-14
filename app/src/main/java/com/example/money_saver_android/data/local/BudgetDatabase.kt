@@ -89,8 +89,11 @@ interface BudgetCategoryDao {
     @Query("SELECT * FROM budget_category ORDER BY name ASC")
     fun getCategoriesWithSubcategories(): Flow<List<BudgetCategoryWithSubcategories>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCategory(category: BudgetCategoryEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCategory(category: BudgetCategoryEntity): Long
+
+    @Update
+    suspend fun updateCategory(category: BudgetCategoryEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategories(categories: List<BudgetCategoryEntity>)

@@ -1,0 +1,225 @@
+%-------------------------
+% CV modificado de  Jake's resume
+% Empieza a modificar en la línea 108
+%------------------------
+
+\documentclass[letterpaper,12pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[spanish]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+\usepackage{fontawesome5}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+\usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+\newcommand{\courseItem}[2]{
+    \vspace{2mm}
+    \hspace{-8mm}
+    \textit{#1}
+    \vspace{-2mm}
+  \item\small{
+    {#2 \vspace{-2mm}}
+  }
+}
+
+
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+%----------HEADING----------
+%
+\begin{center}
+    \textbf{\Huge \scshape Nicolas Anelka Casas Parra} \\ \vspace{4mm}
+    \faPhone\ \small +57 3008868934 $|$ \faEnvelope\ \href{nccasas123@gmail.com}{nccasas123@gmail.com} $|$
+    \faLinkedin\ \href{https://linkedin.com/in/}{nicolascasasp}
+    $|$
+    \faGithub\ \href{https://github.com/Anelka-137C}{Anelka-137C}
+\end{center}
+
+
+
+
+%-----------EXPERIENCIA-----------
+
+\section{Experiencia Laboral}
+    \resumeSubHeadingListStart
+    \resumeSubheading
+       {Desarrollador Full-Stack}{Julio 2022 - Presente}
+      {Indra Company}{Barranquilla, Colombia}
+      \resumeItemListStart
+      \resumeItem{Desarrollo backend utilizando una arquitectura orientada a microservicios con Java, desplegada en servidores Linux.}
+      \resumeItem{Mantenimiento y mejora de una aplicación monolítica en Java, incluyendo corrección de errores y mejoras de rendimiento.}
+      \resumeItem{Gestión de migración y evolución de esquemas de bases de datos utilizando Liquibase en entornos Oracle, SQL Server y PostgreSQL.}
+        \resumeItem{Desarrollo de nuevos módulos web utilizando React, Next y TypeScript, permitiendo a los empleados gestionar procesos de facturación y contabilidad.}
+        \resumeItem{Desarrollo de procesos offline para generar tareas que manejan millones de registros con Java, enfocados en el módulo de contabilidad y facturación.}
+        \resumeItem{Optimización de consultas SQL y desarrollo de vistas, procedimientos almacenados y funciones.}
+        \resumeItem{Capacitar nuevos desarrolladores.}
+        \resumeItemListEnd
+      \vspace{-3mm}
+\resumeSubHeadingListEnd
+ % \resumeSubHeadingListStart
+    % \resumeSubheading
+    %    {Desarrollador Full-Stack}{Septiembre 2022 - Enero 2023}
+    %   {Freelance.com}{Barranquilla, Colombia}
+    %   \resumeItemListStart
+    %   \resumeItem{Desarrollo de interfaces de usuario con React y microservicios en Golang, mejorando aplicaciones web.}
+    %     \resumeItemListEnd
+
+
+% \resumeSubHeadingListEnd
+
+
+%-----------EDUCACIÓN-----------
+\section{Educación}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Ingeniería Electrónica}{Julio 2017 -- Septiembre 2022}
+      {Universidad del Norte}{Barranquilla, Colombia}
+  \resumeSubHeadingListEnd
+  %
+
+%
+%-----------CURSOS RELEVANTES-----------
+\section{Relevant Courses}
+    \resumeSubHeadingListStart
+    \resumeSubheading
+       {Spring Boot \& Spring WebFlux Programación Reactiva RESTful}{}
+      {Udemy}{}
+      \resumeItemListStart
+      \resumeItem{Course on learning Reactive programming and WebFlux.}
+
+        \resumeItemListEnd
+
+    \resumeSubheading
+       {Modern Java - Learn Java 8 Features By coding it}{}
+      {Udemy}{}
+      \resumeItemListStart
+      \resumeItem{Course on learning Java 8 functionalities.}
+        \resumeItemListEnd
+
+    \resumeSubheading
+       {Docker - Guía práctica de uso para desarrolladores}{}
+      {Udemy}{}
+      \resumeItemListStart
+      \resumeItem{Curso para aprender funcionalidades de Docker.}
+        \resumeItemListEnd
+
+    \resumeSubheading
+       {Apache Kafka con Java, Spring framework y AWS}{}
+      {Udemy}{}
+      \resumeItemListStart
+      \resumeItem{Curso de kafka.}
+        \resumeItemListEnd
+  \resumeSubHeadingListEnd
+  %-----------HABILIDADES-----------
+\section{Tecnologías}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     \textbf{Lenguajes de Programación}{: Java(v8, v11), Golang(v1.20), TypeScript} \\
+     \textbf{Computación en la Nube}{: AWS - Amazon Web Service} \\
+     \textbf{Bases de Datos}{: SQL(Oracle, SQL Server, PostgreSQL), NoSQL(MongoDB)} \\
+     \textbf{Frameworks}{: Spring, Gin, React } \\
+     \textbf{Broker de Mensajería}{: Kafka, RabbitMQ } \\
+     \textbf{Control de Versiones}{: Git, SVN } \\
+     \textbf{Idiomas}{: Español nativo, Inglés nivel intermedio} \\
+     \textbf{Herramientas de Monitoreo}{: Grafana} \\
+     \textbf{CI/CD}{: Github Actions, Gitlab CI}\\
+     \textbf{Contenedores}{: Docker, Docker Compose}
+    }}
+ \end{itemize}
+
+%------------------------------------------
+%-------------------------------------------
+
+
+\end{document}
