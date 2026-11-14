@@ -534,4 +534,99 @@ class IncomesViewTest {
         composeTestRule.onNodeWithTag("text_budget_remaining_Food & Dining").performScrollTo().assertTextEquals(expectedRemaining)
         composeTestRule.onNode(hasAnyAncestor(hasTestTag("mini_card_budget_Food & Dining")) and hasText("75%")).performScrollTo().assertIsDisplayed()
     }
+
+    @Test
+    fun test_creating_income_category_and_subcategory_does_not_hide_add_income_dialog() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // 1. Open Add Income Dialog
+        composeTestRule.onNodeWithTag("btn_toggle_add_income").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("card_add_income").assertIsDisplayed()
+
+        // 2. Simulate creating a category
+        incomeViewModel.onNewCategoryNameChange("Investments")
+        incomeViewModel.createCategory()
+        composeTestRule.waitForIdle()
+
+        // 3. Verify dialog is STILL displayed
+        composeTestRule.onNodeWithTag("card_add_income").assertIsDisplayed()
+
+        // 4. Simulate creating a subcategory
+        incomeViewModel.onNewSubcategoryNameChange("Dividends")
+        incomeViewModel.createSubcategory("Investments")
+        composeTestRule.waitForIdle()
+
+        // 5. Verify dialog is STILL displayed
+        composeTestRule.onNodeWithTag("card_add_income").assertIsDisplayed()
+
+        // 6. Complete and save income
+        composeTestRule.onNodeWithTag("input_income_amount").performScrollTo().performTextInput("500")
+        incomeViewModel.onDateTimeChange("2026-05-20 12:00")
+        incomeViewModel.onCategorySelected("Investments", "Dividends")
+        composeTestRule.onNodeWithTag("btn_save_income").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // 7. Verify dialog is now closed after saving
+        composeTestRule.onNodeWithTag("card_add_income").assertDoesNotExist()
+    }
+
+    @Test
+    fun test_creating_budget_category_and_subcategory_does_not_hide_budget_dialog() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Switch to Budget tab
+        incomeViewModel.onTopTabSelected(FinanceTopTab.BUDGET)
+        composeTestRule.waitForIdle()
+
+        // 1. Open Add Budget Dialog
+        composeTestRule.onNodeWithTag("btn_toggle_add_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("card_add_edit_budget").assertIsDisplayed()
+
+        // 2. Simulate creating a budget category
+        incomeViewModel.onNewCategoryNameChange("Health & Fitness")
+        incomeViewModel.createBudgetCategory()
+        composeTestRule.waitForIdle()
+
+        // 3. Verify dialog is STILL displayed
+        composeTestRule.onNodeWithTag("card_add_edit_budget").assertIsDisplayed()
+
+        // 4. Simulate creating a budget subcategory
+        incomeViewModel.onNewSubcategoryNameChange("Gym")
+        incomeViewModel.createBudgetSubcategory("Health & Fitness")
+        composeTestRule.waitForIdle()
+
+        // 5. Verify dialog is STILL displayed
+        composeTestRule.onNodeWithTag("card_add_edit_budget").assertIsDisplayed()
+
+        // 6. Complete and save budget
+        composeTestRule.onNodeWithTag("input_budget_amount").performTextInput("150")
+        incomeViewModel.onBudgetCategorySelected("Health & Fitness", "Gym")
+        composeTestRule.onNodeWithTag("btn_save_budget").performClick()
+        composeTestRule.waitForIdle()
+
+        // 7. Verify dialog is now closed after saving
+        composeTestRule.onNodeWithTag("card_add_edit_budget").assertDoesNotExist()
+    }
 }

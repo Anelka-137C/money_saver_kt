@@ -114,18 +114,22 @@ fun IncomesView(
     var showBudgetEditCategorySheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.toastMessage) {
-        state.toastMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+        state.toastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            if (message == IncomeViewModel.MSG_INCOME_SAVED) {
+                showAddForm = false
+            }
             incomeViewModel.clearToastMessage()
-            showAddForm = false
         }
     }
 
     LaunchedEffect(state.budgetToastMessage) {
-        state.budgetToastMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+        state.budgetToastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            if (message == IncomeViewModel.MSG_BUDGET_SAVED) {
+                showAddBudgetDialog = false
+            }
             incomeViewModel.clearBudgetToastMessage()
-            showAddBudgetDialog = false
         }
     }
 

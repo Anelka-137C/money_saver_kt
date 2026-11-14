@@ -85,6 +85,17 @@ class IncomeViewModel(
     private val incomeUseCase: IncomeUseCase
 ) : ViewModel() {
 
+    companion object {
+        const val MSG_INCOME_SAVED = "Ingreso guardado exitosamente"
+        const val MSG_INCOME_DELETED = "Ingreso eliminado exitosamente"
+        const val MSG_BUDGET_SAVED = "Presupuesto guardado exitosamente"
+        const val MSG_BUDGET_UPDATED = "Presupuesto actualizado exitosamente"
+        const val MSG_CATEGORY_CREATED = "Categoría creada exitosamente"
+        const val MSG_SUBCATEGORY_CREATED = "Subcategoría creada exitosamente"
+        const val MSG_CATEGORY_DELETED = "Categoría eliminada exitosamente"
+        const val MSG_SUBCATEGORY_DELETED = "Subcategoría eliminada exitosamente"
+    }
+
     constructor(incomeRepository: IncomeRepository) : this(IncomeUseCase(incomeRepository))
 
     private val _uiState = MutableStateFlow(IncomeUiState())
@@ -199,7 +210,7 @@ class IncomeViewModel(
                             amountInput = "",
                             descriptionInput = "",
                             errorMessage = null,
-                            toastMessage = "Ingreso guardado exitosamente"
+                            toastMessage = MSG_INCOME_SAVED
                         )
                     }
                 }
@@ -223,7 +234,7 @@ class IncomeViewModel(
                             subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
                             editingIncome = if (shouldClearEdit) current.editingIncome?.copy(category = "", subcategory = "") else current.editingIncome,
                             errorMessage = null,
-                            toastMessage = "Categoría eliminada exitosamente"
+                            toastMessage = MSG_CATEGORY_DELETED
                         )
                     }
                 }
@@ -251,7 +262,7 @@ class IncomeViewModel(
                             subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
                             editingIncome = if (shouldClearEdit) current.editingIncome?.copy(subcategory = "") else current.editingIncome,
                             subcategoryError = null,
-                            toastMessage = "Subcategoría eliminada exitosamente"
+                            toastMessage = MSG_SUBCATEGORY_DELETED
                         )
                     }
                 }
@@ -288,7 +299,7 @@ class IncomeViewModel(
 
     fun createCategory() {
         val current = _uiState.value
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             when (val result = incomeUseCase.createCategory(
                 nameInput = current.newCategoryNameInput,
                 colorInput = current.selectedColorHex
@@ -302,7 +313,7 @@ class IncomeViewModel(
                             newCategoryNameInput = "",
                             selectedColorHex = "#4E73DF",
                             categoryError = null,
-                            toastMessage = "Categoría creada exitosamente"
+                            toastMessage = MSG_CATEGORY_CREATED
                         )
                     }
                 }
@@ -329,7 +340,7 @@ class IncomeViewModel(
                         it.copy(
                             newSubcategoryNameInput = "",
                             subcategoryError = null,
-                            toastMessage = "Subcategoría creada exitosamente"
+                            toastMessage = MSG_SUBCATEGORY_CREATED
                         )
                     }
                 }
@@ -413,7 +424,7 @@ class IncomeViewModel(
                     _uiState.update {
                         it.copy(
                             editingIncome = null,
-                            toastMessage = "Ingreso guardado exitosamente"
+                            toastMessage = MSG_INCOME_SAVED
                         )
                     }
                 }
@@ -441,7 +452,7 @@ class IncomeViewModel(
                     _uiState.update {
                         it.copy(
                             incomeToDelete = null,
-                            toastMessage = "Ingreso eliminado exitosamente"
+                            toastMessage = MSG_INCOME_DELETED
                         )
                     }
                 }
@@ -490,7 +501,7 @@ class IncomeViewModel(
                             budgetCategoryInput = "",
                             budgetSubcategoryInput = "",
                             budgetErrorMessage = null,
-                            budgetToastMessage = "Presupuesto guardado exitosamente"
+                            budgetToastMessage = MSG_BUDGET_SAVED
                         )
                     }
                 }
@@ -545,7 +556,7 @@ class IncomeViewModel(
                     _uiState.update {
                         it.copy(
                             editingBudget = null,
-                            budgetToastMessage = "Presupuesto actualizado exitosamente"
+                            budgetToastMessage = MSG_BUDGET_UPDATED
                         )
                     }
                 }
@@ -571,7 +582,7 @@ class IncomeViewModel(
                         it.copy(
                             newCategoryNameInput = "",
                             categoryError = null,
-                            budgetToastMessage = "Categoría creada exitosamente"
+                            budgetToastMessage = MSG_CATEGORY_CREATED
                         )
                     }
                 }
@@ -595,7 +606,7 @@ class IncomeViewModel(
                         it.copy(
                             newSubcategoryNameInput = "",
                             subcategoryError = null,
-                            budgetToastMessage = "Subcategoría creada exitosamente"
+                            budgetToastMessage = MSG_SUBCATEGORY_CREATED
                         )
                     }
                 }
@@ -618,7 +629,7 @@ class IncomeViewModel(
                             budgetCategoryInput = if (shouldClear) "" else current.budgetCategoryInput,
                             budgetSubcategoryInput = if (shouldClear) "" else current.budgetSubcategoryInput,
                             editingBudget = if (shouldClearEdit) current.editingBudget?.copy(category = "", subcategory = "") else current.editingBudget,
-                            budgetToastMessage = "Categoría eliminada exitosamente"
+                            budgetToastMessage = MSG_CATEGORY_DELETED
                         )
                     }
                 }
@@ -667,7 +678,7 @@ class IncomeViewModel(
                             budgetSubcategoryInput = if (shouldClearForm) "" else current.budgetSubcategoryInput,
                             editingBudget = if (shouldClearEdit) current.editingBudget?.copy(subcategory = "") else current.editingBudget,
                             subcategoryError = null,
-                            budgetToastMessage = "Subcategoría eliminada exitosamente"
+                            budgetToastMessage = MSG_SUBCATEGORY_DELETED
                         )
                     }
                 }
