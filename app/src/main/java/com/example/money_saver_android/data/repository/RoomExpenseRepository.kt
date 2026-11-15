@@ -8,47 +8,46 @@ import kotlinx.coroutines.flow.map
 
 class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
     override fun getAllExpenses(): Flow<List<Expense>> {
-        return dao.getAll().map { list ->
-            list.map { entity ->
-                Expense(
-                    id = entity.id,
-                    amount = entity.amount,
-                    date = entity.date,
-                    description = entity.description,
-                    category = entity.category,
-                    subcategory = entity.subcategory.orEmpty()
-                )
-            }
-        }
+        return dao.getAll().map { list -> list.map { it.toDomain() } }
+    }
+
+    override fun getExpensesByPeriod(periodId: Long): Flow<List<Expense>> {
+        return dao.getByPeriod(periodId).map { list -> list.map { it.toDomain() } }
     }
 
     override suspend fun insertExpense(expense: Expense) {
-        dao.insert(
-            ExpenseEntity(
-                id = expense.id,
-                amount = expense.amount,
-                date = expense.date,
-                description = expense.description,
-                category = expense.category,
-                subcategory = expense.subcategory.takeIf { it.isNotBlank() }
-            )
-        )
+        dao.insert(expense.toEntity())
     }
 
     override suspend fun updateExpense(expense: Expense) {
-        dao.update(
-            ExpenseEntity(
-                id = expense.id,
-                amount = expense.amount,
-                date = expense.date,
-                description = expense.description,
-                category = expense.category,
-                subcategory = expense.subcategory.takeIf { it.isNotBlank() }
-            )
-        )
+        dao.update(expense.toEntity())
     }
 
     override suspend fun deleteExpense(id: Long) {
         dao.deleteById(id)
     }
+
+    private fun ExpenseEntity.toDomain(): Expense = Expense(
+        id = id,
+        amount = amount,
+        date = date,
+        description = description,
+        category = category,
+        subcategory = subcategory.orEmpty(),
+        periodId = periodId ?: 0L,
+        budgetId = budgetId ?: 0L,
+        budgetCategory = budgetCategory.orEmpty()
+    )
+
+    private fun Expense.toEntity(): ExpenseEntity = ExpenseEntity(
+        id = id,
+        amount = amount,
+        date = date,
+        description = description,
+        category = category,
+        subcategory = subcategory.takeIf { it.isNotBlank() },
+        periodId = periodId.takeIf { it > 0L },
+        budgetId = budgetId.takeIf { it > 0L },
+        budgetCategory = budgetCategory.takeIf { it.isNotBlank() }
+    )
 }

@@ -4,6 +4,8 @@ import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.CategoryRepository
 import com.example.money_saver_android.data.repository.ExpenseRepository
+import com.example.money_saver_android.domain.FakeBudgetRepository
+import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
@@ -19,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -447,5 +450,93 @@ class ExpenseViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals("El nombre de la subcategoría no puede estar vacío", state.subcategoryErrorMessage)
+    }
+
+    @Test
+    fun onPeriodSelected_loadsBudgetsAndExpensesAndCancelsOldCollectors() = runTest(testDispatcher) {
+        val budgetRepo = FakeBudgetRepository()
+        val scopedVm = ExpenseViewModel(ExpenseUseCase(repository, budgetRepo), CategoryUseCase(categoryRepository))
+        val b1Id = budgetRepo.insertBudget(Budget(amount = 300.0, category = "Fijos", subcategory = "Renta", periodId = 1L))
+        val b2Id = budgetRepo.insertBudget(Budget(amount = 200.0, category = "Ocio", periodId = 2L))
+        repository.insertExpense(Expense(id = 1L, amount = 80.0, date = "2026-11-01", description = "Luz", category = "Servicios", periodId = 1L, budgetId = b1Id, budgetCategory = "Fijos"))
+        repository.insertExpense(Expense(id = 2L, amount = 50.0, date = "2026-12-01", description = "Cine", category = "Ocio", periodId = 2L, budgetId = b2Id, budgetCategory = "Ocio"))
+
+        scopedVm.onPeriodSelected(1L)
+        advanceUntilIdle()
+        assertTrue(scopedVm.uiState.value.hasActiveBudget)
+        assertEquals(300.0, scopedVm.uiState.value.totalBudgeted, 0.01)
+        assertEquals(80.0, scopedVm.uiState.value.totalSpent, 0.01)
+
+        scopedVm.onPeriodSelected(2L)
+        advanceUntilIdle()
+        assertEquals(200.0, scopedVm.uiState.value.totalBudgeted, 0.01)
+        assertEquals(50.0, scopedVm.uiState.value.totalSpent, 0.01)
+
+        // Old period 1 collector must stay cancelled when period 1 mutates
+        budgetRepo.insertBudget(Budget(amount = 999.0, category = "Extra", periodId = 1L))
+        repository.insertExpense(Expense(id = 3L, amount = 99.0, date = "2026-11-02", description = "Gas", category = "Servicios", periodId = 1L, budgetId = b1Id, budgetCategory = "Fijos"))
+        advanceUntilIdle()
+        assertEquals(200.0, scopedVm.uiState.value.totalBudgeted, 0.01)
+        assertEquals(50.0, scopedVm.uiState.value.totalSpent, 0.01)
+
+        scopedVm.onPeriodSelected(3L)
+        advanceUntilIdle()
+        assertFalse(scopedVm.uiState.value.hasActiveBudget)
+        assertEquals(0.0, scopedVm.uiState.value.totalBudgeted, 0.01)
+        assertEquals(0.0, scopedVm.uiState.value.totalSpent, 0.01)
+    }
+
+    @Test
+    fun saveExpense_withBudgetRepo_requiresBudgetAndPersistsBothSelectors() = runTest(testDispatcher) {
+        val budgetRepo = FakeBudgetRepository()
+        val scopedVm = ExpenseViewModel(ExpenseUseCase(repository, budgetRepo), CategoryUseCase(categoryRepository))
+        val bId = budgetRepo.insertBudget(Budget(amount = 500.0, category = "Gastos Fijos", subcategory = "Comida", periodId = 1L))
+
+        scopedVm.onPeriodSelected(2L)
+        advanceUntilIdle()
+        assertFalse(scopedVm.uiState.value.hasActiveBudget)
+        scopedVm.onAmountChange("50.0")
+        scopedVm.onDateChange("2026-11-06")
+        scopedVm.onCategoryChange("Alimentación", "Restaurante")
+        scopedVm.saveExpense()
+        advanceUntilIdle()
+        assertEquals("Se requiere definir un presupuesto activo en el período", scopedVm.uiState.value.errorMessage)
+
+        scopedVm.onPeriodSelected(1L)
+        advanceUntilIdle()
+        val budget = scopedVm.uiState.value.budgets.first()
+        scopedVm.onBudgetSelected(budget)
+        scopedVm.onAmountChange("120.0")
+        scopedVm.onDateChange("2026-11-06")
+        scopedVm.onDescriptionChange("Cena")
+        scopedVm.onCategoryChange("Alimentación", "Restaurante")
+        scopedVm.saveExpense()
+        advanceUntilIdle()
+
+        val saved = scopedVm.uiState.value.expenses.single()
+        assertEquals(1L, saved.periodId)
+        assertEquals(bId, saved.budgetId)
+        assertEquals("Gastos Fijos", saved.budgetCategory)
+        assertEquals("Alimentación", saved.category)
+        assertEquals("Restaurante", saved.subcategory)
+        assertNull(scopedVm.uiState.value.budgetIdInput)
+        assertEquals("", scopedVm.uiState.value.budgetCategoryInput)
+    }
+
+    @Test
+    fun calculateCategoryExpenses_consolidatesSubcategoriesByCategory() = runTest(testDispatcher) {
+        repository.insertExpense(Expense(id = 1L, amount = 60.0, date = "2026-11-01", description = "Almuerzo", category = "Alimentación", subcategory = "Restaurante"))
+        repository.insertExpense(Expense(id = 2L, amount = 40.0, date = "2026-11-02", description = "Mercado", category = "Alimentación", subcategory = "Supermercado"))
+        repository.insertExpense(Expense(id = 3L, amount = 100.0, date = "2026-11-03", description = "Bus", category = "Transporte", subcategory = ""))
+        advanceUntilIdle()
+
+        val grouped = viewModel.calculateCategoryExpenses()
+        assertEquals(2, grouped.size)
+        val food = grouped.first { it.categoryName == "Alimentación" }
+        val transport = grouped.first { it.categoryName == "Transporte" }
+        assertEquals(100.0, food.spentAmount, 0.01)
+        assertEquals(50, food.percent)
+        assertEquals(100.0, transport.spentAmount, 0.01)
+        assertEquals(50, transport.percent)
     }
 }

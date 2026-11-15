@@ -1,6 +1,7 @@
 package com.example.money_saver_android.domain
 
 import com.example.money_saver_android.data.repository.ExpenseRepository
+import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
@@ -193,5 +194,70 @@ class ExpenseUseCaseTest {
         assertTrue(result is ExpenseResult.Success)
         val list = useCase.getExpenses().first()
         assertEquals(0, list.size)
+    }
+
+    @Test
+    fun saveExpense_whenNoActiveBudgetInPeriod_returnsError() = runBlocking {
+        val budgetRepo = FakeBudgetRepository()
+        val conditionedUseCase = ExpenseUseCase(repository, budgetRepo)
+
+        val result = conditionedUseCase.saveExpense(
+            amountInput = "50.0",
+            dateInput = "2026-05-10",
+            descriptionInput = "Almuerzo",
+            categoryInput = "Comida",
+            periodId = 1L,
+            budgetId = 1L,
+            budgetCategoryInput = "Food & Dining"
+        )
+
+        assertTrue(result is ExpenseResult.Error)
+        assertEquals("Se requiere definir un presupuesto activo en el período", (result as ExpenseResult.Error).message)
+    }
+
+    @Test
+    fun saveExpense_whenBudgetIdAndCategoryMismatch_returnsError() = runBlocking {
+        val budgetRepo = FakeBudgetRepository()
+        val budgetId = budgetRepo.insertBudget(Budget(amount = 300.0, category = "Food & Dining", periodId = 1L))
+        val conditionedUseCase = ExpenseUseCase(repository, budgetRepo)
+
+        val result = conditionedUseCase.saveExpense(
+            amountInput = "50.0",
+            dateInput = "2026-05-10",
+            descriptionInput = "Taxi",
+            categoryInput = "Transporte",
+            periodId = 1L,
+            budgetId = budgetId,
+            budgetCategoryInput = "Transport"
+        )
+
+        assertTrue(result is ExpenseResult.Error)
+        assertEquals("El presupuesto seleccionado no corresponde al período activo", (result as ExpenseResult.Error).message)
+    }
+
+    @Test
+    fun saveExpense_withValidBudgetAndExpenseCategory_persistsPeriodAndBudgetLink() = runBlocking {
+        val budgetRepo = FakeBudgetRepository()
+        val budgetId = budgetRepo.insertBudget(Budget(amount = 300.0, category = "Food & Dining", subcategory = "Supermarket", periodId = 1L))
+        val conditionedUseCase = ExpenseUseCase(repository, budgetRepo)
+
+        val result = conditionedUseCase.saveExpense(
+            amountInput = "75.0",
+            dateInput = "2026-05-10",
+            descriptionInput = "Cena",
+            categoryInput = "Alimentación",
+            subcategoryInput = "Restaurante",
+            periodId = 1L,
+            budgetId = budgetId,
+            budgetCategoryInput = "Food & Dining"
+        )
+
+        assertTrue(result is ExpenseResult.Success)
+        val saved = conditionedUseCase.getExpensesByPeriod(1L).first().single()
+        assertEquals(1L, saved.periodId)
+        assertEquals(budgetId, saved.budgetId)
+        assertEquals("Food & Dining", saved.budgetCategory)
+        assertEquals("Alimentación", saved.category)
+        assertEquals("Restaurante", saved.subcategory)
     }
 }

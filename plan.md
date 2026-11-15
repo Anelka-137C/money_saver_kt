@@ -1,34 +1,27 @@
-# Story #9: Condicionamiento del registro de gastos a un presupuesto activo en el período
+# Plan de Implementación - Story #9
 
 ## Story
-Como usuario, quiero que el registro de gastos quede condicionado a tener un presupuesto activo en el período, para asegurar que mis gastos se ajusten a lo presupuestado.
+Como usuario, quiero que el registro de gastos quede condicionado a tener un presupuesto activo en el período, para asegurar que mis gastos se ajusten a lo planificado y ver reflejado el dinero que sobra en la pantalla de presupuesto.
 
 ## Acceptance criteria
-- [ ] Given que el usuario se encuentra en la pantalla de gastos y el período financiero activo no cuenta con ningún presupuesto registrado, when visualiza la pantalla o intenta registrar un gasto, then el sistema muestra un mensaje informativo indicando que se requiere un presupuesto activo en el período y no permite guardar el gasto.
-- [ ] Given que el período financiero activo cuenta con presupuestos registrados, when el usuario ingresa un monto válido, selecciona una categoría con presupuesto asignado en dicho período y pulsa guardar, then el gasto se guarda exitosamente vinculado al período y se refleja en la lista de gastos.
-- [ ] Given que el usuario intenta guardar un gasto seleccionando una categoría que no tiene un presupuesto asignado en el período activo, when pulsa guardar, then el sistema muestra un mensaje de advertencia indicando que la categoría seleccionada no tiene presupuesto asignado y no aplica el registro.
+- [ ] Given un período financiero activo sin presupuesto configurado, when el usuario accede a la pestaña de gastos, then el botón/formulario de registro se encuentra deshabilitado mostrando un mensaje que indica que se requiere definir un presupuesto activo en el período.
+- [ ] Given un período financiero con presupuestos activos, when el usuario registra un gasto, then cuenta con dos selectores: uno para elegir de qué presupuesto del período tomará el dinero y otro para categorizar el gasto (una sola categoría de gasto con subcategoría opcional), y el gasto queda guardado exitosamente vinculado al período.
+- [ ] Given uno o más gastos registrados en el período activo, when el usuario consulta la pantalla de presupuesto, then se muestra el dinero sobrante (monto presupuestado menos gastos acumulados, con mínimo en 0) reflejado tanto en el balance general como en cada categoría.
+- [ ] Given que el usuario accede al módulo de Contabilidad, when consulta la barra inferior o cambia entre pestañas superiores, then la pestaña inferior se llama "Contabilidad" (sin pestaña de gastos en la barra inferior) y la pantalla de gastos aparece como pestaña superior (junto a Ingresos y Presupuesto), manteniendo la estructura de Presupuesto: resumen de gastos (total gastado y % respecto al total presupuestado), asignación agrupada solo por categorías (sin subcategorías), botón de registrar gasto y desglose de gastos.
 
 ## Plan
-- [ ] Asociar los gastos al período financiero activo en la persistencia para compartir el contexto temporal de los presupuestos.
-- [ ] Implementar la lógica de negocio para validar que el período cuente con presupuesto activo y que la categoría del gasto posea presupuesto en dicho período.
-- [ ] Exponer en la capa de presentación el estado de presupuestos activos del período y la lista de gastos filtrada por período.
-- [ ] Mostrar en la interfaz un estado informativo o advertencia cuando el período no cuente con presupuesto activo, bloqueando el guardado de nuevos gastos.
-- [ ] Restringir la selección o validación de categorías en el formulario de gastos verificando que cuenten con presupuesto activo en el período.
-
-## Test list (TDD)
-- [ ] `test_expense_dao_and_repository_associate_and_query_by_period` (Repositorio / Room DB)
-- [ ] `test_expense_use_case_blocks_saving_when_no_active_budget_in_period` (UseCase)
-- [ ] `test_expense_use_case_allows_saving_when_category_has_active_budget_in_period` (UseCase)
-- [ ] `test_expense_viewmodel_conditions_expense_creation_based_on_active_period_budgets` (ViewModel)
-- [ ] `test_expenses_view_shows_no_budget_banner_and_disables_or_validates_expense_registration` (UI / Compose)
+- Renombrar la pestaña inferior de Ingresos a "Contabilidad", remover Gastos de la barra inferior e integrar la pantalla de gastos en `FinanceTopTabs` (junto a Ingresos y Presupuesto) compartiendo el selector de período.
+- Reestructurar la vista de gastos siguiendo la estructura de Presupuesto: tarjeta de resumen de gastos (total gastado y % respecto al total presupuestado), asignación agrupada solo por categorías de gasto (sin subcategorías), botón de registrar gasto (diálogo modal) y desglose de gastos del período.
+- Asociar los gastos al período financiero activo (`periodId`) y al presupuesto origen seleccionado, y condicionar la disponibilidad del registro a la existencia de al menos un presupuesto activo en el período (deshabilitando el botón de registro y mostrando un mensaje informativo).
+- Implementar en el formulario de registro/edición de gastos dos selectores separados (presupuesto origen del período y categoría de gasto con subcategoría opcional) junto con la validación correspondiente en dominio.
+- Calcular y mostrar el dinero sobrante del presupuesto (presupuestado menos gastado en el período, con tope mínimo en 0) en el balance general de `BudgetOverviewCard` (junto al ingreso disponible para presupuestar) y por categoría en `BudgetAllocationCard`.
 
 ## Out of scope
-- Bloqueo por sobregiro cuando un gasto supera el monto asignado al presupuesto de la categoría (se mantiene flexible o para una historia de alertas).
-- Registro de gastos cubiertos desde ahorros (corresponde a la Historia #12).
-- Históricos comparativos y reportes de ejecución presupuestaria entre períodos (corresponde a la Historia #11).
-- Creación o edición de presupuestos desde la pantalla de gastos (se gestiona desde la pestaña Presupuesto de la Historia #8).
+- Bloquear registros cuando el gasto exceda el presupuesto disponible (no bloqueo estricto de gasto imprevisto).
+- Saldos sobrantes negativos (el dinero sobrante mostrado mantiene el mínimo en 0.0).
+- Gastos financiados mediante ahorros o fondos de reserva (alcance de la historia #12).
+- Historial comparativo de ejecución presupuestaria entre períodos cerrados (alcance de la historia #11).
+- Reasignación automática de montos entre diferentes categorías de presupuesto.
 
 ## Suggestions (your call)
-- En el selector de categorías de gastos, filtrar o resaltar visualmente solo aquellas categorías que tienen presupuesto asignado en el período activo, guiando al usuario y previniendo selecciones inválidas.
-- En el mensaje informativo cuando no hay presupuesto en el período, incluir un botón de acción rápida ("Definir Presupuesto") que cambie a la pestaña de Presupuesto para facilitar el flujo.
-- Confirmar si estás de acuerdo con que la validación sea por categoría presupuestada (criterio 3) o si prefieres que baste con tener cualquier presupuesto activo en el período a nivel global.
+- **División opcional de la historia**: Si prefieres entregas más pequeñas, podemos dividirla en dos: (1) Navegación/estructura de Gastos en Contabilidad y condicionamiento con los dos selectores, y (2) Deducción y visualización del saldo sobrante global y por categoría en Presupuesto.

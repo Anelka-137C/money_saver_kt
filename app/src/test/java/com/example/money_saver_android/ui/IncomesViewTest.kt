@@ -4,6 +4,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,19 +16,24 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import com.example.money_saver_android.FakeCategoryRepoForVm
 import com.example.money_saver_android.FakeExpenseRepository
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.FakeBudgetRepository
+import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.model.Income
+import com.example.money_saver_android.domain.usecase.CategoryUseCase
+import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
+import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.FakeFinancialPeriodRepository
 import com.example.money_saver_android.viewmodel.FakeIncomeRepository
 import com.example.money_saver_android.viewmodel.FinanceTopTab
@@ -52,8 +59,10 @@ class IncomesViewTest {
     private lateinit var incomeRepository: FakeIncomeRepository
     private lateinit var budgetRepository: FakeBudgetRepository
     private lateinit var expenseRepository: FakeExpenseRepository
+    private lateinit var expenseCategoryRepository: FakeCategoryRepoForVm
     private lateinit var periodRepository: FakeFinancialPeriodRepository
     private lateinit var incomeViewModel: IncomeViewModel
+    private lateinit var expenseViewModel: ExpenseViewModel
     private lateinit var i18nManager: I18nManager
 
     private val period1 = FinancialPeriod(id = 1L, startDate = "2026-05-01", endDate = "2026-05-31")
@@ -64,6 +73,7 @@ class IncomesViewTest {
         incomeRepository = FakeIncomeRepository()
         budgetRepository = FakeBudgetRepository()
         expenseRepository = FakeExpenseRepository()
+        expenseCategoryRepository = FakeCategoryRepoForVm()
         periodRepository = FakeFinancialPeriodRepository(initialPeriod = period1)
         runBlocking {
             periodRepository.savePeriod(period2)
@@ -99,20 +109,33 @@ class IncomesViewTest {
         incomeViewModel = IncomeViewModel(incomeUseCase)
         incomeViewModel.onPeriodSelected(1L)
 
+        val expenseUseCase = ExpenseUseCase(expenseRepository, budgetRepository)
+        expenseViewModel = ExpenseViewModel(expenseUseCase, CategoryUseCase(expenseCategoryRepository))
+        expenseViewModel.onPeriodSelected(1L)
+
         i18nManager = I18nManager()
         val esJson = """
             {
               "incomes": {
-                "tabs": { "incomes": "Ingresos", "budget": "Presupuesto" },
+                "tabs": { "incomes": "Ingresos", "budget": "Presupuesto", "expenses": "Gastos" },
                 "header": { "title": "Ingresos", "add_button": "Registrar Ingreso", "select_period": "Seleccionar período" },
                 "overview": { "title": "Resumen de Ingresos", "total_income": "Ingreso total", "trend": "↑ +12% vs mes ant.", "used": "Usado" },
                 "allocation": { "title": "Asignación de Ingresos", "details": "Detalles >", "budgeted": "Presupuestado", "savings": "Ahorros", "spent": "Spent", "available": "Disponible" },
                 "breakdown": { "title": "Desglose de Ingresos" },
                 "history": { "empty_message": "No hay ingresos registrados en este período" }
               },
+              "expenses": {
+                "overview": { "title": "Resumen de Gastos", "total_spent": "Total gastado", "budget_label": "Presupuesto" },
+                "allocation": { "title": "Distribución de Gastos", "details": "Detalles >", "spent_label": "Gastado", "empty_message": "No hay gastos registrados en este período" },
+                "no_budget_banner": { "title": "Sin presupuesto activo", "subtitle": "Define al menos un presupuesto en este período para poder registrar gastos." },
+                "add_card": { "title": "Registrar Gasto", "amount_label": "Monto", "amount_placeholder": "0.00", "date_label": "Fecha", "budget_label": "Presupuesto origen", "budget_placeholder": "Seleccionar presupuesto", "category_label": "Categoría", "category_placeholder": "Seleccionar categoría", "description_label": "Nota (opcional)", "description_placeholder": "Agregar una descripción...", "save_button": "Guardar Gasto" },
+                "breakdown": { "title": "Desglose de gastos" },
+                "history": { "period_empty_message": "No hay gastos registrados en este período" },
+                "edit_dialog": { "title": "Modificar Gasto", "save_button": "Guardar" }
+              },
               "budget": {
                 "header": { "title": "Presupuesto", "add_button": "Registrar Presupuesto" },
-                "overview": { "title": "Resumen de Presupuesto", "total_budgeted": "Total presupuestado", "available_banner_title": "Tienes %s disponible", "available_banner_subtitle": "%s disponible para presupuestar." },
+                "overview": { "title": "Resumen de Presupuesto", "total_budgeted": "Total presupuestado", "spent_label": "Gastado", "remaining_label": "Restante global", "available_banner_title": "Tienes %s disponible", "available_banner_subtitle": "%s disponible para presupuestar." },
                 "allocation": { "title": "Asignación de Presupuesto", "details": "Detalles >", "budget_label": "Presupuesto", "remaining_label": "Sobrante", "empty_message": "No hay presupuestos asignados para este período" },
                 "add_dialog": { "title": "Registrar Presupuesto", "edit_title": "Modificar Presupuesto", "amount_label": "Monto", "amount_placeholder": "0.00", "category_label": "Categoría", "select_category": "Seleccionar categoría", "save_button": "✓ Guardar Presupuesto", "edit_save_button": "✓ Guardar Cambios" },
                 "breakdown": { "title": "Desglose de presupuestos" },
@@ -628,5 +651,165 @@ class IncomesViewTest {
 
         // 7. Verify dialog is now closed after saving
         composeTestRule.onNodeWithTag("card_add_edit_budget").assertDoesNotExist()
+    }
+
+    @Test
+    fun test_expenses_tab_disables_button_and_shows_banner_when_no_budget_active() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    expenseViewModel = expenseViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Verify 3rd top tab exists and switch to Gastos
+        composeTestRule.onNodeWithTag("tab_top_expenses").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("container_expenses_view").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("banner_no_active_budget").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun test_register_expense_with_two_selectors_updates_expense_and_budget_cards() {
+        val budgetId = runBlocking {
+            budgetRepository.insertBudget(
+                Budget(
+                    amount = 500.0,
+                    category = "Food & Dining",
+                    subcategory = "Supermarket",
+                    periodId = 1L
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    expenseViewModel = expenseViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Open Gastos tab and verify add button is enabled when budget exists
+        composeTestRule.onNodeWithTag("tab_top_expenses").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("banner_no_active_budget").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().assertIsEnabled().performClick()
+        composeTestRule.waitForIdle()
+
+        // 1st expense ($150) using Selector 1 (budget item) + Selector 2 (Alimentación > Restaurante)
+        composeTestRule.onNodeWithTag("card_add_edit_expense").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("input_expense_amount").performTextInput("150")
+        composeTestRule.onNodeWithTag("selector_expense_budget").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("budget_option_$budgetId").performClick()
+        composeTestRule.waitForIdle()
+        expenseViewModel.onCategoryChange("Alimentación", "Restaurante")
+        composeTestRule.onNodeWithTag("btn_save_expense_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // 2nd expense ($50) in same expense category without subcategory
+        composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("input_expense_amount").performTextInput("50")
+        composeTestRule.onNodeWithTag("selector_expense_budget").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("budget_option_$budgetId").performClick()
+        composeTestRule.waitForIdle()
+        expenseViewModel.onCategoryChange("Alimentación", "")
+        composeTestRule.onNodeWithTag("btn_save_expense_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // ExpenseOverviewCard and category-only ExpenseAllocationCard consolidate both expenses ($200)
+        composeTestRule.onNodeWithTag("text_expense_total_spent").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(200.0, defaultCurrencies.first()))
+        composeTestRule.onNodeWithTag("mini_card_expense_Alimentación").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_expense_category_spent_Alimentación")
+            .assertTextEquals(CurrencyFormatter.format(200.0, defaultCurrencies.first()))
+        composeTestRule.onNodeWithTag("mini_card_expense_Restaurante").assertDoesNotExist()
+
+        // Switch to Budget tab and verify global + category remaining balances
+        composeTestRule.onNodeWithTag("tab_top_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("text_budget_total_spent").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(200.0, defaultCurrencies.first()))
+        composeTestRule.onNodeWithTag("text_budget_remaining").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(300.0, defaultCurrencies.first()))
+        composeTestRule.onNodeWithTag("text_budget_available_banner").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_budget_remaining_Food & Dining").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(300.0, defaultCurrencies.first()))
+    }
+
+    @Test
+    fun test_period_selector_syncs_expenses_and_clamps_over_budget_remaining_at_zero() {
+        runBlocking {
+            val budgetId = budgetRepository.insertBudget(
+                Budget(
+                    amount = 100.0,
+                    category = "Food & Dining",
+                    subcategory = "Supermarket",
+                    periodId = 1L
+                )
+            )
+            expenseRepository.insertExpense(
+                Expense(
+                    id = 10L,
+                    amount = 160.0,
+                    date = "2026-05-10",
+                    description = "Exceso",
+                    category = "Alimentación",
+                    subcategory = "Restaurante",
+                    periodId = 1L,
+                    budgetId = budgetId,
+                    budgetCategory = "Food & Dining"
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    expenseViewModel = expenseViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Remaining balance must clamp at 0.00 (no negative values) in Budget tab
+        composeTestRule.onNodeWithTag("tab_top_budget").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("text_budget_remaining").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(0.0, defaultCurrencies.first()))
+
+        // Switch period to Period 2 (which has no budgets or expenses)
+        composeTestRule.onNodeWithTag("selector_period").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("period_option_2").performClick()
+        composeTestRule.waitForIdle()
+
+        // Switch to Gastos tab and verify Period 2 state synced cleanly
+        composeTestRule.onNodeWithTag("tab_top_expenses").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("text_expense_total_spent").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(0.0, defaultCurrencies.first()))
+        composeTestRule.onNodeWithTag("banner_no_active_budget").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().assertIsNotEnabled()
     }
 }

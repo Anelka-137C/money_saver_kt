@@ -43,7 +43,7 @@ class NavigationTest {
             {
               "navigation": {
                 "tab_expenses": "Gastos",
-                "tab_incomes": "Ingresos",
+                "tab_incomes": "Contabilidad",
                 "tab_settings": "Configuración",
                 "tab_period": "Período"
               },
@@ -72,7 +72,7 @@ class NavigationTest {
             {
               "navigation": {
                 "tab_expenses": "Expenses",
-                "tab_incomes": "Incomes",
+                "tab_incomes": "Accounting",
                 "tab_settings": "Settings",
                 "tab_period": "Period"
               },
@@ -106,31 +106,29 @@ class NavigationTest {
     }
 
     @Test
-    fun test_bottom_navigation_switches_between_expenses_and_settings() {
+    fun test_bottom_navigation_switches_between_accounting_and_settings() {
         composeTestRule.setContent {
             MainContainer(
                 settingsViewModel = settingsViewModel,
                 i18nManager = i18nManager,
-                expensesContent = {
-                    androidx.compose.material3.Text("Vista de Gastos")
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
                 }
             )
         }
 
-        // Initially shows Expenses content
-        composeTestRule.onNodeWithText("Vista de Gastos").assertIsDisplayed()
+        // Bottom bar no longer has Gastos tab and defaults to Contabilidad
+        composeTestRule.onNodeWithTag("tab_expenses").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Contabilidad").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
 
         // Click Settings tab
         composeTestRule.onNodeWithTag("tab_settings").performClick()
-
-        // Now shows Settings content
         composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
 
-        // Click Expenses tab
-        composeTestRule.onNodeWithTag("tab_expenses").performClick()
-
-        // Back to Expenses content
-        composeTestRule.onNodeWithText("Vista de Gastos").assertIsDisplayed()
+        // Click Contabilidad tab
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
     }
 
     @Test
@@ -139,8 +137,8 @@ class NavigationTest {
             MainContainer(
                 settingsViewModel = settingsViewModel,
                 i18nManager = i18nManager,
-                expensesContent = {
-                    androidx.compose.material3.Text(i18nManager.t("expenses.header.title"))
+                incomesContent = {
+                    androidx.compose.material3.Text(i18nManager.t("navigation.tab_incomes"))
                 }
             )
         }
@@ -157,9 +155,9 @@ class NavigationTest {
         // Verify immediate real-time update to English in Settings
         composeTestRule.onNodeWithText("Language").assertIsDisplayed()
 
-        // Switch back to Expenses tab and verify both the tab and screen content updated in real-time to English
-        composeTestRule.onNodeWithTag("tab_expenses").performClick()
-        composeTestRule.onAllNodesWithText("Expenses").assertCountEquals(2)
+        // Switch back to Contabilidad tab and verify both tab and content updated to Accounting
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onAllNodesWithText("Accounting").assertCountEquals(2)
     }
 
     @Test
@@ -173,23 +171,22 @@ class NavigationTest {
                 settingsViewModel = settingsViewModel,
                 periodViewModel = periodViewModel,
                 i18nManager = i18nManager,
-                expensesContent = {
-                    androidx.compose.material3.Text("Vista de Gastos")
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
                 }
             )
         }
 
-        // Screen is locked to Period tab
+        // Screen is locked to Period tab and Gastos bottom tab does not exist
         composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_expenses").assertDoesNotExist()
 
-        // Attempting to click Expenses tab
-        composeTestRule.onNodeWithTag("tab_expenses").performClick()
-
-        // Still on Period screen, expenses not displayed
+        // Attempting to click Contabilidad tab keeps lock on Period
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
         composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Vista de Gastos").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertDoesNotExist()
 
-        // Attempting to click Settings tab
+        // Attempting to click Settings tab keeps lock on Period
         composeTestRule.onNodeWithTag("tab_settings").performClick()
         composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
         composeTestRule.onNodeWithTag("settings_screen").assertDoesNotExist()
@@ -206,8 +203,8 @@ class NavigationTest {
                 settingsViewModel = settingsViewModel,
                 periodViewModel = periodViewModel,
                 i18nManager = i18nManager,
-                expensesContent = {
-                    androidx.compose.material3.Text("Vista de Gastos")
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
                 }
             )
         }
@@ -223,8 +220,8 @@ class NavigationTest {
         composeTestRule.onNodeWithText("Guardar período").assertIsDisplayed()
 
         // Navigation is now unlocked
-        composeTestRule.onNodeWithTag("tab_expenses").performClick()
-        composeTestRule.onNodeWithText("Vista de Gastos").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
 
         // Switch to Settings
         composeTestRule.onNodeWithTag("tab_settings").performClick()
@@ -248,9 +245,6 @@ class NavigationTest {
                 i18nManager = i18nManager,
                 incomesContent = {
                     androidx.compose.material3.Text("Vista de Ingresos")
-                },
-                expensesContent = {
-                    androidx.compose.material3.Text("Vista de Gastos")
                 }
             )
         }
@@ -266,7 +260,7 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("input_end_date").performTextInput("2026-11-30")
         composeTestRule.onNodeWithTag("btn_save_period").performClick()
 
-        // 3. Navigation is unlocked: navigate to Incomes tab
+        // 3. Navigation is unlocked: navigate to Contabilidad tab
         composeTestRule.onNodeWithTag("tab_incomes").performClick()
         composeTestRule.onNodeWithText("Vista de Ingresos").assertIsDisplayed()
     }

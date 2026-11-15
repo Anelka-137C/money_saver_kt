@@ -329,4 +329,23 @@ class IncomeUseCaseTest {
         assertEquals(500.0, result[0].remainingAmount, 0.0)
         assertEquals(100, result[0].percent)
     }
+
+    @Test
+    fun test_calculate_category_and_global_budgets_deduct_by_budgetId_category_and_periodId() {
+        val cats = listOf(Category(name = "Food & Dining", icon = "🍔", color = "#1CC88A", subcategories = emptyList()))
+        val budgets = listOf(Budget(id = 10L, amount = 500.0, category = "Food & Dining", periodId = 1L))
+        val expenses = listOf(
+            Expense(id = 1L, amount = 150.0, date = "2026-05-10", description = "Lunch", category = "Restaurantes", periodId = 1L, budgetId = 10L, budgetCategory = "Food & Dining"),
+            Expense(id = 2L, amount = 90.0, date = "2026-05-12", description = "Other period", category = "Restaurantes", periodId = 2L, budgetId = 10L, budgetCategory = "Food & Dining"),
+            Expense(id = 3L, amount = 40.0, date = "2026-05-14", description = "Wrong cat", category = "Restaurantes", periodId = 1L, budgetId = 10L, budgetCategory = "Transport")
+        )
+        val result = useCase.calculateCategoryBudgets(budgets, cats, expenses, "2026-05-01", "2026-05-31", periodId = 1L)
+        assertEquals(150.0, result[0].spentAmount, 0.0)
+        assertEquals(350.0, result[0].remainingAmount, 0.0)
+
+        val totalSpent = useCase.calculateTotalBudgetSpent(budgets, expenses, "2026-05-01", "2026-05-31", periodId = 1L)
+        assertEquals(150.0, totalSpent, 0.0)
+        assertEquals(350.0, useCase.calculateRemainingBudget(500.0, totalSpent), 0.0)
+        assertEquals(0.0, useCase.calculateRemainingBudget(100.0, totalSpent), 0.0)
+    }
 }

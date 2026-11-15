@@ -1,7 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Despesas",
-    "tab_incomes": "Rendas",
+    "tab_incomes": "Contabilidade",
     "tab_settings": "Configurações",
     "tab_period": "Período"
   },
@@ -9,26 +9,49 @@
     "header": {
       "title": "Despesas"
     },
+    "overview": {
+      "title": "Resumo de Despesas",
+      "total_spent": "Total gasto",
+      "budget_label": "Orçamento"
+    },
+    "allocation": {
+      "title": "Distribuição de Despesas",
+      "details": "Detalhes >",
+      "spent_label": "Gasto",
+      "empty_message": "Não há despesas registadas neste período"
+    },
+    "no_budget_banner": {
+      "title": "Sem orçamento ativo",
+      "subtitle": "Defina pelo menos um orçamento neste período para poder registrar despesas."
+    },
     "add_card": {
       "title": "Registrar Despesa",
       "amount_label": "Valor",
       "amount_placeholder": "0.00",
       "date_label": "Data",
+      "budget_label": "Orçamento de origem",
+      "budget_placeholder": "Selecionar orçamento",
       "category_label": "Categoria",
       "category_placeholder": "Selecionar categoria",
       "description_label": "Nota (opcional)",
       "description_placeholder": "Adicionar uma descrição...",
       "save_button": "Salvar Despesa"
     },
+    "breakdown": {
+      "title": "Discriminação de despesas"
+    },
     "history": {
       "title": "Histórico de despesas",
-      "empty_message": "Nenhuma despesa registrada ainda"
+      "empty_message": "Nenhuma despesa registrada ainda",
+      "period_empty_message": "Não há despesas registadas neste período"
     },
     "edit_dialog": {
       "title": "Editar Despesa",
       "amount_label": "Valor",
       "amount_placeholder": "0.00",
       "date_label": "Data",
+      "budget_label": "Orçamento de origem",
+      "budget_placeholder": "Selecionar orçamento",
       "category_label": "Categoria",
       "category_placeholder": "Selecionar categoria",
       "description_label": "Descrição (opcional)",
@@ -86,7 +109,8 @@
   "incomes": {
     "tabs": {
       "incomes": "Rendas",
-      "budget": "Orçamento"
+      "budget": "Orçamento",
+      "expenses": "Despesas"
     },
     "header": {
       "title": "Rendas",
@@ -162,6 +186,8 @@
     "overview": {
       "title": "Resumo do Orçamento",
       "total_budgeted": "Total orçado",
+      "spent_label": "Gasto",
+      "remaining_label": "Restante global",
       "available_banner_title": "Tem %s disponível",
       "available_banner_subtitle": "%s das suas rendas continua disponível para orçamentar."
     },

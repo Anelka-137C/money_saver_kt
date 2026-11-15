@@ -83,6 +83,7 @@ import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.FinanceTopTab
 import com.example.money_saver_android.viewmodel.IncomeViewModel
 import java.text.SimpleDateFormat
@@ -92,6 +93,7 @@ import java.util.Locale
 @Composable
 fun IncomesView(
     incomeViewModel: IncomeViewModel,
+    expenseViewModel: ExpenseViewModel? = null,
     allPeriods: List<FinancialPeriod> = emptyList(),
     selectedPeriodId: Long? = null,
     onPeriodSelected: (Long) -> Unit = {},
@@ -160,6 +162,12 @@ fun IncomesView(
     LaunchedEffect(selectedPeriodId) {
         if (selectedPeriodId != null && state.selectedPeriodId != selectedPeriodId) {
             incomeViewModel.onPeriodSelected(selectedPeriodId)
+        }
+    }
+
+    LaunchedEffect(state.selectedPeriodId) {
+        if (state.selectedPeriodId != null) {
+            expenseViewModel?.onPeriodSelected(state.selectedPeriodId)
         }
     }
 
@@ -362,10 +370,18 @@ fun IncomesView(
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         // 1. Budget Overview Card
+                        val totalBudgetSpent = remember(state.budgets, state.expenses, activePeriod) {
+                            incomeViewModel.calculateTotalBudgetSpent(activePeriod)
+                        }
+                        val remainingBudget = remember(state.totalBudgeted, state.budgets, state.expenses, activePeriod) {
+                            incomeViewModel.calculateRemainingBudget(activePeriod)
+                        }
                         BudgetOverviewCard(
                             totalBudgeted = state.totalBudgeted,
                             totalIncome = state.totalIncome,
                             availableIncome = state.availableIncome,
+                            totalSpent = totalBudgetSpent,
+                            remainingBudget = remainingBudget,
                             currency = currency
                         )
 
@@ -465,6 +481,20 @@ fun IncomesView(
                                 }
                             }
                         }
+                    }
+                }
+                FinanceTopTab.EXPENSES -> {
+                    if (expenseViewModel != null) {
+                        ExpensesTabContent(
+                            viewModel = expenseViewModel,
+                            currency = currency
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("container_expenses_view")
+                        )
                     }
                 }
             }

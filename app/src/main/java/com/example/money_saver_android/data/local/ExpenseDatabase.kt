@@ -23,7 +23,10 @@ data class ExpenseEntity(
     val date: String,
     val description: String,
     val category: String,
-    val subcategory: String? = null
+    val subcategory: String? = null,
+    val periodId: Long? = null,
+    val budgetId: Long? = null,
+    val budgetCategory: String? = null
 )
 
 @Entity(tableName = "expenses_categories")
@@ -64,6 +67,9 @@ data class CategoryWithSubcategories(
 interface ExpenseDao {
     @Query("SELECT * FROM expenses ORDER BY id DESC")
     fun getAll(): Flow<List<ExpenseEntity>>
+
+    @Query("SELECT * FROM expenses WHERE periodId = :periodId ORDER BY id DESC")
+    fun getByPeriod(periodId: Long): Flow<List<ExpenseEntity>>
 
     @Insert
     suspend fun insert(entity: ExpenseEntity)
@@ -121,7 +127,7 @@ interface CategoryDao {
         IncomeCategoryEntity::class,
         IncomeSubcategoryEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

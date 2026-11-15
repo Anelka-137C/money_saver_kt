@@ -25,7 +25,6 @@ import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import com.example.money_saver_android.domain.usecase.PeriodUseCase
 import com.example.money_saver_android.i18n.I18nManager
-import com.example.money_saver_android.ui.ExpensesView
 import com.example.money_saver_android.ui.IncomesView
 import com.example.money_saver_android.ui.MainContainer
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
@@ -106,7 +105,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val expenseUseCase by lazy {
-        ExpenseUseCase(repository)
+        ExpenseUseCase(repository, budgetRepository)
     }
 
     private val categoryUseCase by lazy {
@@ -160,18 +159,14 @@ class MainActivity : ComponentActivity() {
                     incomesContent = {
                         IncomesView(
                             incomeViewModel = incomeViewModel,
+                            expenseViewModel = viewModel,
                             allPeriods = periodState.allPeriods,
                             selectedPeriodId = periodState.activePeriod?.id,
                             onPeriodSelected = { periodId ->
                                 incomeViewModel.onPeriodSelected(periodId)
+                                viewModel.onPeriodSelected(periodId)
                             },
                             i18nManager = i18nManager,
-                            currency = activeCurrency
-                        )
-                    },
-                    expensesContent = {
-                        ExpensesView(
-                            viewModel = viewModel,
                             currency = activeCurrency
                         )
                     }

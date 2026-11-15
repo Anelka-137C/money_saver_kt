@@ -1,7 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Ausgaben",
-    "tab_incomes": "Einkommen",
+    "tab_incomes": "Buchhaltung",
     "tab_settings": "Einstellungen",
     "tab_period": "Zeitraum"
   },
@@ -9,26 +9,49 @@
     "header": {
       "title": "Ausgaben"
     },
+    "overview": {
+      "title": "Ausgabenübersicht",
+      "total_spent": "Gesamtausgaben",
+      "budget_label": "Budget"
+    },
+    "allocation": {
+      "title": "Ausgabenverteilung",
+      "details": "Details >",
+      "spent_label": "Ausgegeben",
+      "empty_message": "Keine Ausgaben in diesem Zeitraum erfasst"
+    },
+    "no_budget_banner": {
+      "title": "Kein aktives Budget",
+      "subtitle": "Legen Sie mindestens ein Budget in diesem Zeitraum fest, um Ausgaben zu erfassen."
+    },
     "add_card": {
       "title": "Ausgabe erfassen",
       "amount_label": "Betrag",
       "amount_placeholder": "0.00",
       "date_label": "Datum",
+      "budget_label": "Quellbudget",
+      "budget_placeholder": "Budget auswählen",
       "category_label": "Kategorie",
       "category_placeholder": "Kategorie auswählen",
       "description_label": "Notiz (optional)",
       "description_placeholder": "Beschreibung hinzufügen...",
       "save_button": "Ausgabe speichern"
     },
+    "breakdown": {
+      "title": "Ausgabenaufschlüsselung"
+    },
     "history": {
       "title": "Ausgabenhistorie",
-      "empty_message": "Noch keine Ausgaben erfasst"
+      "empty_message": "Noch keine Ausgaben erfasst",
+      "period_empty_message": "Keine Ausgaben in diesem Zeitraum erfasst"
     },
     "edit_dialog": {
       "title": "Ausgabe bearbeiten",
       "amount_label": "Betrag",
       "amount_placeholder": "0.00",
       "date_label": "Datum",
+      "budget_label": "Quellbudget",
+      "budget_placeholder": "Budget auswählen",
       "category_label": "Kategorie",
       "category_placeholder": "Kategorie auswählen",
       "description_label": "Beschreibung (optional)",
@@ -86,7 +109,8 @@
   "incomes": {
     "tabs": {
       "incomes": "Einnahmen",
-      "budget": "Budget"
+      "budget": "Budget",
+      "expenses": "Ausgaben"
     },
     "header": {
       "title": "Einkommen",
@@ -162,6 +186,8 @@
     "overview": {
       "title": "Budgetübersicht",
       "total_budgeted": "Budget gesamt",
+      "spent_label": "Ausgegeben",
+      "remaining_label": "Restbudget",
       "available_banner_title": "Sie haben %s verfügbar",
       "available_banner_subtitle": "%s Ihres Einkommens steht noch für Budgets zur Verfügung."
     },

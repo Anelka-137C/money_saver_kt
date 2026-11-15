@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.i18n.t
@@ -33,6 +34,11 @@ fun FinanceTopTabs(
     onTabSelected: (FinanceTopTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val tabs = listOf(
+        Triple(FinanceTopTab.INCOMES, "incomes.tabs.incomes", "tab_top_incomes"),
+        Triple(FinanceTopTab.BUDGET, "incomes.tabs.budget", "tab_top_budget"),
+        Triple(FinanceTopTab.EXPENSES, "incomes.tabs.expenses", "tab_top_expenses")
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -43,42 +49,27 @@ fun FinanceTopTabs(
             .testTag("row_finance_top_tabs"),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val isIncomes = selectedTab == FinanceTopTab.INCOMES
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (isIncomes) FieldBackground else Color.Transparent)
-                .clickable { onTabSelected(FinanceTopTab.INCOMES) }
-                .testTag("tab_top_incomes"),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = t("incomes.tabs.incomes"),
-                color = if (isIncomes) GreenAccent else TextSecondary,
-                fontSize = 14.sp,
-                fontWeight = if (isIncomes) FontWeight.Bold else FontWeight.Medium
-            )
-        }
-
-        val isBudget = selectedTab == FinanceTopTab.BUDGET
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (isBudget) FieldBackground else Color.Transparent)
-                .clickable { onTabSelected(FinanceTopTab.BUDGET) }
-                .testTag("tab_top_budget"),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = t("incomes.tabs.budget"),
-                color = if (isBudget) GreenAccent else TextSecondary,
-                fontSize = 14.sp,
-                fontWeight = if (isBudget) FontWeight.Bold else FontWeight.Medium
-            )
+        tabs.forEach { (tab, labelKey, tag) ->
+            val isSelected = selectedTab == tab
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) FieldBackground else Color.Transparent)
+                    .clickable { onTabSelected(tab) }
+                    .testTag(tag),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = t(labelKey),
+                    color = if (isSelected) GreenAccent else TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

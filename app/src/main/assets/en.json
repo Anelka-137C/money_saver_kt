@@ -1,7 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Expenses",
-    "tab_incomes": "Incomes",
+    "tab_incomes": "Accounting",
     "tab_settings": "Settings",
     "tab_period": "Period"
   },
@@ -9,26 +9,49 @@
     "header": {
       "title": "Expenses"
     },
+    "overview": {
+      "title": "Expense Overview",
+      "total_spent": "Total spent",
+      "budget_label": "Budget"
+    },
+    "allocation": {
+      "title": "Expense Allocation",
+      "details": "Details >",
+      "spent_label": "Spent",
+      "empty_message": "No expenses recorded in this period"
+    },
+    "no_budget_banner": {
+      "title": "No active budget",
+      "subtitle": "Define at least one budget in this period before recording expenses."
+    },
     "add_card": {
       "title": "Add Expense",
       "amount_label": "Amount",
       "amount_placeholder": "0.00",
       "date_label": "Date",
+      "budget_label": "Source budget",
+      "budget_placeholder": "Select budget",
       "category_label": "Category",
       "category_placeholder": "Select category",
       "description_label": "Note (optional)",
       "description_placeholder": "Add a description...",
       "save_button": "Save Expense"
     },
+    "breakdown": {
+      "title": "Expense breakdown"
+    },
     "history": {
       "title": "Expense history",
-      "empty_message": "No expenses recorded yet"
+      "empty_message": "No expenses recorded yet",
+      "period_empty_message": "No expenses recorded in this period"
     },
     "edit_dialog": {
       "title": "Edit Expense",
       "amount_label": "Amount",
       "amount_placeholder": "0.00",
       "date_label": "Date",
+      "budget_label": "Source budget",
+      "budget_placeholder": "Select budget",
       "category_label": "Category",
       "category_placeholder": "Select category",
       "description_label": "Description (optional)",
@@ -86,7 +109,8 @@
   "incomes": {
     "tabs": {
       "incomes": "Incomes",
-      "budget": "Budget"
+      "budget": "Budget",
+      "expenses": "Expenses"
     },
     "header": {
       "title": "Incomes",
@@ -162,6 +186,8 @@
     "overview": {
       "title": "Budget Overview",
       "total_budgeted": "Total budgeted",
+      "spent_label": "Spent",
+      "remaining_label": "Remaining budget",
       "available_banner_title": "You have %s available",
       "available_banner_subtitle": "%s of your income remains available to budget."
     },

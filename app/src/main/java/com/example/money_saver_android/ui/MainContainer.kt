@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
@@ -35,7 +34,6 @@ import com.example.money_saver_android.viewmodel.PeriodViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
 
 enum class AppTab {
-    EXPENSES,
     INCOMES,
     SETTINGS,
     PERIOD
@@ -47,8 +45,7 @@ fun MainContainer(
     i18nManager: I18nManager,
     modifier: Modifier = Modifier,
     periodViewModel: PeriodViewModel? = null,
-    incomesContent: (@Composable () -> Unit)? = null,
-    expensesContent: @Composable () -> Unit
+    incomesContent: (@Composable () -> Unit)? = null
 ) {
     // Observe language changes to re-render texts in real-time
     val settingsState by settingsViewModel.uiState.collectAsState()
@@ -56,7 +53,7 @@ fun MainContainer(
     val isPeriodLocked = periodState?.let { !it.isPeriodConfigured } ?: false
 
     var currentTab by rememberSaveable {
-        mutableStateOf(if (isPeriodLocked) AppTab.PERIOD else AppTab.EXPENSES)
+        mutableStateOf(if (isPeriodLocked) AppTab.PERIOD else AppTab.INCOMES)
     }
 
     val activeTab = if (isPeriodLocked) AppTab.PERIOD else currentTab
@@ -70,24 +67,6 @@ fun MainContainer(
                     containerColor = CardBackground,
                     contentColor = TextPrimary
                 ) {
-                    NavigationBarItem(
-                        modifier = Modifier.testTag("tab_expenses"),
-                        selected = activeTab == AppTab.EXPENSES,
-                        onClick = {
-                            if (!isPeriodLocked) {
-                                currentTab = AppTab.EXPENSES
-                            }
-                        },
-                        icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = i18nManager.t("navigation.tab_expenses")) },
-                        label = { Text(i18nManager.t("navigation.tab_expenses")) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = GreenAccent,
-                            selectedTextColor = GreenAccent,
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary,
-                            indicatorColor = CardBackground
-                        )
-                    )
                     NavigationBarItem(
                         modifier = Modifier.testTag("tab_incomes"),
                         selected = activeTab == AppTab.INCOMES,
@@ -147,7 +126,6 @@ fun MainContainer(
                     .padding(innerPadding)
             ) {
                 when (activeTab) {
-                    AppTab.EXPENSES -> expensesContent()
                     AppTab.INCOMES -> incomesContent?.invoke()
                     AppTab.SETTINGS -> SettingsView(
                         settingsViewModel = settingsViewModel,

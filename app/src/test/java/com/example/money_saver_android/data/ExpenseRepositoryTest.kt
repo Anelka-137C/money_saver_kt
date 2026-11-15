@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,5 +102,62 @@ class ExpenseRepositoryTest {
 
         val expenses = repository.getAllExpenses().first()
         assertEquals(0, expenses.size)
+    }
+
+    @Test
+    fun getExpensesByPeriod_filtersByPeriodAndPreservesBudgetFields() = runBlocking {
+        repository.insertExpense(
+            Expense(
+                amount = 120.0,
+                date = "2026-05-10",
+                description = "Compra",
+                category = "Comida",
+                subcategory = "Mercado",
+                periodId = 1L,
+                budgetId = 10L,
+                budgetCategory = "Food & Dining"
+            )
+        )
+        repository.insertExpense(
+            Expense(
+                amount = 80.0,
+                date = "2026-06-10",
+                description = "Otro período",
+                category = "Comida",
+                periodId = 2L,
+                budgetId = 20L,
+                budgetCategory = "Food & Dining"
+            )
+        )
+
+        val period1Expenses = repository.getExpensesByPeriod(1L).first()
+        assertEquals(1, period1Expenses.size)
+        val saved = period1Expenses.first()
+        assertEquals(1L, saved.periodId)
+        assertEquals(10L, saved.budgetId)
+        assertEquals("Food & Dining", saved.budgetCategory)
+    }
+
+    @Test
+    fun unsetPeriodAndBudgetFields_persistAsNullInRoomAndReadBackAsDefaults() = runBlocking {
+        repository.insertExpense(
+            Expense(
+                amount = 45.0,
+                date = "2026-05-12",
+                description = "Sin asignar",
+                category = "Otros"
+            )
+        )
+
+        val entity = db.expenseDao().getAll().first().first()
+        assertNull(entity.periodId)
+        assertNull(entity.budgetId)
+        assertNull(entity.budgetCategory)
+
+        val domain = repository.getAllExpenses().first().first()
+        assertEquals(0L, domain.periodId)
+        assertEquals(0L, domain.budgetId)
+        assertEquals("", domain.budgetCategory)
+        assertEquals(0, repository.getExpensesByPeriod(1L).first().size)
     }
 }

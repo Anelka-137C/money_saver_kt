@@ -6,5 +6,8 @@ data class Expense(
     val date: String,
     val description: String,
     val category: String,
-    val subcategory: String = ""
+    val subcategory: String = "",
+    val periodId: Long = 0L,
+    val budgetId: Long = 0L,
+    val budgetCategory: String = ""
 )

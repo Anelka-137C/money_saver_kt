@@ -354,7 +354,8 @@ class IncomeUseCase(
         categories: List<Category>,
         expenses: List<Expense>,
         periodStartDate: String?,
-        periodEndDate: String?
+        periodEndDate: String?,
+        periodId: Long? = null
     ): List<CategoryBudgetItem> {
         if (budgets.isEmpty()) return emptyList()
         return budgets.groupBy { it.category.trim().lowercase() }
@@ -363,9 +364,8 @@ class IncomeUseCase(
                 val category = categories.find { it.name.equals(rawName, ignoreCase = true) }
                 val totalBudget = catBudgets.sumOf { it.amount }
                 val spent = expenses.filter { expense ->
-                    expense.category.trim().equals(rawName, ignoreCase = true) &&
-                        (periodStartDate == null || periodEndDate == null ||
-                            (expense.date >= periodStartDate && expense.date <= periodEndDate))
+                    expense.matchesPeriod(periodStartDate, periodEndDate, periodId) &&
+                        expense.matchesBudgetGroup(catBudgets, rawName)
                 }.sumOf { it.amount }
                 val remaining = maxOf(0.0, totalBudget - spent)
                 val progress = if (totalBudget > 0.0) (remaining / totalBudget).toFloat().coerceIn(0f, 1f) else 0f
@@ -380,5 +380,47 @@ class IncomeUseCase(
                     percent = (progress * 100).toInt()
                 )
             }
+    }
+
+    fun calculateTotalBudgetSpent(
+        budgets: List<Budget>,
+        expenses: List<Expense>,
+        periodStartDate: String?,
+        periodEndDate: String?,
+        periodId: Long? = null
+    ): Double {
+        if (budgets.isEmpty()) return 0.0
+        val budgetsByCat = budgets.groupBy { it.category.trim().lowercase() }
+        return expenses.filter { expense ->
+            expense.matchesPeriod(periodStartDate, periodEndDate, periodId) &&
+                budgetsByCat.any { (_, catBudgets) ->
+                    expense.matchesBudgetGroup(catBudgets, catBudgets.first().category.trim())
+                }
+        }.sumOf { it.amount }
+    }
+
+    fun calculateRemainingBudget(totalBudgeted: Double, totalSpent: Double): Double {
+        return maxOf(0.0, totalBudgeted - totalSpent)
+    }
+
+    private fun Expense.matchesPeriod(
+        periodStartDate: String?,
+        periodEndDate: String?,
+        periodId: Long?
+    ): Boolean {
+        if (this.periodId > 0L && periodId != null) {
+            return this.periodId == periodId
+        }
+        return periodStartDate == null || periodEndDate == null ||
+            (date >= periodStartDate && date <= periodEndDate)
+    }
+
+    private fun Expense.matchesBudgetGroup(catBudgets: List<Budget>, categoryName: String): Boolean {
+        if (budgetId > 0L || budgetCategory.isNotBlank()) {
+            val categoryMatches = budgetCategory.trim().equals(categoryName, ignoreCase = true)
+            val idMatches = budgetId <= 0L || catBudgets.any { it.id == budgetId }
+            return categoryMatches && idMatches
+        }
+        return category.trim().equals(categoryName, ignoreCase = true)
     }
 }

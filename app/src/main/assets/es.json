@@ -1,7 +1,7 @@
 {
   "navigation": {
     "tab_expenses": "Gastos",
-    "tab_incomes": "Ingresos",
+    "tab_incomes": "Contabilidad",
     "tab_settings": "Configuración",
     "tab_period": "Período"
   },
@@ -9,26 +9,49 @@
     "header": {
       "title": "Gastos"
     },
+    "overview": {
+      "title": "Resumen de Gastos",
+      "total_spent": "Total gastado",
+      "budget_label": "Presupuesto"
+    },
+    "allocation": {
+      "title": "Distribución de Gastos",
+      "details": "Detalles >",
+      "spent_label": "Gastado",
+      "empty_message": "No hay gastos registrados en este período"
+    },
+    "no_budget_banner": {
+      "title": "Sin presupuesto activo",
+      "subtitle": "Define al menos un presupuesto en este período para poder registrar gastos."
+    },
     "add_card": {
       "title": "Registrar Gasto",
       "amount_label": "Monto",
       "amount_placeholder": "0.00",
       "date_label": "Fecha",
+      "budget_label": "Presupuesto origen",
+      "budget_placeholder": "Seleccionar presupuesto",
       "category_label": "Categoría",
       "category_placeholder": "Seleccionar categoría",
       "description_label": "Nota (opcional)",
       "description_placeholder": "Agregar una descripción...",
       "save_button": "Guardar Gasto"
     },
+    "breakdown": {
+      "title": "Desglose de gastos"
+    },
     "history": {
       "title": "Historial de gastos",
-      "empty_message": "Aún no hay gastos registrados"
+      "empty_message": "Aún no hay gastos registrados",
+      "period_empty_message": "No hay gastos registrados en este período"
     },
     "edit_dialog": {
       "title": "Modificar Gasto",
       "amount_label": "Monto",
       "amount_placeholder": "0.00",
       "date_label": "Fecha",
+      "budget_label": "Presupuesto origen",
+      "budget_placeholder": "Seleccionar presupuesto",
       "category_label": "Categoría",
       "category_placeholder": "Seleccionar categoría",
       "description_label": "Descripción (opcional)",
@@ -86,7 +109,8 @@
   "incomes": {
     "tabs": {
       "incomes": "Ingresos",
-      "budget": "Presupuesto"
+      "budget": "Presupuesto",
+      "expenses": "Gastos"
     },
     "header": {
       "title": "Ingresos",
@@ -162,6 +186,8 @@
     "overview": {
       "title": "Resumen de Presupuesto",
       "total_budgeted": "Total presupuestado",
+      "spent_label": "Gastado",
+      "remaining_label": "Restante global",
       "available_banner_title": "Tienes %s disponible",
       "available_banner_subtitle": "%s de tus ingresos sigue disponible para presupuestar."
     },

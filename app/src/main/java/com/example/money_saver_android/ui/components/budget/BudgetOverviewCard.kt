@@ -44,11 +44,15 @@ fun BudgetOverviewCard(
     totalBudgeted: Double,
     totalIncome: Double,
     availableIncome: Double,
+    totalSpent: Double = 0.0,
+    remainingBudget: Double = maxOf(0.0, totalBudgeted - totalSpent),
     currency: Currency = defaultCurrencies.first(),
     modifier: Modifier = Modifier
 ) {
     val formattedTotal = CurrencyFormatter.format(totalBudgeted, currency)
     val formattedAvailable = CurrencyFormatter.format(availableIncome, currency)
+    val formattedSpent = CurrencyFormatter.format(totalSpent, currency)
+    val formattedRemaining = CurrencyFormatter.format(remainingBudget, currency)
     val progress = if (totalIncome > 0) (totalBudgeted / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
     val percent = (progress * 100).toInt()
 
@@ -108,7 +112,43 @@ fun BudgetOverviewCard(
                 fontSize = 13.sp
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = t("budget.overview.spent_label"),
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = formattedSpent,
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.testTag("text_budget_total_spent")
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = t("budget.overview.remaining_label"),
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = formattedRemaining,
+                        color = GreenAccent,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.testTag("text_budget_remaining")
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -24,7 +24,8 @@ import kotlinx.coroutines.launch
 
 enum class FinanceTopTab {
     INCOMES,
-    BUDGET
+    BUDGET,
+    EXPENSES
 }
 
 data class EditBudgetState(
@@ -696,7 +697,24 @@ class IncomeViewModel(
             categories = current.budgetCategories,
             expenses = current.expenses,
             periodStartDate = activePeriod?.startDate,
-            periodEndDate = activePeriod?.endDate
+            periodEndDate = activePeriod?.endDate,
+            periodId = activePeriod?.id ?: current.selectedPeriodId
         )
+    }
+
+    fun calculateTotalBudgetSpent(activePeriod: FinancialPeriod?): Double {
+        val current = _uiState.value
+        return incomeUseCase.calculateTotalBudgetSpent(
+            budgets = current.budgets,
+            expenses = current.expenses,
+            periodStartDate = activePeriod?.startDate,
+            periodEndDate = activePeriod?.endDate,
+            periodId = activePeriod?.id ?: current.selectedPeriodId
+        )
+    }
+
+    fun calculateRemainingBudget(activePeriod: FinancialPeriod?): Double {
+        val spent = calculateTotalBudgetSpent(activePeriod)
+        return incomeUseCase.calculateRemainingBudget(_uiState.value.totalBudgeted, spent)
     }
 }
