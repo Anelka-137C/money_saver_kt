@@ -1,27 +1,27 @@
-# Plan de Implementación - Story #9
+# Story #10: Apartar dinero hacia ahorros clasificados por categoría
 
 ## Story
-Como usuario, quiero que el registro de gastos quede condicionado a tener un presupuesto activo en el período, para asegurar que mis gastos se ajusten a lo planificado y ver reflejado el dinero que sobra en la pantalla de presupuesto.
+Como usuario, quiero apartar dinero de mis ingresos hacia ahorros clasificados por categoría, para reservar fondos ordenadamente hacia objetivos específicos.
 
 ## Acceptance criteria
-- [ ] Given un período financiero activo sin presupuesto configurado, when el usuario accede a la pestaña de gastos, then el botón/formulario de registro se encuentra deshabilitado mostrando un mensaje que indica que se requiere definir un presupuesto activo en el período.
-- [ ] Given un período financiero con presupuestos activos, when el usuario registra un gasto, then cuenta con dos selectores: uno para elegir de qué presupuesto del período tomará el dinero y otro para categorizar el gasto (una sola categoría de gasto con subcategoría opcional), y el gasto queda guardado exitosamente vinculado al período.
-- [ ] Given uno o más gastos registrados en el período activo, when el usuario consulta la pantalla de presupuesto, then se muestra el dinero sobrante (monto presupuestado menos gastos acumulados, con mínimo en 0) reflejado tanto en el balance general como en cada categoría.
-- [ ] Given que el usuario accede al módulo de Contabilidad, when consulta la barra inferior o cambia entre pestañas superiores, then la pestaña inferior se llama "Contabilidad" (sin pestaña de gastos en la barra inferior) y la pantalla de gastos aparece como pestaña superior (junto a Ingresos y Presupuesto), manteniendo la estructura de Presupuesto: resumen de gastos (total gastado y % respecto al total presupuestado), asignación agrupada solo por categorías (sin subcategorías), botón de registrar gasto y desglose de gastos.
+- [ ] Given un período financiero con ingreso disponible (ingresos no comprometidos en presupuesto u otros ahorros), when el usuario ingresa un monto válido y selecciona una categoría para apartar como ahorro, then el ahorro queda registrado bajo esa categoría en el período, y el monto total de ahorros y el ingreso disponible restante se actualizan.
+- [ ] Given un período financiero activo, when el usuario intenta apartar un monto mayor al ingreso disponible restante o un monto menor o igual a cero, then se muestra un mensaje de validación indicando el error y no se registra el ahorro.
+- [ ] Given ahorros registrados en el período financiero actual, when el usuario consulta la sección financiera del período, then visualiza el total acumulado en ahorros y el listado de montos apartados con su categoría correspondiente.
 
 ## Plan
-- Renombrar la pestaña inferior de Ingresos a "Contabilidad", remover Gastos de la barra inferior e integrar la pantalla de gastos en `FinanceTopTabs` (junto a Ingresos y Presupuesto) compartiendo el selector de período.
-- Reestructurar la vista de gastos siguiendo la estructura de Presupuesto: tarjeta de resumen de gastos (total gastado y % respecto al total presupuestado), asignación agrupada solo por categorías de gasto (sin subcategorías), botón de registrar gasto (diálogo modal) y desglose de gastos del período.
-- Asociar los gastos al período financiero activo (`periodId`) y al presupuesto origen seleccionado, y condicionar la disponibilidad del registro a la existencia de al menos un presupuesto activo en el período (deshabilitando el botón de registro y mostrando un mensaje informativo).
-- Implementar en el formulario de registro/edición de gastos dos selectores separados (presupuesto origen del período y categoría de gasto con subcategoría opcional) junto con la validación correspondiente en dominio.
-- Calcular y mostrar el dinero sobrante del presupuesto (presupuestado menos gastado en el período, con tope mínimo en 0) en el balance general de `BudgetOverviewCard` (junto al ingreso disponible para presupuestar) y por categoría en `BudgetAllocationCard`.
+- Persistencia local para almacenar los registros de ahorros vinculados a su categoría y período financiero.
+- Lógica de negocio para calcular el total ahorrado y validar que el monto apartado no supere el ingreso disponible del período ni sea menor o igual a cero.
+- Gestión de estado para el período activo, exponiendo el total de ahorros registrados, el ingreso disponible actualizado y la lista de ahorros.
+- Formulario de entrada para ingresar el monto, seleccionar la categoría y confirmar el apartado de ahorro.
+- Visualización en la interfaz del total apartado en ahorros, su impacto en la distribución del ingreso del período y el listado de ahorros realizados.
 
 ## Out of scope
-- Bloquear registros cuando el gasto exceda el presupuesto disponible (no bloqueo estricto de gasto imprevisto).
-- Saldos sobrantes negativos (el dinero sobrante mostrado mantiene el mínimo en 0.0).
-- Gastos financiados mediante ahorros o fondos de reserva (alcance de la historia #12).
-- Historial comparativo de ejecución presupuestaria entre períodos cerrados (alcance de la historia #11).
-- Reasignación automática de montos entre diferentes categorías de presupuesto.
+- Modificar o eliminar ahorros ya apartados (se puede abordar en una historia dedicada si se requiere).
+- Registrar gastos financiados desde ahorros (cubierto en la historia #12).
+- Historial global o comparativa de ahorros entre períodos (cubierto en la historia #11).
+- Metas de ahorro complejas con plazos, fechas límite o aportes automáticos recurrentes.
+- Creación de nuevas categorías exclusivas de ahorro (se reutiliza el catálogo de categorías existente).
 
 ## Suggestions (your call)
-- **División opcional de la historia**: Si prefieres entregas más pequeñas, podemos dividirla en dos: (1) Navegación/estructura de Gastos en Contabilidad y condicionamiento con los dos selectores, y (2) Deducción y visualización del saldo sobrante global y por categoría en Presupuesto.
+- Añadir pestaña "Ahorros" a la navegación superior (`FinanceTopTabs`): Actualmente la pantalla de Contabilidad agrupa `Ingresos`, `Presupuesto` y `Gastos`. Agregar una 4ª pestaña sigue el patrón visual y de navegación idéntico al resto de módulos.
+- Reemplazar el cálculo mock de ahorros en las tarjetas de distribución: Actualmente la tarjeta de distribución de ingresos calcula los ahorros con un valor estático del 21% (`val savings = totalIncome * 0.21`). Al implementar esta historia, esa tarjeta puede consumir directamente el total real ahorrado.

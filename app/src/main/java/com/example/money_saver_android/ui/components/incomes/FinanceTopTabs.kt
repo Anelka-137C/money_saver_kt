@@ -37,7 +37,8 @@ fun FinanceTopTabs(
     val tabs = listOf(
         Triple(FinanceTopTab.INCOMES, "incomes.tabs.incomes", "tab_top_incomes"),
         Triple(FinanceTopTab.BUDGET, "incomes.tabs.budget", "tab_top_budget"),
-        Triple(FinanceTopTab.EXPENSES, "incomes.tabs.expenses", "tab_top_expenses")
+        Triple(FinanceTopTab.EXPENSES, "incomes.tabs.expenses", "tab_top_expenses"),
+        Triple(FinanceTopTab.SAVINGS, "incomes.tabs.savings", "tab_top_savings")
     )
     Row(
         modifier = modifier
@@ -64,7 +65,7 @@ fun FinanceTopTabs(
                 Text(
                     text = t(labelKey),
                     color = if (isSelected) GreenAccent else TextSecondary,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

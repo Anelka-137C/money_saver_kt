@@ -127,7 +127,8 @@
     "tabs": {
       "incomes": "Ingresos",
       "budget": "Presupuesto",
-      "expenses": "Gastos"
+      "expenses": "Gastos",
+      "savings": "Ahorros"
     },
     "header": {
       "title": "Ingresos",
@@ -244,6 +245,69 @@
       "title": "¿Eliminar esta categoría?",
       "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
       "cancel_button": "Cancelar"
+    }
+  },
+  "savings": {
+    "header": {
+      "title": "Ahorros",
+      "add_button": "Apartar Ahorro"
+    },
+    "overview": {
+      "title": "Resumen de Ahorros",
+      "total_saved": "Total ahorrado",
+      "assigned_badge": "%s%% ahorrado",
+      "available_banner_title": "Tienes %s disponible",
+      "available_banner_subtitle": "%s de tus ingresos sigue disponible para apartar."
+    },
+    "add_dialog": {
+      "title": "Apartar Ahorro",
+      "amount_label": "Monto",
+      "amount_placeholder": "0.00",
+      "income_label": "Ingreso origen",
+      "select_income": "Seleccionar ingreso",
+      "no_incomes_available": "No hay ingresos registrados en este período",
+      "category_label": "Categoría",
+      "select_category": "Seleccionar categoría",
+      "date_time_label": "Fecha y hora",
+      "note_label": "Nota (opcional)",
+      "note_placeholder": "Agregar una nota...",
+      "save_button": "✓ Guardar Ahorro"
+    },
+    "edit_dialog": {
+      "title": "Modificar Ahorro",
+      "save_button": "✓ Guardar Cambios"
+    },
+    "item": {
+      "saved_badge": "Guardado"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
+    },
+    "breakdown": {
+      "title": "Desglose de ahorros"
+    },
+    "history": {
+      "empty_message": "No hay ahorros registrados en este período"
+    },
+    "delete_dialog": {
+      "title": "¿Eliminar este ahorro?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "delete_category_dialog": {
+      "title": "¿Eliminar esta categoría?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "messages": {
+      "saved": "Ahorro guardado exitosamente",
+      "updated": "Ahorro actualizado exitosamente",
+      "deleted": "Ahorro eliminado exitosamente",
+      "category_created": "Categoría creada exitosamente",
+      "subcategory_created": "Subcategoría creada exitosamente",
+      "category_deleted": "Categoría eliminada exitosamente",
+      "subcategory_deleted": "Subcategoría eliminada exitosamente"
     }
   }
 }

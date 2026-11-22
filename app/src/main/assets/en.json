@@ -127,7 +127,8 @@
     "tabs": {
       "incomes": "Incomes",
       "budget": "Budget",
-      "expenses": "Expenses"
+      "expenses": "Expenses",
+      "savings": "Savings"
     },
     "header": {
       "title": "Incomes",
@@ -244,6 +245,69 @@
       "title": "Delete this category?",
       "warning_message": "This action cannot be undone. Slide the button to confirm.",
       "cancel_button": "Cancel"
+    }
+  },
+  "savings": {
+    "header": {
+      "title": "Savings",
+      "add_button": "Set Aside Saving"
+    },
+    "overview": {
+      "title": "Savings Overview",
+      "total_saved": "Total saved",
+      "assigned_badge": "%s%% saved",
+      "available_banner_title": "You have %s available",
+      "available_banner_subtitle": "%s of your income is still available to set aside."
+    },
+    "add_dialog": {
+      "title": "Set Aside Saving",
+      "amount_label": "Amount",
+      "amount_placeholder": "0.00",
+      "income_label": "Source income",
+      "select_income": "Select income",
+      "no_incomes_available": "No incomes recorded in this period",
+      "category_label": "Category",
+      "select_category": "Select category",
+      "date_time_label": "Date & Time",
+      "note_label": "Note (optional)",
+      "note_placeholder": "Add a note...",
+      "save_button": "✓ Save Saving"
+    },
+    "edit_dialog": {
+      "title": "Edit Saving",
+      "save_button": "✓ Save Changes"
+    },
+    "item": {
+      "saved_badge": "Saved"
+    },
+    "options": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "breakdown": {
+      "title": "Savings breakdown"
+    },
+    "history": {
+      "empty_message": "No savings registered in this period"
+    },
+    "delete_dialog": {
+      "title": "Delete this saving?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
+    },
+    "delete_category_dialog": {
+      "title": "Delete this category?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
+    },
+    "messages": {
+      "saved": "Saving added successfully",
+      "updated": "Saving updated successfully",
+      "deleted": "Saving deleted successfully",
+      "category_created": "Category created successfully",
+      "subcategory_created": "Subcategory created successfully",
+      "category_deleted": "Category deleted successfully",
+      "subcategory_deleted": "Subcategory deleted successfully"
     }
   }
 }

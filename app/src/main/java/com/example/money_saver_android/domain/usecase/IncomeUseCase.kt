@@ -5,9 +5,11 @@ import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.BudgetRepository
 import com.example.money_saver_android.data.repository.ExpenseRepository
 import com.example.money_saver_android.data.repository.IncomeRepository
+import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.Income
+import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -33,9 +35,13 @@ data class CategoryBudgetItem(
 class IncomeUseCase(
     private val repository: IncomeRepository,
     private val budgetRepository: BudgetRepository? = null,
-    private val budgetUseCase: BudgetUseCase? = budgetRepository?.let { BudgetUseCase(it, repository) },
-    private val expenseRepository: ExpenseRepository? = null
+    budgetUseCase: BudgetUseCase? = null,
+    private val expenseRepository: ExpenseRepository? = null,
+    private val savingsRepository: SavingsRepository? = null
 ) {
+    private val budgetUseCase: BudgetUseCase? = budgetUseCase ?: budgetRepository?.let {
+        BudgetUseCase(it, repository, savingsRepository)
+    }
     private val deletionMutex = Mutex()
     fun getIncomesByPeriod(periodId: Long): Flow<List<Income>> {
         return repository.getIncomesByPeriod(periodId)
@@ -229,8 +235,21 @@ class IncomeUseCase(
         return budgetUseCase?.calculateTotalBudgeted(budgets) ?: budgets.sumOf { it.amount }
     }
 
-    fun calculateAvailableIncome(totalIncome: Double, totalBudgeted: Double): Double {
-        return budgetUseCase?.calculateAvailableIncome(totalIncome, totalBudgeted) ?: maxOf(0.0, totalIncome - totalBudgeted)
+    fun calculateAvailableIncome(
+        totalIncome: Double,
+        totalBudgeted: Double,
+        totalSaved: Double = 0.0
+    ): Double {
+        return budgetUseCase?.calculateAvailableIncome(totalIncome, totalBudgeted, totalSaved)
+            ?: maxOf(0.0, totalIncome - totalBudgeted - totalSaved)
+    }
+
+    fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>> {
+        return savingsRepository?.getSavingsByPeriod(periodId) ?: emptyFlow()
+    }
+
+    fun calculateTotalSaved(savings: List<Saving>): Double {
+        return savings.sumOf { it.amount }
     }
 
     suspend fun saveBudget(

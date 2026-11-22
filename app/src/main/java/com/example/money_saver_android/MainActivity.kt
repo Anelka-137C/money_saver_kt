@@ -12,18 +12,21 @@ import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.local.AppDatabase
 import com.example.money_saver_android.data.local.BudgetDatabase
 import com.example.money_saver_android.data.local.ConfigDatabase
+import com.example.money_saver_android.data.local.SavingsDatabase
 import com.example.money_saver_android.data.repository.RoomBudgetRepository
 import com.example.money_saver_android.data.repository.RoomCategoryRepository
 import com.example.money_saver_android.data.repository.RoomCurrencyRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
 import com.example.money_saver_android.data.repository.RoomFinancialPeriodRepository
 import com.example.money_saver_android.data.repository.RoomIncomeRepository
+import com.example.money_saver_android.data.repository.RoomSavingsRepository
 import com.example.money_saver_android.data.repository.SharedPrefsCurrencyRepository
 import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import com.example.money_saver_android.domain.usecase.PeriodUseCase
+import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.ui.IncomesView
 import com.example.money_saver_android.ui.MainContainer
@@ -31,6 +34,7 @@ import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.IncomeViewModel
 import com.example.money_saver_android.viewmodel.PeriodViewModel
+import com.example.money_saver_android.viewmodel.SavingsViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
@@ -134,8 +138,35 @@ class MainActivity : ComponentActivity() {
         RoomBudgetRepository(budgetDatabase.budgetDao(), budgetDatabase.budgetCategoryDao())
     }
 
+    private val savingsDatabase by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            SavingsDatabase::class.java,
+            "savings.db"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
+    }
+
+    private val savingsRepository by lazy {
+        RoomSavingsRepository(savingsDatabase.savingDao(), savingsDatabase.savingCategoryDao())
+    }
+
+    private val savingsUseCase by lazy {
+        SavingsUseCase(savingsRepository, incomeRepository, budgetRepository)
+    }
+
+    private val savingsViewModel by lazy {
+        SavingsViewModel(savingsUseCase)
+    }
+
     private val incomeUseCase by lazy {
-        IncomeUseCase(incomeRepository, budgetRepository, expenseRepository = repository)
+        IncomeUseCase(
+            incomeRepository,
+            budgetRepository,
+            expenseRepository = repository,
+            savingsRepository = savingsRepository
+        )
     }
 
     private val incomeViewModel by lazy {
@@ -169,11 +200,13 @@ class MainActivity : ComponentActivity() {
                         IncomesView(
                             incomeViewModel = incomeViewModel,
                             expenseViewModel = viewModel,
+                            savingsViewModel = savingsViewModel,
                             allPeriods = periodState.allPeriods,
                             selectedPeriodId = currentSelectedPeriodId,
                             onPeriodSelected = { periodId ->
                                 incomeViewModel.onPeriodSelected(periodId)
                                 viewModel.onPeriodSelected(periodId)
+                                savingsViewModel.onPeriodSelected(periodId)
                             },
                             i18nManager = i18nManager,
                             currency = activeCurrency

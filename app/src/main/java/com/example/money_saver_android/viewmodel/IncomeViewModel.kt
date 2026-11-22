@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
 enum class FinanceTopTab {
     INCOMES,
     BUDGET,
-    EXPENSES
+    EXPENSES,
+    SAVINGS
 }
 
 data class EditBudgetState(
@@ -71,6 +72,7 @@ data class IncomeUiState(
     val budgets: List<Budget> = emptyList(),
     val budgetCategories: List<Category> = emptyList(),
     val totalBudgeted: Double = 0.0,
+    val totalSaved: Double = 0.0,
     val availableIncome: Double = 0.0,
     val budgetAmountInput: String = "",
     val budgetCategoryInput: String = "",
@@ -106,6 +108,7 @@ class IncomeViewModel(
 
     private var incomesPeriodJob: Job? = null
     private var budgetsPeriodJob: Job? = null
+    private var savingsPeriodJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -152,6 +155,7 @@ class IncomeViewModel(
     fun onPeriodSelected(periodId: Long?) {
         incomesPeriodJob?.cancel()
         budgetsPeriodJob?.cancel()
+        savingsPeriodJob?.cancel()
         val periodChanged = _uiState.value.selectedPeriodId != periodId
         _uiState.update { current ->
             if (periodId == null || periodChanged) {
@@ -161,6 +165,7 @@ class IncomeViewModel(
                     totalIncome = 0.0,
                     budgets = emptyList(),
                     totalBudgeted = 0.0,
+                    totalSaved = 0.0,
                     availableIncome = 0.0
                 )
             } else {
@@ -174,7 +179,7 @@ class IncomeViewModel(
                     .collect { incomeList ->
                         val total = incomeUseCase.calculateTotalIncome(incomeList)
                         _uiState.update { current ->
-                            val available = incomeUseCase.calculateAvailableIncome(total, current.totalBudgeted)
+                            val available = incomeUseCase.calculateAvailableIncome(total, current.totalBudgeted, current.totalSaved)
                             current.copy(incomes = incomeList, totalIncome = total, availableIncome = available)
                         }
                     }
@@ -185,14 +190,26 @@ class IncomeViewModel(
                     .collect { budgetList ->
                         val totalBudgeted = incomeUseCase.calculateTotalBudgeted(budgetList)
                         _uiState.update { current ->
-                            val available = incomeUseCase.calculateAvailableIncome(current.totalIncome, totalBudgeted)
+                            val available = incomeUseCase.calculateAvailableIncome(current.totalIncome, totalBudgeted, current.totalSaved)
                             current.copy(budgets = budgetList, totalBudgeted = totalBudgeted, availableIncome = available)
+                        }
+                    }
+            }
+            savingsPeriodJob = viewModelScope.launch {
+                incomeUseCase.getSavingsByPeriod(periodId)
+                    .catch { emit(emptyList()) }
+                    .collect { savingList ->
+                        val totalSaved = incomeUseCase.calculateTotalSaved(savingList)
+                        _uiState.update { current ->
+                            val available = incomeUseCase.calculateAvailableIncome(current.totalIncome, current.totalBudgeted, totalSaved)
+                            current.copy(totalSaved = totalSaved, availableIncome = available)
                         }
                     }
             }
         } else {
             incomesPeriodJob = null
             budgetsPeriodJob = null
+            savingsPeriodJob = null
         }
     }
 

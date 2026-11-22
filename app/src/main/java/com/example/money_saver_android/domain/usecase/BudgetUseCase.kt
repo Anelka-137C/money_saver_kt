@@ -2,6 +2,7 @@ package com.example.money_saver_android.domain.usecase
 
 import com.example.money_saver_android.data.repository.BudgetRepository
 import com.example.money_saver_android.data.repository.IncomeRepository
+import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -15,7 +16,8 @@ sealed class BudgetResult {
 
 class BudgetUseCase(
     private val budgetRepository: BudgetRepository,
-    private val incomeRepository: IncomeRepository
+    private val incomeRepository: IncomeRepository,
+    private val savingsRepository: SavingsRepository? = null
 ) {
     private val budgetMutex = Mutex()
 
@@ -27,8 +29,13 @@ class BudgetUseCase(
         return budgets.sumOf { it.amount }
     }
 
-    fun calculateAvailableIncome(totalIncome: Double, totalBudgeted: Double): Double {
-        return maxOf(0.0, totalIncome - totalBudgeted)
+    fun calculateAvailableIncome(
+        totalIncome: Double,
+        totalBudgeted: Double,
+        totalSaved: Double = 0.0
+    ): Double {
+        val raw = totalIncome - totalBudgeted - totalSaved
+        return if (raw.isNaN()) 0.0 else maxOf(0.0, raw)
     }
 
     suspend fun saveBudget(
@@ -54,7 +61,8 @@ class BudgetUseCase(
             val totalIncome = incomeRepository.getIncomesByPeriod(periodId).first().sumOf { it.amount }
             val currentBudgets = budgetRepository.getBudgetsByPeriod(periodId).first()
             val totalBudgeted = currentBudgets.sumOf { it.amount }
-            val available = totalIncome - totalBudgeted
+            val totalSaved = savingsRepository?.getSavingsByPeriod(periodId)?.first()?.sumOf { it.amount } ?: 0.0
+            val available = totalIncome - totalBudgeted - totalSaved
 
             if (amount > available) {
                 return@withLock BudgetResult.Error("El monto supera el ingreso disponible")
@@ -100,7 +108,8 @@ class BudgetUseCase(
 
             val totalIncome = incomeRepository.getIncomesByPeriod(periodId).first().sumOf { it.amount }
             val totalBudgetedWithoutCurrent = currentBudgets.sumOf { it.amount } - currentBudgetAmount
-            val availableForUpdate = totalIncome - totalBudgetedWithoutCurrent
+            val totalSaved = savingsRepository?.getSavingsByPeriod(periodId)?.first()?.sumOf { it.amount } ?: 0.0
+            val availableForUpdate = totalIncome - totalBudgetedWithoutCurrent - totalSaved
 
             if (amount > availableForUpdate) {
                 return@withLock BudgetResult.Error("El monto supera el ingreso disponible")

@@ -127,7 +127,8 @@
     "tabs": {
       "incomes": "Rendas",
       "budget": "Orçamento",
-      "expenses": "Despesas"
+      "expenses": "Despesas",
+      "savings": "Economias"
     },
     "header": {
       "title": "Rendas",
@@ -244,6 +245,69 @@
       "title": "Excluir esta categoria?",
       "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
       "cancel_button": "Cancelar"
+    }
+  },
+  "savings": {
+    "header": {
+      "title": "Economias",
+      "add_button": "Reservar Economia"
+    },
+    "overview": {
+      "title": "Resumo de Economias",
+      "total_saved": "Total economizado",
+      "assigned_badge": "%s%% economizado",
+      "available_banner_title": "Você tem %s disponível",
+      "available_banner_subtitle": "%s da sua renda ainda está disponível para reservar."
+    },
+    "add_dialog": {
+      "title": "Reservar Economia",
+      "amount_label": "Valor",
+      "amount_placeholder": "0.00",
+      "income_label": "Renda de origem",
+      "select_income": "Selecionar renda",
+      "no_incomes_available": "Não há rendas registradas neste período",
+      "category_label": "Categoria",
+      "select_category": "Selecionar categoria",
+      "date_time_label": "Data e hora",
+      "note_label": "Nota (opcional)",
+      "note_placeholder": "Adicionar uma nota...",
+      "save_button": "✓ Salvar Economia"
+    },
+    "edit_dialog": {
+      "title": "Editar Economia",
+      "save_button": "✓ Salvar Alterações"
+    },
+    "item": {
+      "saved_badge": "Salvo"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
+    },
+    "breakdown": {
+      "title": "Detalhamento de economias"
+    },
+    "history": {
+      "empty_message": "Nenhuma economia registrada neste período"
+    },
+    "delete_dialog": {
+      "title": "Excluir esta economia?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "delete_category_dialog": {
+      "title": "Excluir esta categoria?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
+    },
+    "messages": {
+      "saved": "Economia salva com sucesso",
+      "updated": "Economia atualizada com sucesso",
+      "deleted": "Economia excluída com sucesso",
+      "category_created": "Categoria criada com sucesso",
+      "subcategory_created": "Subcategoria criada com sucesso",
+      "category_deleted": "Categoria excluída com sucesso",
+      "subcategory_deleted": "Subcategoria excluída com sucesso"
     }
   }
 }

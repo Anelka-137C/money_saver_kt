@@ -127,7 +127,8 @@
     "tabs": {
       "incomes": "Einnahmen",
       "budget": "Budget",
-      "expenses": "Ausgaben"
+      "expenses": "Ausgaben",
+      "savings": "Ersparnisse"
     },
     "header": {
       "title": "Einkommen",
@@ -244,6 +245,69 @@
       "title": "Diese Kategorie löschen?",
       "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Schieberegler zur Bestätigung.",
       "cancel_button": "Abbrechen"
+    }
+  },
+  "savings": {
+    "header": {
+      "title": "Ersparnisse",
+      "add_button": "Ersparnis zurücklegen"
+    },
+    "overview": {
+      "title": "Übersicht Ersparnisse",
+      "total_saved": "Gesamt gespart",
+      "assigned_badge": "%s%% gespart",
+      "available_banner_title": "Du hast %s verfügbar",
+      "available_banner_subtitle": "%s deines Einkommens ist noch zum Sparen verfügbar."
+    },
+    "add_dialog": {
+      "title": "Ersparnis zurücklegen",
+      "amount_label": "Betrag",
+      "amount_placeholder": "0.00",
+      "income_label": "Quell-Einkommen",
+      "select_income": "Einkommen auswählen",
+      "no_incomes_available": "Keine Einkommen in diesem Zeitraum erfasst",
+      "category_label": "Kategorie",
+      "select_category": "Kategorie auswählen",
+      "date_time_label": "Datum & Uhrzeit",
+      "note_label": "Notiz (optional)",
+      "note_placeholder": "Notiz hinzufügen...",
+      "save_button": "✓ Ersparnis speichern"
+    },
+    "edit_dialog": {
+      "title": "Ersparnis bearbeiten",
+      "save_button": "✓ Änderungen speichern"
+    },
+    "item": {
+      "saved_badge": "Gespeichert"
+    },
+    "options": {
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "breakdown": {
+      "title": "Aufschlüsselung der Ersparnisse"
+    },
+    "history": {
+      "empty_message": "Keine Ersparnisse in diesem Zeitraum registriert"
+    },
+    "delete_dialog": {
+      "title": "Diese Ersparnis löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
+      "cancel_button": "Abbrechen"
+    },
+    "delete_category_dialog": {
+      "title": "Diese Kategorie löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Schieberegler zur Bestätigung.",
+      "cancel_button": "Abbrechen"
+    },
+    "messages": {
+      "saved": "Ersparnis erfolgreich gespeichert",
+      "updated": "Ersparnis erfolgreich aktualisiert",
+      "deleted": "Ersparnis erfolgreich gelöscht",
+      "category_created": "Kategorie erfolgreich erstellt",
+      "subcategory_created": "Unterkategorie erfolgreich erstellt",
+      "category_deleted": "Kategorie erfolgreich gelöscht",
+      "subcategory_deleted": "Unterkategorie erfolgreich gelöscht"
     }
   }
 }

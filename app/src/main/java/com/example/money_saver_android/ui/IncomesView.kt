@@ -88,6 +88,7 @@ import com.example.money_saver_android.ui.theme.TextSecondary
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.FinanceTopTab
 import com.example.money_saver_android.viewmodel.IncomeViewModel
+import com.example.money_saver_android.viewmodel.SavingsViewModel
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -97,6 +98,7 @@ import java.util.Locale
 fun IncomesView(
     incomeViewModel: IncomeViewModel,
     expenseViewModel: ExpenseViewModel? = null,
+    savingsViewModel: SavingsViewModel? = null,
     allPeriods: List<FinancialPeriod> = emptyList(),
     selectedPeriodId: Long? = null,
     onPeriodSelected: (Long) -> Unit = {},
@@ -170,6 +172,7 @@ fun IncomesView(
 
     LaunchedEffect(state.selectedPeriodId) {
         expenseViewModel?.onPeriodSelected(state.selectedPeriodId)
+        savingsViewModel?.onPeriodSelected(state.selectedPeriodId)
     }
 
     val effectiveSelectedPeriodId = state.selectedPeriodId ?: selectedPeriodId
@@ -288,6 +291,7 @@ fun IncomesView(
                     IncomeAllocationCard(
                         totalIncome = state.totalIncome,
                         totalBudgeted = state.totalBudgeted,
+                        totalSaved = state.totalSaved,
                         currency = currency
                     )
 
@@ -510,6 +514,20 @@ fun IncomesView(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("container_expenses_view")
+                        )
+                    }
+                }
+                FinanceTopTab.SAVINGS -> {
+                    if (savingsViewModel != null) {
+                        SavingsTabContent(
+                            viewModel = savingsViewModel,
+                            currency = currency
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("container_savings_view")
                         )
                     }
                 }
