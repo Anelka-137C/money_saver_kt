@@ -28,7 +28,7 @@
       "title": "Ausgabe erfassen",
       "amount_label": "Betrag",
       "amount_placeholder": "0.00",
-      "date_label": "Datum",
+      "date_label": "Datum & Uhrzeit",
       "budget_label": "Quellbudget",
       "budget_placeholder": "Budget auswählen",
       "category_label": "Kategorie",
@@ -49,7 +49,7 @@
       "title": "Ausgabe bearbeiten",
       "amount_label": "Betrag",
       "amount_placeholder": "0.00",
-      "date_label": "Datum",
+      "date_label": "Datum & Uhrzeit",
       "budget_label": "Quellbudget",
       "budget_placeholder": "Budget auswählen",
       "category_label": "Kategorie",
@@ -66,6 +66,23 @@
     "category_sheet": {
       "title": "Kategorie auswählen",
       "create_category": "Kategorie erstellen"
+    },
+    "options": {
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "edit_category_dialog": {
+      "title": "Kategorie bearbeiten",
+      "name_label": "Kategoriename",
+      "name_placeholder": "z. B. Lebensmittel",
+      "color_label": "Farbe",
+      "cancel_button": "Abbrechen",
+      "save_button": "Speichern"
+    },
+    "delete_category_dialog": {
+      "title": "Diese Kategorie löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
+      "cancel_button": "Abbrechen"
     }
   },
   "settings": {
@@ -213,6 +230,15 @@
     },
     "history": {
       "empty_message": "In diesem Zeitraum sind keine Budgets erfasst"
+    },
+    "options": {
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "delete_dialog": {
+      "title": "Dieses Budget löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
+      "cancel_button": "Abbrechen"
     },
     "delete_category_dialog": {
       "title": "Diese Kategorie löschen?",

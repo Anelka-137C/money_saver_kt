@@ -47,6 +47,9 @@ class FakeExpenseRepository : ExpenseRepository {
 
 class FakeCategoryRepoForVm : CategoryRepository {
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    var expenseCountForCategory: (String) -> Int = { 0 }
+    var expenseCountForSubcategory: (String, String) -> Int = { _, _ -> 0 }
+
     override fun getAllCategories(): Flow<List<Category>> = _categories
 
     override suspend fun preloadDefaultCategoriesIfNeeded() {
@@ -75,6 +78,36 @@ class FakeCategoryRepoForVm : CategoryRepository {
             }
         }
     }
+
+    override suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name.equals(oldName, ignoreCase = true)) {
+                cat.copy(name = newName, color = color, icon = icon)
+            } else {
+                cat
+            }
+        }
+    }
+
+    override suspend fun deleteCategory(categoryName: String) {
+        _categories.value = _categories.value.filterNot { it.name.equals(categoryName, ignoreCase = true) }
+    }
+
+    override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name.equals(categoryName, ignoreCase = true)) {
+                cat.copy(subcategories = cat.subcategories.filterNot { it.name.equals(subcategoryName, ignoreCase = true) })
+            } else {
+                cat
+            }
+        }
+    }
+
+    override suspend fun countExpensesForCategory(categoryName: String): Int =
+        expenseCountForCategory(categoryName)
+
+    override suspend fun countExpensesForSubcategory(categoryName: String, subcategoryName: String): Int =
+        expenseCountForSubcategory(categoryName, subcategoryName)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -538,5 +571,43 @@ class ExpenseViewModelTest {
         assertEquals(50, food.percent)
         assertEquals(100.0, transport.spentAmount, 0.01)
         assertEquals(50, transport.percent)
+    }
+
+    @Test
+    fun editAndDeleteExpenseCategoryAndSubcategory_updatesUiStateAndRepository() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        val initialCategory = viewModel.uiState.value.categories.single()
+        assertEquals("Alimentación", initialCategory.name)
+
+        // 1. Edit category name & color
+        viewModel.startEditingCategory(initialCategory)
+        assertNotNull(viewModel.uiState.value.editingCategory)
+        viewModel.onEditCategoryNameChange("Comida")
+        viewModel.onEditCategoryColorChange("#E74A3B")
+        viewModel.confirmEditCategory()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editingCategory)
+        assertEquals("Comida", viewModel.uiState.value.categories.single().name)
+        assertEquals("#E74A3B", viewModel.uiState.value.categories.single().color)
+
+        // 2. Delete subcategory directly
+        viewModel.deleteSubcategory("Comida", "Restaurante")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.categories.single().subcategories.isEmpty())
+
+        // 3. Request, dismiss, and confirm category deletion
+        viewModel.requestDeleteCategory("Comida")
+        assertNotNull(viewModel.uiState.value.categoryToDelete)
+        viewModel.dismissDeleteCategoryConfirmation()
+        assertNull(viewModel.uiState.value.categoryToDelete)
+        assertEquals(1, viewModel.uiState.value.categories.size)
+
+        viewModel.requestDeleteCategory("Comida")
+        viewModel.confirmDeleteCategory()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.categoryToDelete)
+        assertTrue(viewModel.uiState.value.categories.isEmpty())
     }
 }

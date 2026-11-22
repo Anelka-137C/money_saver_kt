@@ -196,5 +196,12 @@ class BudgetUseCaseTest {
             periodId = periodId
         )
         assertTrue(updateExceeding is BudgetResult.Error)
+
+        // Deleting budget removes it and frees available income
+        val deleteResult = useCase.deleteBudget(budgetId)
+        assertTrue(deleteResult is BudgetResult.Success)
+        val budgetsAfterDelete = useCase.getBudgetsByPeriod(periodId).first()
+        assertTrue(budgetsAfterDelete.isEmpty())
+        assertEquals(1000.0, useCase.calculateAvailableIncome(1000.0, useCase.calculateTotalBudgeted(budgetsAfterDelete)), 0.001)
     }
 }

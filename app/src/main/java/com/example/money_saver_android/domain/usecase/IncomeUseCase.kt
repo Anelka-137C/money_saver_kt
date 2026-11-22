@@ -265,6 +265,11 @@ class IncomeUseCase(
         )
     }
 
+    suspend fun deleteBudget(id: Long): BudgetResult {
+        val useCase = budgetUseCase ?: return BudgetResult.Error("Módulo de presupuestos no configurado")
+        return useCase.deleteBudget(id)
+    }
+
     fun getBudgetCategories(): Flow<List<Category>> {
         return budgetRepository?.getAllCategories() ?: emptyFlow()
     }
@@ -367,8 +372,14 @@ class IncomeUseCase(
                     expense.matchesPeriod(periodStartDate, periodEndDate, periodId) &&
                         expense.matchesBudgetGroup(catBudgets, rawName)
                 }.sumOf { it.amount }
-                val remaining = maxOf(0.0, totalBudget - spent)
-                val progress = if (totalBudget > 0.0) (remaining / totalBudget).toFloat().coerceIn(0f, 1f) else 0f
+                val rawRemaining = totalBudget - spent
+                val remaining = if (rawRemaining.isNaN()) 0.0 else maxOf(0.0, rawRemaining)
+                val ratio = when {
+                    totalBudget.isInfinite() -> if (remaining.isInfinite()) 1.0 else 0.0
+                    totalBudget > 0.0 -> remaining / totalBudget
+                    else -> 0.0
+                }
+                val progress = if (ratio.isFinite()) ratio.toFloat().coerceIn(0f, 1f) else 0f
                 CategoryBudgetItem(
                     categoryName = category?.name ?: rawName,
                     icon = category?.icon?.ifBlank { "📋" } ?: "📋",
@@ -400,7 +411,8 @@ class IncomeUseCase(
     }
 
     fun calculateRemainingBudget(totalBudgeted: Double, totalSpent: Double): Double {
-        return maxOf(0.0, totalBudgeted - totalSpent)
+        val raw = totalBudgeted - totalSpent
+        return if (raw.isNaN()) 0.0 else maxOf(0.0, raw)
     }
 
     private fun Expense.matchesPeriod(
@@ -408,18 +420,22 @@ class IncomeUseCase(
         periodEndDate: String?,
         periodId: Long?
     ): Boolean {
-        if (this.periodId > 0L && periodId != null) {
+        if (periodId != null) {
             return this.periodId == periodId
         }
-        return periodStartDate == null || periodEndDate == null ||
-            (date >= periodStartDate && date <= periodEndDate)
+        if (periodStartDate == null || periodEndDate == null) {
+            return false
+        }
+        val dateOnly = date.take(10)
+        return dateOnly >= periodStartDate && dateOnly <= periodEndDate
     }
 
     private fun Expense.matchesBudgetGroup(catBudgets: List<Budget>, categoryName: String): Boolean {
-        if (budgetId > 0L || budgetCategory.isNotBlank()) {
-            val categoryMatches = budgetCategory.trim().equals(categoryName, ignoreCase = true)
-            val idMatches = budgetId <= 0L || catBudgets.any { it.id == budgetId }
-            return categoryMatches && idMatches
+        if (budgetId > 0L) {
+            return catBudgets.any { it.id == budgetId }
+        }
+        if (budgetCategory.isNotBlank()) {
+            return budgetCategory.trim().equals(categoryName, ignoreCase = true)
         }
         return category.trim().equals(categoryName, ignoreCase = true)
     }

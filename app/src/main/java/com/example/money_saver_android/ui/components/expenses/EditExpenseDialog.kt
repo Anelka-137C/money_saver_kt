@@ -44,6 +44,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.incomes.DateTimePickerField
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -153,29 +154,12 @@ fun EditExpenseDialog(
                     }
                 }
 
-                // Fecha
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(FieldBackground)
-                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                        .padding(12.dp)
-                ) {
-                    Text(text = t("expenses.edit_dialog.date_label"), fontSize = 11.sp, color = TextSecondary)
-                    OutlinedTextField(
-                        value = editState.date,
-                        onValueChange = onDateChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-                }
+                // Fecha y hora (calendario + reloj)
+                DateTimePickerField(
+                    value = editState.date,
+                    onValueChange = onDateChange,
+                    label = t("expenses.edit_dialog.date_label")
+                )
 
                 // Selector Categoría
                 Column(

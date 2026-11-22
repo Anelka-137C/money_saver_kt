@@ -7,6 +7,7 @@ import com.example.money_saver_android.data.local.CategoryDao
 import com.example.money_saver_android.data.local.CategoryEntity
 import com.example.money_saver_android.data.local.SubcategoryEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class RoomCategoryRepository(
@@ -39,15 +40,20 @@ class RoomCategoryRepository(
         }
 
         if (dao.isSubcategoryTableCreated() > 0 && dao.getSubcategoryCount() == 0) {
-            val subcategoryEntities = defaultCategories.flatMap { cat ->
-                cat.subcategories.map { sub ->
-                    SubcategoryEntity(
-                        categoryName = cat.name,
-                        name = sub.name
-                    )
+            val existingCategoryNames = dao.getAllCategories().first().map { it.name }.toSet()
+            val subcategoryEntities = defaultCategories
+                .filter { it.name in existingCategoryNames }
+                .flatMap { cat ->
+                    cat.subcategories.map { sub ->
+                        SubcategoryEntity(
+                            categoryName = cat.name,
+                            name = sub.name
+                        )
+                    }
                 }
+            if (subcategoryEntities.isNotEmpty()) {
+                dao.insertSubcategories(subcategoryEntities)
             }
-            dao.insertSubcategories(subcategoryEntities)
         }
     }
 
@@ -74,5 +80,25 @@ class RoomCategoryRepository(
                 name = subcategory.name
             )
         )
+    }
+
+    override suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        dao.updateCategory(oldName = oldName, newName = newName, color = color, icon = icon)
+    }
+
+    override suspend fun deleteCategory(categoryName: String) {
+        dao.deleteCategoryByName(categoryName)
+    }
+
+    override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        dao.deleteSubcategoryByName(categoryName, subcategoryName)
+    }
+
+    override suspend fun countExpensesForCategory(categoryName: String): Int {
+        return dao.countExpensesForCategory(categoryName)
+    }
+
+    override suspend fun countExpensesForSubcategory(categoryName: String, subcategoryName: String): Int {
+        return dao.countExpensesForSubcategory(categoryName, subcategoryName)
     }
 }

@@ -55,6 +55,7 @@ import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.incomes.CurrencyFormatVisualTransformation
+import com.example.money_saver_android.ui.components.incomes.DateTimePickerField
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -218,28 +219,12 @@ fun AddEditExpenseDialog(
                     onClick = onSelectCategoryClick
                 )
 
-                // Date input
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = t("expenses.add_card.date_label"),
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = date,
-                        onValueChange = onDateChange,
-                        singleLine = true,
-                        colors = transparentFieldColors(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(FieldBackground)
-                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                            .testTag("input_expense_date")
-                    )
-                }
+                // Date & Time picker (calendar + clock)
+                DateTimePickerField(
+                    value = date,
+                    onValueChange = onDateChange,
+                    label = if (isEditing) t("expenses.edit_dialog.date_label") else t("expenses.add_card.date_label")
+                )
 
                 // Optional Description
                 Column(modifier = Modifier.fillMaxWidth()) {

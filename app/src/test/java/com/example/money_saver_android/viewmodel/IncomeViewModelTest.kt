@@ -403,6 +403,59 @@ class IncomeViewModelTest {
     }
 
     @Test
+    fun test_budget_delete_flow_with_confirmation_updates_totals_and_clears_state() = runTest {
+        val fakeBudgetRepo = FakeBudgetRepository()
+        val incomeUseCase = IncomeUseCase(
+            repository = repository,
+            budgetRepository = fakeBudgetRepo
+        )
+        val vm = IncomeViewModel(incomeUseCase)
+        vm.onPeriodSelected(1L)
+
+        repository.insertIncome(
+            Income(
+                amount = 1000.0,
+                dateTime = "2026-05-01 09:00",
+                category = "Salary",
+                subcategory = "Main",
+                description = "",
+                periodId = 1L
+            )
+        )
+        advanceUntilIdle()
+
+        vm.onBudgetAmountChange("400")
+        vm.onBudgetCategorySelected("Food", "Supermarket")
+        vm.saveBudget()
+        advanceUntilIdle()
+
+        val savedBudget = vm.uiState.value.budgets.first()
+        assertEquals(400.0, vm.uiState.value.totalBudgeted, 0.001)
+        assertEquals(600.0, vm.uiState.value.availableIncome, 0.001)
+        assertNull(vm.uiState.value.budgetToDelete)
+
+        // 1. Request delete sets budgetToDelete
+        vm.requestDeleteBudget(savedBudget)
+        assertEquals(savedBudget, vm.uiState.value.budgetToDelete)
+
+        // 2. Dismiss clears budgetToDelete without deleting
+        vm.dismissDeleteBudgetConfirmation()
+        assertNull(vm.uiState.value.budgetToDelete)
+        assertEquals(1, vm.uiState.value.budgets.size)
+
+        // 3. Request again and confirm deletion
+        vm.requestDeleteBudget(savedBudget)
+        vm.confirmDeleteBudget()
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.budgetToDelete)
+        assertTrue(vm.uiState.value.budgets.isEmpty())
+        assertEquals(0.0, vm.uiState.value.totalBudgeted, 0.001)
+        assertEquals(1000.0, vm.uiState.value.availableIncome, 0.001)
+        assertEquals(IncomeViewModel.MSG_BUDGET_DELETED, vm.uiState.value.budgetToastMessage)
+    }
+
+    @Test
     fun test_income_viewmodel_collects_expenses_and_exposes_in_ui_state() = runTest {
         val fakeExpenseRepo = FakeExpenseRepository()
         val expense = Expense(1L, 120.0, "2026-05-10", "Groceries", "Food & Dining", "Supermarket")

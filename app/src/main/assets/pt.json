@@ -28,7 +28,7 @@
       "title": "Registrar Despesa",
       "amount_label": "Valor",
       "amount_placeholder": "0.00",
-      "date_label": "Data",
+      "date_label": "Data e hora",
       "budget_label": "Orçamento de origem",
       "budget_placeholder": "Selecionar orçamento",
       "category_label": "Categoria",
@@ -49,7 +49,7 @@
       "title": "Editar Despesa",
       "amount_label": "Valor",
       "amount_placeholder": "0.00",
-      "date_label": "Data",
+      "date_label": "Data e hora",
       "budget_label": "Orçamento de origem",
       "budget_placeholder": "Selecionar orçamento",
       "category_label": "Categoria",
@@ -66,6 +66,23 @@
     "category_sheet": {
       "title": "Selecionar Categoria",
       "create_category": "Criar Categoria"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
+    },
+    "edit_category_dialog": {
+      "title": "Editar Categoria",
+      "name_label": "Nome da categoria",
+      "name_placeholder": "Ex. Alimentação",
+      "color_label": "Cor",
+      "cancel_button": "Cancelar",
+      "save_button": "Salvar"
+    },
+    "delete_category_dialog": {
+      "title": "Excluir esta categoria?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
     }
   },
   "settings": {
@@ -213,6 +230,15 @@
     },
     "history": {
       "empty_message": "Não há orçamentos registados neste período"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
+    },
+    "delete_dialog": {
+      "title": "Excluir este orçamento?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
     },
     "delete_category_dialog": {
       "title": "Excluir esta categoria?",

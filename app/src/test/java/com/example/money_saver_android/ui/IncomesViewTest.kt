@@ -131,7 +131,10 @@ class IncomesViewTest {
                 "add_card": { "title": "Registrar Gasto", "amount_label": "Monto", "amount_placeholder": "0.00", "date_label": "Fecha", "budget_label": "Presupuesto origen", "budget_placeholder": "Seleccionar presupuesto", "category_label": "Categoría", "category_placeholder": "Seleccionar categoría", "description_label": "Nota (opcional)", "description_placeholder": "Agregar una descripción...", "save_button": "Guardar Gasto" },
                 "breakdown": { "title": "Desglose de gastos" },
                 "history": { "period_empty_message": "No hay gastos registrados en este período" },
-                "edit_dialog": { "title": "Modificar Gasto", "save_button": "Guardar" }
+                "edit_dialog": { "title": "Modificar Gasto", "save_button": "Guardar" },
+                "options": { "edit": "Modificar", "delete": "Eliminar" },
+                "edit_category_dialog": { "title": "Modificar Categoría", "name_label": "Nombre de la categoría", "name_placeholder": "Ej. Alimentación", "color_label": "Color", "cancel_button": "Cancelar", "save_button": "Guardar" },
+                "delete_category_dialog": { "title": "¿Eliminar esta categoría?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" }
               },
               "budget": {
                 "header": { "title": "Presupuesto", "add_button": "Registrar Presupuesto" },
@@ -140,6 +143,8 @@ class IncomesViewTest {
                 "add_dialog": { "title": "Registrar Presupuesto", "edit_title": "Modificar Presupuesto", "amount_label": "Monto", "amount_placeholder": "0.00", "category_label": "Categoría", "select_category": "Seleccionar categoría", "save_button": "✓ Guardar Presupuesto", "edit_save_button": "✓ Guardar Cambios" },
                 "breakdown": { "title": "Desglose de presupuestos" },
                 "history": { "empty_message": "No hay presupuestos registrados en este período" },
+                "options": { "edit": "Modificar", "delete": "Eliminar" },
+                "delete_dialog": { "title": "¿Eliminar este presupuesto?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" },
                 "delete_category_dialog": { "title": "¿Eliminar esta categoría?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" }
               }
             }
@@ -420,8 +425,10 @@ class IncomesViewTest {
         composeTestRule.onNodeWithTag("budget_item_1").assertExists()
         composeTestRule.onNodeWithTag("text_budget_amount_1").assertExists()
 
-        // Scroll to list and edit the budget item
+        // Scroll to list, open three-dots menu, and edit the budget item
         composeTestRule.onNodeWithTag("list_budget_breakdown").performScrollTo()
+        composeTestRule.onNodeWithTag("btn_options_budget_1").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("btn_edit_budget_1").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("card_add_edit_budget").assertIsDisplayed()
@@ -549,7 +556,9 @@ class IncomesViewTest {
         composeTestRule.waitForIdle()
 
         runBlocking {
-            expenseRepository.insertExpense(Expense(1L, 125.0, "2026-05-10", "Lunch", "Food & Dining", "Supermarket"))
+            expenseRepository.insertExpense(
+                Expense(1L, 125.0, "2026-05-10", "Lunch", "Food & Dining", "Supermarket", periodId = 1L)
+            )
         }
         composeTestRule.waitForIdle()
 
@@ -811,5 +820,248 @@ class IncomesViewTest {
             .assertTextEquals(CurrencyFormatter.format(0.0, defaultCurrencies.first()))
         composeTestRule.onNodeWithTag("banner_no_active_budget").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun test_budget_breakdown_options_menu_displays_edit_and_delete_and_uses_slide_dialog_to_delete() {
+        runBlocking {
+            budgetRepository.insertBudget(
+                Budget(
+                    amount = 500.0,
+                    category = "Food & Dining",
+                    subcategory = "Supermarket",
+                    periodId = 1L
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Switch to Budget tab
+        incomeViewModel.onTopTabSelected(FinanceTopTab.BUDGET)
+        composeTestRule.waitForIdle()
+
+        // Budget item and three-dots options menu button are displayed
+        composeTestRule.onNodeWithTag("list_budget_breakdown").performScrollTo()
+        composeTestRule.onNodeWithTag("budget_item_1").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_options_budget_1").performScrollTo().assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        // Menu displays both Edit and Delete options
+        composeTestRule.onNodeWithTag("btn_edit_budget_1").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_delete_budget_1").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        // Delete confirmation dialog with slide-to-confirm button is displayed
+        composeTestRule.onNodeWithTag("dialog_delete_budget").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_slide_to_confirm_delete_budget").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_cancel_delete_budget").assertIsDisplayed()
+
+        // Cancel dismisses dialog without deleting budget
+        composeTestRule.onNodeWithTag("btn_cancel_delete_budget").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_delete_budget").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("budget_item_1").assertExists()
+
+        // Re-open menu, click delete, and confirm deletion
+        composeTestRule.onNodeWithTag("btn_options_budget_1").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_delete_budget_1").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_delete_budget").assertIsDisplayed()
+
+        incomeViewModel.confirmDeleteBudget()
+        composeTestRule.waitForIdle()
+
+        // Dialog is closed and budget item is removed
+        composeTestRule.onNodeWithTag("dialog_delete_budget").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("budget_item_1").assertDoesNotExist()
+        runBlocking {
+            val remaining = budgetRepository.getBudgetsByPeriod(1L).first()
+            assertTrue(remaining.isEmpty())
+        }
+    }
+
+    @Test
+    fun test_expenses_tab_category_edit_and_delete_dialogs_with_slide_button_and_direct_subcategory_delete() {
+        runBlocking {
+            budgetRepository.insertBudget(
+                Budget(
+                    amount = 500.0,
+                    category = "Food & Dining",
+                    subcategory = "Supermarket",
+                    periodId = 1L
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    expenseViewModel = expenseViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = {
+                        incomeViewModel.onPeriodSelected(it)
+                        expenseViewModel.onPeriodSelected(it)
+                    },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Switch to Expenses tab
+        composeTestRule.onNodeWithTag("tab_top_expenses").performClick()
+        composeTestRule.waitForIdle()
+
+        // 1. Delete subcategory directly (single delete action)
+        expenseViewModel.deleteSubcategory("Alimentación", "Restaurante")
+        composeTestRule.waitForIdle()
+        runBlocking {
+            val cat = expenseCategoryRepository.getAllCategories().first().first { it.name == "Alimentación" }
+            assertTrue(cat.subcategories.isEmpty())
+        }
+
+        // 2. Edit category opens EditExpenseCategoryDialog
+        val category = expenseViewModel.uiState.value.categories.first { it.name == "Alimentación" }
+        expenseViewModel.startEditingCategory(category)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_edit_expense_category").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("input_edit_expense_category_name").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_save_edit_expense_category").assertIsDisplayed()
+        expenseViewModel.onEditCategoryNameChange("Comida")
+        composeTestRule.onNodeWithTag("btn_save_edit_expense_category").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_edit_expense_category").assertDoesNotExist()
+
+        // 3. Delete category triggers confirmation dialog with SlideToConfirmButton
+        expenseViewModel.requestDeleteCategory("Comida")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_delete_expense_category").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_slide_to_confirm_delete_expense_category").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_cancel_delete_expense_category").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_delete_expense_category").assertDoesNotExist()
+
+        // 4. Request again and confirm deletion removes category
+        expenseViewModel.requestDeleteCategory("Comida")
+        composeTestRule.waitForIdle()
+        expenseViewModel.confirmDeleteCategory()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_delete_expense_category").assertDoesNotExist()
+        runBlocking {
+            assertTrue(expenseCategoryRepository.getAllCategories().first().none { it.name == "Comida" })
+        }
+    }
+
+    @Test
+    fun test_add_expense_dialog_uses_calendar_and_clock_date_time_picker() {
+        runBlocking {
+            budgetRepository.insertBudget(
+                Budget(
+                    amount = 500.0,
+                    category = "Food & Dining",
+                    subcategory = "Supermarket",
+                    periodId = 1L
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    expenseViewModel = expenseViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = {
+                        incomeViewModel.onPeriodSelected(it)
+                        expenseViewModel.onPeriodSelected(it)
+                    },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Open Expenses tab and open Add Expense dialog
+        composeTestRule.onNodeWithTag("tab_top_expenses").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // Tap DateTimePickerField -> opens Calendar dialog
+        composeTestRule.onNodeWithTag("field_date_time").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("date_picker_dialog").assertIsDisplayed()
+
+        // Confirm calendar date -> opens Clock dialog
+        composeTestRule.onNodeWithTag("btn_confirm_date_picker").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("date_picker_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("time_picker_dialog").assertIsDisplayed()
+
+        // Confirm clock time -> closes dialog and updates dateInput with YYYY-MM-DD HH:mm
+        composeTestRule.onNodeWithTag("btn_confirm_time_picker").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("time_picker_dialog").assertDoesNotExist()
+        assertTrue(
+            "Expected YYYY-MM-DD HH:mm but was '${expenseViewModel.uiState.value.dateInput}'",
+            expenseViewModel.uiState.value.dateInput.matches(Regex("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}"))
+        )
+    }
+
+    @Test
+    fun test_period_selector_displays_compact_readable_date_ranges_in_pill_and_dropdown() {
+        val crossMonthPeriod = FinancialPeriod(id = 3L, startDate = "2026-05-15", endDate = "2026-06-14")
+        val crossYearPeriod = FinancialPeriod(id = 4L, startDate = "2026-12-15", endDate = "2027-01-14")
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    allPeriods = listOf(period1, crossMonthPeriod, crossYearPeriod),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = { incomeViewModel.onPeriodSelected(it) },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+
+        // Selector pill shows compact readable range for period1 (same month & year)
+        val expectedPeriod1 = formatPeriodRange("2026-05-01", "2026-05-31", "es")
+        composeTestRule.onNode(
+            hasTestTag("selector_period") and hasText(expectedPeriod1)
+        ).assertIsDisplayed()
+
+        // Open dropdown and verify all 3 compact range formats are shown
+        composeTestRule.onNodeWithTag("selector_period").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("period_option_1").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("period_option_3").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("period_option_4").assertIsDisplayed()
+
+        val expectedCrossMonth = formatPeriodRange("2026-05-15", "2026-06-14", "es")
+        val expectedCrossYear = formatPeriodRange("2026-12-15", "2027-01-14", "es")
+        composeTestRule.onNodeWithText(expectedCrossMonth).assertIsDisplayed()
+        composeTestRule.onNodeWithText(expectedCrossYear).assertIsDisplayed()
+
+        // Selecting a different period updates the selector pill to show the newly selected period
+        composeTestRule.onNodeWithTag("period_option_3").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNode(
+            hasTestTag("selector_period") and hasText(expectedCrossMonth)
+        ).assertIsDisplayed()
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -20,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
 import com.example.money_saver_android.data.Category
@@ -882,16 +884,16 @@ class BudgetConditionedExpensesAdversarialTest {
         composeTestRule.waitForIdle()
 
         // Entrar a "Alimentación" y disparar error de nombre de subcategoría vacío
-        composeTestRule.onNodeWithText("Alimentación").performClick()
+        composeTestRule.onNodeWithText("Alimentación").performSemanticsAction(SemanticsActions.OnClick)
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithContentDescription("Crear").performClick()
+        composeTestRule.onNodeWithContentDescription("Crear").performSemanticsAction(SemanticsActions.OnClick)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("El nombre de la subcategoría no puede estar vacío").assertIsDisplayed()
 
         // Volver a la lista de categorías y entrar a "Transporte"
-        composeTestRule.onNodeWithContentDescription("Volver").performClick()
+        composeTestRule.onNodeWithContentDescription("Volver").performSemanticsAction(SemanticsActions.OnClick)
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Transporte").performClick()
+        composeTestRule.onNodeWithText("Transporte").performSemanticsAction(SemanticsActions.OnClick)
         composeTestRule.waitForIdle()
 
         // INVARIANTE UX: El error de subcategoría de "Alimentación" NO debe fugarse hacia "Transporte"

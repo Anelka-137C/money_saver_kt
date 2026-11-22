@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 
 data class EditExpenseState(
     val expenseId: Long = 0,
@@ -29,6 +30,14 @@ data class EditExpenseState(
     val budgetId: Long? = null,
     val budgetCategory: String = "",
     val budgetSubcategory: String = "",
+    val errorMessage: String? = null
+)
+
+data class EditExpenseCategoryState(
+    val originalName: String = "",
+    val name: String = "",
+    val color: String = "#4E73DF",
+    val icon: String = "💰",
     val errorMessage: String? = null
 )
 
@@ -56,7 +65,9 @@ data class ExpenseUiState(
     val newCategoryColorInput: String = "#4E73DF",
     val categoryErrorMessage: String? = null,
     val newSubcategoryNameInput: String = "",
-    val subcategoryErrorMessage: String? = null
+    val subcategoryErrorMessage: String? = null,
+    val editingCategory: EditExpenseCategoryState? = null,
+    val categoryToDelete: Category? = null
 )
 
 class ExpenseViewModel(
@@ -69,11 +80,14 @@ class ExpenseViewModel(
 
     private var expensesJob: Job? = null
     private var budgetsJob: Job? = null
+    private var isSavingExpense: Boolean = false
 
     init {
-        expensesJob = viewModelScope.launch {
-            expenseUseCase.getExpenses().collect { list ->
-                _uiState.update { it.copy(expenses = list, totalSpent = list.sumOf { e -> e.amount }) }
+        if (!expenseUseCase.requiresBudgetConditioning) {
+            expensesJob = viewModelScope.launch {
+                expenseUseCase.getExpenses().collect { list ->
+                    _uiState.update { it.copy(expenses = list, totalSpent = list.sumOf { e -> e.amount }) }
+                }
             }
         }
         categoryUseCase?.let { uc ->
@@ -99,9 +113,16 @@ class ExpenseViewModel(
                     hasActiveBudget = false,
                     totalBudgeted = 0.0,
                     totalSpent = 0.0,
+                    amountInput = "",
+                    descriptionInput = "",
+                    categoryInput = "",
+                    subcategoryInput = "",
                     budgetIdInput = null,
                     budgetCategoryInput = "",
-                    budgetSubcategoryInput = ""
+                    budgetSubcategoryInput = "",
+                    errorMessage = null,
+                    editingExpense = null,
+                    expenseToDelete = null
                 )
             } else {
                 current.copy(selectedPeriodId = periodId)
@@ -162,13 +183,11 @@ class ExpenseViewModel(
     }
 
     fun startEditing(expense: Expense) {
-        val amountStr = if (expense.amount % 1.0 == 0.0) {
-            expense.amount.toLong().toString()
+        val amountStr = formatAmountForEdit(expense.amount)
+        val matchingBudget = if (expense.budgetId > 0L) {
+            _uiState.value.budgets.find { it.id == expense.budgetId }
         } else {
-            expense.amount.toString()
-        }
-        val matchingBudget = _uiState.value.budgets.find {
-            it.id == expense.budgetId && it.category.equals(expense.budgetCategory, ignoreCase = true)
+            null
         }
         _uiState.update {
             it.copy(
@@ -181,11 +200,16 @@ class ExpenseViewModel(
                     subcategory = expense.subcategory,
                     periodId = expense.periodId.takeIf { id -> id > 0L } ?: (it.selectedPeriodId ?: 0L),
                     budgetId = expense.budgetId.takeIf { id -> id > 0L },
-                    budgetCategory = expense.budgetCategory,
+                    budgetCategory = matchingBudget?.category ?: expense.budgetCategory,
                     budgetSubcategory = matchingBudget?.subcategory.orEmpty()
                 )
             )
         }
+    }
+
+    private fun formatAmountForEdit(amount: Double): String {
+        if (!amount.isFinite() || amount == 0.0) return "0"
+        return BigDecimal.valueOf(amount).stripTrailingZeros().toPlainString()
     }
 
     fun onEditBudgetSelected(budget: Budget) {
@@ -302,37 +326,47 @@ class ExpenseViewModel(
         _uiState.update { it.copy(toastMessage = null) }
     }
 
+    fun clearErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     fun saveExpense() {
+        if (isSavingExpense) return
         val current = _uiState.value
+        isSavingExpense = true
         viewModelScope.launch {
-            when (val result = expenseUseCase.saveExpense(
-                amountInput = current.amountInput,
-                dateInput = current.dateInput,
-                descriptionInput = current.descriptionInput,
-                categoryInput = current.categoryInput,
-                subcategoryInput = current.subcategoryInput,
-                periodId = current.selectedPeriodId,
-                budgetId = current.budgetIdInput,
-                budgetCategoryInput = current.budgetCategoryInput
-            )) {
-                is ExpenseResult.Error -> {
-                    _uiState.update { it.copy(errorMessage = result.message) }
-                }
-                is ExpenseResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            amountInput = "",
-                            descriptionInput = "",
-                            categoryInput = "",
-                            subcategoryInput = "",
-                            budgetIdInput = null,
-                            budgetCategoryInput = "",
-                            budgetSubcategoryInput = "",
-                            errorMessage = null,
-                            toastMessage = "Gasto guardado"
-                        )
+            try {
+                when (val result = expenseUseCase.saveExpense(
+                    amountInput = current.amountInput,
+                    dateInput = current.dateInput,
+                    descriptionInput = current.descriptionInput,
+                    categoryInput = current.categoryInput,
+                    subcategoryInput = current.subcategoryInput,
+                    periodId = current.selectedPeriodId,
+                    budgetId = current.budgetIdInput,
+                    budgetCategoryInput = current.budgetCategoryInput
+                )) {
+                    is ExpenseResult.Error -> {
+                        _uiState.update { it.copy(errorMessage = result.message) }
+                    }
+                    is ExpenseResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                amountInput = "",
+                                descriptionInput = "",
+                                categoryInput = "",
+                                subcategoryInput = "",
+                                budgetIdInput = null,
+                                budgetCategoryInput = "",
+                                budgetSubcategoryInput = "",
+                                errorMessage = null,
+                                toastMessage = "Gasto guardado"
+                            )
+                        }
                     }
                 }
+            } finally {
+                isSavingExpense = false
             }
         }
     }
@@ -409,5 +443,167 @@ class ExpenseViewModel(
 
     fun clearSubcategoryError() {
         _uiState.update { it.copy(subcategoryErrorMessage = null) }
+    }
+
+    fun startEditingCategory(category: Category) {
+        _uiState.update {
+            it.copy(
+                editingCategory = EditExpenseCategoryState(
+                    originalName = category.name,
+                    name = category.name,
+                    color = category.color,
+                    icon = category.icon
+                )
+            )
+        }
+    }
+
+    fun onEditCategoryNameChange(name: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingCategory = current.editingCategory?.copy(name = name, errorMessage = null)
+            )
+        }
+    }
+
+    fun onEditCategoryColorChange(color: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingCategory = current.editingCategory?.copy(color = color)
+            )
+        }
+    }
+
+    fun cancelEditingCategory() {
+        _uiState.update { it.copy(editingCategory = null) }
+    }
+
+    fun confirmEditCategory() {
+        val editState = _uiState.value.editingCategory ?: return
+        val uc = categoryUseCase ?: return
+        viewModelScope.launch {
+            when (val result = uc.updateCategory(
+                oldName = editState.originalName,
+                newNameInput = editState.name,
+                colorInput = editState.color,
+                iconInput = editState.icon
+            )) {
+                is CategoryResult.Error -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            editingCategory = current.editingCategory?.copy(errorMessage = result.message)
+                        )
+                    }
+                }
+                is CategoryResult.Success -> {
+                    val trimmedNewName = editState.name.trim()
+                    val oldName = editState.originalName.trim()
+                    _uiState.update { current ->
+                        val updatedCategoryInput = if (current.categoryInput.equals(oldName, ignoreCase = true)) {
+                            trimmedNewName
+                        } else {
+                            current.categoryInput
+                        }
+                        val updatedEditingExpense = current.editingExpense?.let { exp ->
+                            if (exp.category.equals(oldName, ignoreCase = true)) {
+                                exp.copy(category = trimmedNewName)
+                            } else {
+                                exp
+                            }
+                        }
+                        current.copy(
+                            categoryInput = updatedCategoryInput,
+                            editingExpense = updatedEditingExpense,
+                            editingCategory = null,
+                            categoryErrorMessage = null,
+                            toastMessage = "Categoría actualizada"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun requestDeleteCategory(category: Category) {
+        _uiState.update { it.copy(categoryToDelete = category) }
+    }
+
+    fun requestDeleteCategory(categoryName: String) {
+        val trimmed = categoryName.trim()
+        val category = _uiState.value.categories.find { it.name.equals(trimmed, ignoreCase = true) }
+            ?: Category(name = trimmed, icon = "📁", color = "#4E73DF", subcategories = emptyList())
+        requestDeleteCategory(category)
+    }
+
+    fun dismissDeleteCategoryConfirmation() {
+        _uiState.update { it.copy(categoryToDelete = null) }
+    }
+
+    fun confirmDeleteCategory() {
+        val category = _uiState.value.categoryToDelete ?: return
+        _uiState.update { it.copy(categoryToDelete = null) }
+        deleteCategory(category.name)
+    }
+
+    fun deleteCategory(categoryName: String) {
+        val uc = categoryUseCase ?: return
+        viewModelScope.launch {
+            when (val result = uc.deleteCategory(categoryName)) {
+                is CategoryResult.Success -> {
+                    val trimmed = categoryName.trim()
+                    _uiState.update { current ->
+                        val shouldClearForm = current.categoryInput.equals(trimmed, ignoreCase = true)
+                        val shouldClearEdit = current.editingExpense?.category?.equals(trimmed, ignoreCase = true) == true
+                        current.copy(
+                            categoryInput = if (shouldClearForm) "" else current.categoryInput,
+                            subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
+                            editingExpense = if (shouldClearEdit) {
+                                current.editingExpense?.copy(category = "", subcategory = "")
+                            } else {
+                                current.editingExpense
+                            },
+                            categoryErrorMessage = null,
+                            toastMessage = "Categoría eliminada"
+                        )
+                    }
+                }
+                is CategoryResult.Error -> {
+                    _uiState.update { it.copy(categoryErrorMessage = result.message) }
+                }
+            }
+        }
+    }
+
+    fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        val uc = categoryUseCase ?: return
+        viewModelScope.launch {
+            when (val result = uc.deleteSubcategory(categoryName, subcategoryName)) {
+                is CategoryResult.Success -> {
+                    val trimmedCategory = categoryName.trim()
+                    val trimmedSubcategory = subcategoryName.trim()
+                    _uiState.update { current ->
+                        val shouldClearForm = current.categoryInput.equals(trimmedCategory, ignoreCase = true) &&
+                            current.subcategoryInput.equals(trimmedSubcategory, ignoreCase = true)
+                        val shouldClearEdit = current.editingExpense?.let { edit ->
+                            edit.category.equals(trimmedCategory, ignoreCase = true) &&
+                                edit.subcategory.equals(trimmedSubcategory, ignoreCase = true)
+                        } == true
+                        current.copy(
+                            subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
+                            editingExpense = if (shouldClearEdit) {
+                                current.editingExpense?.copy(subcategory = "")
+                            } else {
+                                current.editingExpense
+                            },
+                            subcategoryErrorMessage = null,
+                            toastMessage = "Subcategoría eliminada"
+                        )
+                    }
+                }
+                is CategoryResult.Error -> {
+                    _uiState.update { it.copy(subcategoryErrorMessage = result.message) }
+                }
+            }
+        }
     }
 }

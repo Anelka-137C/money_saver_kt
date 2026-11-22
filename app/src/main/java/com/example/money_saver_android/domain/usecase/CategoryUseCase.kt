@@ -5,6 +5,8 @@ import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.CategoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 sealed class CategoryResult {
     object Success : CategoryResult()
@@ -14,6 +16,7 @@ sealed class CategoryResult {
 class CategoryUseCase(
     private val repository: CategoryRepository
 ) {
+    private val mutationMutex = Mutex()
     fun getCategories(): Flow<List<Category>> {
         return repository.getAllCategories()
     }
@@ -72,5 +75,68 @@ class CategoryUseCase(
             subcategory = Subcategory(name = trimmedSubcategory)
         )
         return CategoryResult.Success
+    }
+
+    suspend fun updateCategory(
+        oldName: String,
+        newNameInput: String,
+        colorInput: String,
+        iconInput: String? = null
+    ): CategoryResult = mutationMutex.withLock {
+        val trimmedOldName = oldName.trim()
+        val trimmedNewName = newNameInput.trim()
+        if (trimmedNewName.isEmpty()) {
+            return@withLock CategoryResult.Error("El nombre de la categoría no puede estar vacío")
+        }
+
+        val existingCategories = repository.getAllCategories().first()
+        val targetCategory = existingCategories.find { it.name.equals(trimmedOldName, ignoreCase = true) }
+            ?: return@withLock CategoryResult.Error("Categoría no encontrada")
+
+        val isDuplicate = existingCategories.any {
+            !it.name.equals(targetCategory.name, ignoreCase = true) &&
+                it.name.equals(trimmedNewName, ignoreCase = true)
+        }
+        if (isDuplicate) {
+            return@withLock CategoryResult.Error("Ya existe una categoría con este nombre")
+        }
+
+        val resolvedColor = if (colorInput.isBlank()) targetCategory.color else colorInput
+        val resolvedIcon = iconInput?.takeIf { it.isNotBlank() } ?: targetCategory.icon
+
+        repository.updateCategory(
+            oldName = targetCategory.name,
+            newName = trimmedNewName,
+            color = resolvedColor,
+            icon = resolvedIcon
+        )
+        CategoryResult.Success
+    }
+
+    suspend fun deleteCategory(categoryName: String): CategoryResult = mutationMutex.withLock {
+        val trimmedCategory = categoryName.trim()
+        if (trimmedCategory.isEmpty()) {
+            return@withLock CategoryResult.Error("El nombre de la categoría no puede estar vacío")
+        }
+        val count = repository.countExpensesForCategory(trimmedCategory)
+        if (count > 0) {
+            return@withLock CategoryResult.Error("No se puede eliminar la categoría porque tiene gastos asociados")
+        }
+        repository.deleteCategory(trimmedCategory)
+        CategoryResult.Success
+    }
+
+    suspend fun deleteSubcategory(categoryName: String, subcategoryName: String): CategoryResult = mutationMutex.withLock {
+        val trimmedCategory = categoryName.trim()
+        val trimmedSubcategory = subcategoryName.trim()
+        if (trimmedCategory.isEmpty() || trimmedSubcategory.isEmpty()) {
+            return@withLock CategoryResult.Error("El nombre no puede estar vacío")
+        }
+        val count = repository.countExpensesForSubcategory(trimmedCategory, trimmedSubcategory)
+        if (count > 0) {
+            return@withLock CategoryResult.Error("No se puede eliminar la subcategoría porque tiene gastos asociados")
+        }
+        repository.deleteSubcategory(trimmedCategory, trimmedSubcategory)
+        CategoryResult.Success
     }
 }

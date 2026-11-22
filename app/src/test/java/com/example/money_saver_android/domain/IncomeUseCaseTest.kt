@@ -337,7 +337,7 @@ class IncomeUseCaseTest {
         val expenses = listOf(
             Expense(id = 1L, amount = 150.0, date = "2026-05-10", description = "Lunch", category = "Restaurantes", periodId = 1L, budgetId = 10L, budgetCategory = "Food & Dining"),
             Expense(id = 2L, amount = 90.0, date = "2026-05-12", description = "Other period", category = "Restaurantes", periodId = 2L, budgetId = 10L, budgetCategory = "Food & Dining"),
-            Expense(id = 3L, amount = 40.0, date = "2026-05-14", description = "Wrong cat", category = "Restaurantes", periodId = 1L, budgetId = 10L, budgetCategory = "Transport")
+            Expense(id = 3L, amount = 40.0, date = "2026-05-14", description = "Wrong cat", category = "Restaurantes", periodId = 1L, budgetId = 20L, budgetCategory = "Transport")
         )
         val result = useCase.calculateCategoryBudgets(budgets, cats, expenses, "2026-05-01", "2026-05-31", periodId = 1L)
         assertEquals(150.0, result[0].spentAmount, 0.0)

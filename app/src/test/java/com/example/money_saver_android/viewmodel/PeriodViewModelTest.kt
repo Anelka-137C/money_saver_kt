@@ -180,4 +180,32 @@ class PeriodViewModelTest {
         assertEquals(false, viewModel.uiState.value.isPeriodConfigured)
         assertEquals(0, viewModel.uiState.value.allPeriods.size)
     }
+
+    @Test
+    fun test_initial_check_detects_active_period_and_marks_initial_check_done() = runTest {
+        val activePeriod = FinancialPeriod(id = 1L, startDate = "2026-11-01", endDate = "2026-11-30")
+        val repoWithActivePeriod = FakeFinancialPeriodRepository(initialPeriod = activePeriod)
+        val activeUseCase = PeriodUseCase(repoWithActivePeriod, currentDateProvider = { "2026-11-07" })
+
+        val viewModel = PeriodViewModel(activeUseCase)
+        assertEquals(false, viewModel.uiState.value.isInitialCheckDone)
+
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value.isInitialCheckDone)
+        assertEquals(true, viewModel.uiState.value.isPeriodConfigured)
+        assertEquals(activePeriod, viewModel.uiState.value.activePeriod)
+    }
+
+    @Test
+    fun test_initial_check_marks_initial_check_done_and_not_configured_when_no_active_period() = runTest {
+        val viewModel = PeriodViewModel(useCase)
+        assertEquals(false, viewModel.uiState.value.isInitialCheckDone)
+
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value.isInitialCheckDone)
+        assertEquals(false, viewModel.uiState.value.isPeriodConfigured)
+        assertNull(viewModel.uiState.value.activePeriod)
+    }
 }

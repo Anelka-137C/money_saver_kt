@@ -142,6 +142,11 @@ class MainActivity : ComponentActivity() {
         IncomeViewModel(incomeUseCase)
     }
 
+    override fun onResume() {
+        super.onResume()
+        periodViewModel.checkActivePeriod()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -151,6 +156,10 @@ class MainActivity : ComponentActivity() {
                 val activeCurrency = settingsState.availableCurrencies.find { it.code == settingsState.selectedCurrency }
                     ?: defaultCurrencies.first()
                 val periodState by periodViewModel.uiState.collectAsState()
+                val incomeState by incomeViewModel.uiState.collectAsState()
+                val currentSelectedPeriodId = incomeState.selectedPeriodId
+                    ?.takeIf { id -> periodState.allPeriods.any { it.id == id } }
+                    ?: periodState.activePeriod?.id
 
                 MainContainer(
                     settingsViewModel = settingsViewModel,
@@ -161,7 +170,7 @@ class MainActivity : ComponentActivity() {
                             incomeViewModel = incomeViewModel,
                             expenseViewModel = viewModel,
                             allPeriods = periodState.allPeriods,
-                            selectedPeriodId = periodState.activePeriod?.id,
+                            selectedPeriodId = currentSelectedPeriodId,
                             onPeriodSelected = { periodId ->
                                 incomeViewModel.onPeriodSelected(periodId)
                                 viewModel.onPeriodSelected(periodId)

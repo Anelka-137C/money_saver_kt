@@ -17,14 +17,15 @@ data class PeriodUiState(
     val activePeriod: FinancialPeriod? = null,
     val allPeriods: List<FinancialPeriod> = emptyList(),
     val isPeriodConfigured: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isInitialCheckDone: Boolean = false
 )
 
 class PeriodViewModel(
     private val periodUseCase: PeriodUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(PeriodUiState())
+    private val _uiState = MutableStateFlow(PeriodUiState(isInitialCheckDone = false))
     val uiState: StateFlow<PeriodUiState> = _uiState.asStateFlow()
 
     init {
@@ -99,14 +100,25 @@ class PeriodViewModel(
         }
     }
 
-    private fun checkActivePeriod() {
+    fun checkActivePeriod() {
         viewModelScope.launch {
-            val period = periodUseCase.getActivePeriod()
-            _uiState.update {
-                it.copy(
-                    activePeriod = period,
-                    isPeriodConfigured = period != null
-                )
+            try {
+                val period = periodUseCase.getActivePeriod()
+                _uiState.update {
+                    it.copy(
+                        activePeriod = period,
+                        isPeriodConfigured = period != null,
+                        isInitialCheckDone = true
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        activePeriod = null,
+                        isPeriodConfigured = false,
+                        isInitialCheckDone = true
+                    )
+                }
             }
         }
     }

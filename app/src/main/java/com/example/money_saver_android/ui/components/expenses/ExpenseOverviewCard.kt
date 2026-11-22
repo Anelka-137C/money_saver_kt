@@ -40,6 +40,7 @@ import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import kotlin.math.roundToInt
 
 /**
  * Period expense summary card matching BudgetOverviewCard's visual structure.
@@ -52,7 +53,10 @@ fun ExpenseOverviewCard(
     modifier: Modifier = Modifier
 ) {
     val progress = if (totalBudgeted > 0.0) (totalSpent / totalBudgeted).toFloat().coerceIn(0f, 1f) else 0f
-    val rawPercent = if (totalBudgeted > 0.0) ((totalSpent / totalBudgeted) * 100).toInt() else 0
+    val rawPercent = if (totalBudgeted > 0.0) {
+        val pct = (totalSpent / totalBudgeted) * 100.0
+        if (pct.isFinite()) pct.roundToInt() else 0
+    } else 0
     val isOverBudget = totalBudgeted > 0.0 && totalSpent > totalBudgeted
     val accentColor = if (isOverBudget) Color(0xFFEF4444) else GreenAccent
     val badgeBg = if (isOverBudget) Color(0xFF3B1A1A) else Color(0xFF143026)

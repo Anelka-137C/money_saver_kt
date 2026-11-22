@@ -16,6 +16,9 @@ import org.junit.Test
 
 class FakeCategoryRepository : CategoryRepository {
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    var expenseCountForCategory: (String) -> Int = { 0 }
+    var expenseCountForSubcategory: (String, String) -> Int = { _, _ -> 0 }
+
     override fun getAllCategories(): Flow<List<Category>> = _categories
 
     override suspend fun preloadDefaultCategoriesIfNeeded() {
@@ -39,6 +42,36 @@ class FakeCategoryRepository : CategoryRepository {
             }
         }
     }
+
+    override suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name.equals(oldName, ignoreCase = true)) {
+                cat.copy(name = newName, color = color, icon = icon)
+            } else {
+                cat
+            }
+        }
+    }
+
+    override suspend fun deleteCategory(categoryName: String) {
+        _categories.value = _categories.value.filterNot { it.name.equals(categoryName, ignoreCase = true) }
+    }
+
+    override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
+        _categories.value = _categories.value.map { cat ->
+            if (cat.name.equals(categoryName, ignoreCase = true)) {
+                cat.copy(subcategories = cat.subcategories.filterNot { it.name.equals(subcategoryName, ignoreCase = true) })
+            } else {
+                cat
+            }
+        }
+    }
+
+    override suspend fun countExpensesForCategory(categoryName: String): Int =
+        expenseCountForCategory(categoryName)
+
+    override suspend fun countExpensesForSubcategory(categoryName: String, subcategoryName: String): Int =
+        expenseCountForSubcategory(categoryName, subcategoryName)
 }
 
 class CategoryUseCaseTest {
@@ -126,5 +159,54 @@ class CategoryUseCaseTest {
         assertEquals("Ya existe una subcategoría con este nombre", (result as CategoryResult.Error).message)
         val list = useCase.getCategories().first()
         assertEquals(1, list.first().subcategories.size)
+    }
+
+    @Test
+    fun updateCategory_withValidData_updatesNameAndColorAndPreservesSubcategories() = runBlocking {
+        repository.insertCategory(
+            Category(name = "Salud", icon = "🏥", color = "#E74A3B", subcategories = listOf(Subcategory("Farmacia")))
+        )
+
+        val result = useCase.updateCategory(oldName = "Salud", newNameInput = "Bienestar", colorInput = "#1CC88A")
+
+        assertTrue(result is CategoryResult.Success)
+        val updated = useCase.getCategories().first().single()
+        assertEquals("Bienestar", updated.name)
+        assertEquals("#1CC88A", updated.color)
+        assertEquals("🏥", updated.icon)
+        assertEquals(listOf(Subcategory("Farmacia")), updated.subcategories)
+    }
+
+    @Test
+    fun deleteCategory_whenNoExpensesAssociated_deletesSuccessfully() = runBlocking {
+        repository.insertCategory(Category(name = "Salud", color = "#E74A3B", subcategories = emptyList()))
+
+        val result = useCase.deleteCategory("Salud")
+
+        assertTrue(result is CategoryResult.Success)
+        assertTrue(useCase.getCategories().first().isEmpty())
+    }
+
+    @Test
+    fun deleteCategory_whenExpensesAssociated_returnsError() = runBlocking {
+        repository.insertCategory(Category(name = "Salud", color = "#E74A3B", subcategories = emptyList()))
+        repository.expenseCountForCategory = { 2 }
+
+        val result = useCase.deleteCategory("Salud")
+
+        assertTrue(result is CategoryResult.Error)
+        assertEquals(1, useCase.getCategories().first().size)
+    }
+
+    @Test
+    fun deleteSubcategory_whenNoExpensesAssociated_deletesSuccessfully() = runBlocking {
+        repository.insertCategory(
+            Category(name = "Salud", color = "#E74A3B", subcategories = listOf(Subcategory("Farmacia")))
+        )
+
+        val result = useCase.deleteSubcategory("Salud", "Farmacia")
+
+        assertTrue(result is CategoryResult.Success)
+        assertTrue(useCase.getCategories().first().single().subcategories.isEmpty())
     }
 }

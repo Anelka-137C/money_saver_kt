@@ -264,4 +264,71 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("tab_incomes").performClick()
         composeTestRule.onNodeWithText("Vista de Ingresos").assertIsDisplayed()
     }
+
+    @Test
+    fun test_app_starts_on_accounting_tab_when_current_date_in_active_period() {
+        val activePeriod = FinancialPeriod(id = 1L, startDate = "2026-11-01", endDate = "2026-11-30")
+        val fakePeriodRepo = FakeFinancialPeriodRepository(initialPeriod = activePeriod)
+        val periodUseCase = PeriodUseCase(fakePeriodRepo, currentDateProvider = { "2026-11-07" })
+        val periodViewModel = PeriodViewModel(periodUseCase)
+
+        composeTestRule.setContent {
+            MainContainer(
+                settingsViewModel = settingsViewModel,
+                periodViewModel = periodViewModel,
+                i18nManager = i18nManager,
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
+                }
+            )
+        }
+
+        // Must display accounting view directly on initial launch
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("period_screen").assertDoesNotExist()
+
+        // Navigation is unlocked: can visit Period and Settings
+        composeTestRule.onNodeWithTag("tab_period").performClick()
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("tab_settings").performClick()
+        composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+
+        // Can return to Contabilidad
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_app_starts_on_period_tab_when_period_is_expired() {
+        // Expired period: ended on 2026-10-31, but current date is 2026-11-07
+        val expiredPeriod = FinancialPeriod(id = 1L, startDate = "2026-10-01", endDate = "2026-10-31")
+        val fakePeriodRepo = FakeFinancialPeriodRepository(initialPeriod = expiredPeriod)
+        val periodUseCase = PeriodUseCase(fakePeriodRepo, currentDateProvider = { "2026-11-07" })
+        val periodViewModel = PeriodViewModel(periodUseCase)
+
+        composeTestRule.setContent {
+            MainContainer(
+                settingsViewModel = settingsViewModel,
+                periodViewModel = periodViewModel,
+                i18nManager = i18nManager,
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
+                }
+            )
+        }
+
+        // Current date is not in active period -> must start on Period tab
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertDoesNotExist()
+
+        // Navigation is locked
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("tab_settings").performClick()
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+    }
 }

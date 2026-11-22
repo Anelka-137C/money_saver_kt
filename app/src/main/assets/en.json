@@ -28,7 +28,7 @@
       "title": "Add Expense",
       "amount_label": "Amount",
       "amount_placeholder": "0.00",
-      "date_label": "Date",
+      "date_label": "Date & Time",
       "budget_label": "Source budget",
       "budget_placeholder": "Select budget",
       "category_label": "Category",
@@ -49,7 +49,7 @@
       "title": "Edit Expense",
       "amount_label": "Amount",
       "amount_placeholder": "0.00",
-      "date_label": "Date",
+      "date_label": "Date & Time",
       "budget_label": "Source budget",
       "budget_placeholder": "Select budget",
       "category_label": "Category",
@@ -66,6 +66,23 @@
     "category_sheet": {
       "title": "Select Category",
       "create_category": "Create Category"
+    },
+    "options": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "edit_category_dialog": {
+      "title": "Edit Category",
+      "name_label": "Category name",
+      "name_placeholder": "e.g. Food",
+      "color_label": "Color",
+      "cancel_button": "Cancel",
+      "save_button": "Save"
+    },
+    "delete_category_dialog": {
+      "title": "Delete this category?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
     }
   },
   "settings": {
@@ -213,6 +230,15 @@
     },
     "history": {
       "empty_message": "No budgets registered in this period"
+    },
+    "options": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "delete_dialog": {
+      "title": "Delete this budget?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
     },
     "delete_category_dialog": {
       "title": "Delete this category?",

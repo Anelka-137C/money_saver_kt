@@ -8,6 +8,9 @@ import com.example.money_saver_android.domain.model.Expense
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import java.text.ParsePosition
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 sealed class ExpenseResult {
     object Success : ExpenseResult()
@@ -27,6 +30,9 @@ class ExpenseUseCase(
     private val repository: ExpenseRepository,
     private val budgetRepository: BudgetRepository? = null
 ) {
+    val requiresBudgetConditioning: Boolean
+        get() = budgetRepository != null
+
     fun getExpenses(): Flow<List<Expense>> {
         return repository.getAllExpenses()
     }
@@ -59,6 +65,7 @@ class ExpenseUseCase(
         budgetCategoryInput = budgetCategoryInput
     ) { expense ->
         repository.insertExpense(expense)
+        ExpenseResult.Success
     }
 
     suspend fun updateExpense(
@@ -82,7 +89,11 @@ class ExpenseUseCase(
         budgetId = budgetId,
         budgetCategoryInput = budgetCategoryInput
     ) { expense ->
+        if (id <= 0L || repository.getAllExpenses().first().none { it.id == id }) {
+            return@withValidatedExpense ExpenseResult.Error("Gasto no encontrado")
+        }
         repository.updateExpense(expense)
+        ExpenseResult.Success
     }
 
     private suspend fun withValidatedExpense(
@@ -95,7 +106,7 @@ class ExpenseUseCase(
         periodId: Long?,
         budgetId: Long?,
         budgetCategoryInput: String,
-        onValid: suspend (Expense) -> Unit
+        onValid: suspend (Expense) -> ExpenseResult
     ): ExpenseResult {
         val periodBudgets = if (budgetRepository != null) {
             if (periodId == null || periodId <= 0L) {
@@ -106,7 +117,7 @@ class ExpenseUseCase(
             }
         } else null
 
-        val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
+        val amount = parseAmountInput(amountInput) ?: 0.0
         if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return ExpenseResult.Error("El monto debe ser mayor a cero")
         }
@@ -126,11 +137,16 @@ class ExpenseUseCase(
             return ExpenseResult.Error("Debes seleccionar una categoría")
         }
 
-        onValid(
+        val trimmedDate = dateInput.trim()
+        if (!isValidExpenseDate(trimmedDate)) {
+            return ExpenseResult.Error("Fecha inválida")
+        }
+
+        return onValid(
             Expense(
                 id = id,
                 amount = amount,
-                date = dateInput,
+                date = trimmedDate,
                 description = descriptionInput,
                 category = trimmedCategory,
                 subcategory = subcategoryInput.trim(),
@@ -139,7 +155,48 @@ class ExpenseUseCase(
                 budgetCategory = matchedBudget?.category ?: budgetCategoryInput.trim()
             )
         )
-        return ExpenseResult.Success
+    }
+
+    private fun parseAmountInput(rawInput: String): Double? {
+        val trimmed = rawInput.trim()
+        if (trimmed.isEmpty()) return null
+        val normalized = when {
+            trimmed.contains(',') && trimmed.contains('.') -> {
+                if (trimmed.lastIndexOf(',') > trimmed.lastIndexOf('.')) {
+                    trimmed.replace(".", "").replace(",", ".")
+                } else {
+                    trimmed.replace(",", "")
+                }
+            }
+            trimmed.contains(',') -> {
+                if (Regex("^\\d{1,3}(,\\d{3})+$").matches(trimmed)) {
+                    trimmed.replace(",", "")
+                } else if (trimmed.count { it == ',' } == 1) {
+                    trimmed.replace(",", ".")
+                } else {
+                    return null
+                }
+            }
+            else -> trimmed
+        }
+        return normalized.toDoubleOrNull()
+    }
+
+    private fun isValidExpenseDate(dateStr: String): Boolean {
+        if (dateStr.isEmpty()) return false
+        val pattern = when {
+            Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(dateStr) -> "yyyy-MM-dd"
+            Regex("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$").matches(dateStr) -> "yyyy-MM-dd HH:mm"
+            else -> return false
+        }
+        return try {
+            val parser = SimpleDateFormat(pattern, Locale.ROOT).apply { isLenient = false }
+            val pos = ParsePosition(0)
+            val parsed = parser.parse(dateStr, pos)
+            parsed != null && pos.index == dateStr.length && pos.errorIndex == -1
+        } catch (_: Exception) {
+            false
+        }
     }
 
     suspend fun deleteExpense(id: Long): ExpenseResult {
@@ -161,7 +218,12 @@ class ExpenseUseCase(
                 val rawName = catExpenses.first().category.trim()
                 val category = categories.find { it.name.equals(rawName, ignoreCase = true) }
                 val spent = catExpenses.sumOf { it.amount }
-                val progress = if (totalSpent > 0.0) (spent / totalSpent).toFloat().coerceIn(0f, 1f) else 0f
+                val ratio = when {
+                    totalSpent.isInfinite() -> if (spent.isInfinite()) 1.0 else 0.0
+                    totalSpent > 0.0 -> spent / totalSpent
+                    else -> 0.0
+                }
+                val progress = if (ratio.isFinite()) ratio.toFloat().coerceIn(0f, 1f) else 0f
                 CategoryExpenseItem(
                     categoryName = category?.name ?: rawName,
                     icon = category?.icon?.ifBlank { "💸" } ?: "💸",

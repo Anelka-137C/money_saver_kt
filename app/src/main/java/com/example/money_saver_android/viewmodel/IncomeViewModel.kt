@@ -78,6 +78,7 @@ data class IncomeUiState(
     val budgetErrorMessage: String? = null,
     val budgetToastMessage: String? = null,
     val editingBudget: EditBudgetState? = null,
+    val budgetToDelete: Budget? = null,
     val budgetCategoryToDelete: Category? = null,
     val expenses: List<Expense> = emptyList()
 )
@@ -91,6 +92,7 @@ class IncomeViewModel(
         const val MSG_INCOME_DELETED = "Ingreso eliminado exitosamente"
         const val MSG_BUDGET_SAVED = "Presupuesto guardado exitosamente"
         const val MSG_BUDGET_UPDATED = "Presupuesto actualizado exitosamente"
+        const val MSG_BUDGET_DELETED = "Presupuesto eliminado exitosamente"
         const val MSG_CATEGORY_CREATED = "Categoría creada exitosamente"
         const val MSG_SUBCATEGORY_CREATED = "Subcategoría creada exitosamente"
         const val MSG_CATEGORY_DELETED = "Categoría eliminada exitosamente"
@@ -565,6 +567,34 @@ class IncomeViewModel(
                     _uiState.update { current ->
                         current.copy(editingBudget = current.editingBudget?.copy(errorMessage = result.message))
                     }
+                }
+            }
+        }
+    }
+
+    fun requestDeleteBudget(budget: Budget) {
+        _uiState.update { it.copy(budgetToDelete = budget) }
+    }
+
+    fun dismissDeleteBudgetConfirmation() {
+        _uiState.update { it.copy(budgetToDelete = null) }
+    }
+
+    fun confirmDeleteBudget() {
+        val budget = _uiState.value.budgetToDelete ?: return
+        viewModelScope.launch {
+            when (incomeUseCase.deleteBudget(budget.id)) {
+                is BudgetResult.Success -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            budgetToDelete = null,
+                            editingBudget = if (current.editingBudget?.budgetId == budget.id) null else current.editingBudget,
+                            budgetToastMessage = MSG_BUDGET_DELETED
+                        )
+                    }
+                }
+                is BudgetResult.Error -> {
+                    _uiState.update { it.copy(budgetToDelete = null) }
                 }
             }
         }

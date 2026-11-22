@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Currency
@@ -68,6 +69,7 @@ import com.example.money_saver_android.ui.components.budget.AddEditBudgetDialog
 import com.example.money_saver_android.ui.components.budget.BudgetAllocationCard
 import com.example.money_saver_android.ui.components.budget.BudgetOverviewCard
 import com.example.money_saver_android.ui.components.budget.DeleteBudgetCategoryConfirmationDialog
+import com.example.money_saver_android.ui.components.budget.DeleteBudgetConfirmationDialog
 import com.example.money_saver_android.ui.components.incomes.AddIncomeCard
 import com.example.money_saver_android.ui.components.incomes.AddIncomeDialog
 import com.example.money_saver_android.ui.components.incomes.DeleteIncomeConfirmationDialog
@@ -86,8 +88,9 @@ import com.example.money_saver_android.ui.theme.TextSecondary
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.FinanceTopTab
 import com.example.money_saver_android.viewmodel.IncomeViewModel
+import java.text.ParsePosition
 import java.text.SimpleDateFormat
-import java.util.Date
+import java.util.Calendar
 import java.util.Locale
 
 @Composable
@@ -166,17 +169,17 @@ fun IncomesView(
     }
 
     LaunchedEffect(state.selectedPeriodId) {
-        if (state.selectedPeriodId != null) {
-            expenseViewModel?.onPeriodSelected(state.selectedPeriodId)
-        }
+        expenseViewModel?.onPeriodSelected(state.selectedPeriodId)
     }
 
-    val activePeriod = allPeriods.find { it.id == selectedPeriodId } ?: allPeriods.firstOrNull()
+    val effectiveSelectedPeriodId = state.selectedPeriodId ?: selectedPeriodId
+    val activePeriod = allPeriods.find { it.id == effectiveSelectedPeriodId } ?: allPeriods.firstOrNull()
     val currentLang = LocalI18nManager.current.currentLanguage
-    val periodLabel = remember(activePeriod, currentLang) {
+    val selectPeriodFallback = t("incomes.header.select_period")
+    val periodLabel = remember(activePeriod, currentLang, selectPeriodFallback) {
         activePeriod?.let {
-            formatPeriodLabel(it.startDate, currentLang)
-        } ?: "May 2026"
+            formatPeriodRange(it.startDate, it.endDate, currentLang)
+        } ?: selectPeriodFallback
     }
 
     val scrollState = rememberScrollState()
@@ -228,7 +231,9 @@ fun IncomesView(
                             text = periodLabel,
                             color = TextPrimary,
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(
@@ -243,14 +248,22 @@ fun IncomesView(
                 DropdownMenu(
                     expanded = periodMenuExpanded,
                     onDismissRequest = { periodMenuExpanded = false },
-                    modifier = Modifier.background(CardBackground)
+                    modifier = Modifier
+                        .background(CardBackground)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
                 ) {
                     allPeriods.forEach { period ->
+                        val isSelected = period.id == effectiveSelectedPeriodId
+                        val optionRangeLabel = formatPeriodRange(period.startDate, period.endDate, currentLang)
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    text = "${formatPeriodLabel(period.startDate)} (${period.startDate} - ${period.endDate})",
-                                    color = if (period.id == selectedPeriodId) GreenAccent else TextPrimary
+                                    text = optionRangeLabel,
+                                    color = if (isSelected) GreenAccent else TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             },
                             onClick = {
@@ -472,11 +485,14 @@ fun IncomesView(
                                 state.budgets.forEach { budget ->
                                     val category = state.budgetCategories.find { it.name.equals(budget.category, ignoreCase = true) }
                                     val categoryColor = category?.color?.let { parseHexColor(it) } ?: GreenAccent
+                                    val categoryIcon = category?.icon?.ifBlank { "📋" } ?: "📋"
                                     BudgetListItem(
                                         budget = budget,
                                         currency = currency,
                                         categoryColor = categoryColor,
-                                        onEditClick = { incomeViewModel.startEditingBudget(budget) }
+                                        categoryIcon = categoryIcon,
+                                        onEditClick = { incomeViewModel.startEditingBudget(budget) },
+                                        onDeleteClick = { incomeViewModel.requestDeleteBudget(budget) }
                                     )
                                 }
                             }
@@ -706,6 +722,20 @@ fun IncomesView(
         )
     }
 
+    state.budgetToDelete?.let { budgetToDelete ->
+        val category = state.budgetCategories.find { it.name.equals(budgetToDelete.category, ignoreCase = true) }
+        val categoryColor = category?.color?.let { parseHexColor(it) } ?: GreenAccent
+        val categoryIcon = category?.icon?.ifBlank { "📋" } ?: "📋"
+        DeleteBudgetConfirmationDialog(
+            budget = budgetToDelete,
+            currency = currency,
+            categoryColor = categoryColor,
+            categoryIcon = categoryIcon,
+            onConfirm = { incomeViewModel.confirmDeleteBudget() },
+            onDismiss = { incomeViewModel.dismissDeleteBudgetConfirmation() }
+        )
+    }
+
     state.budgetCategoryToDelete?.let { categoryToDelete ->
         DeleteBudgetCategoryConfirmationDialog(
             category = categoryToDelete,
@@ -855,7 +885,9 @@ fun BudgetListItem(
     budget: Budget,
     currency: Currency,
     categoryColor: Color,
-    onEditClick: () -> Unit,
+    categoryIcon: String = "📋",
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -869,11 +901,14 @@ fun BudgetListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -882,7 +917,7 @@ fun BudgetListItem(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "📋",
+                        text = categoryIcon,
                         fontSize = 18.sp
                     )
                 }
@@ -896,7 +931,9 @@ fun BudgetListItem(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    if (budget.subcategory.isNotBlank()) {
+                    if (budget.subcategory.isNotBlank() &&
+                        !budget.subcategory.trim().equals(budget.category.trim(), ignoreCase = true)
+                    ) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = budget.subcategory,
@@ -907,6 +944,8 @@ fun BudgetListItem(
                 }
             }
 
+            Spacer(modifier = Modifier.width(8.dp))
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = CurrencyFormatter.format(budget.amount, currency),
@@ -916,31 +955,110 @@ fun BudgetListItem(
                     modifier = Modifier.testTag("text_budget_amount_${budget.id}")
                 )
 
-                IconButton(
-                    onClick = onEditClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("btn_edit_budget_${budget.id}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Modificar",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                Box {
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("btn_options_budget_${budget.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Opciones",
+                            tint = TextSecondary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        modifier = Modifier
+                            .background(CardBackground)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(t("budget.options.edit"), color = TextPrimary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = TextSecondary
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onEditClick()
+                            },
+                            modifier = Modifier.testTag("btn_edit_budget_${budget.id}")
+                        )
+                        DropdownMenuItem(
+                            text = { Text(t("budget.options.delete"), color = ErrorRed) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = ErrorRed
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDeleteClick()
+                            },
+                            modifier = Modifier.testTag("btn_delete_budget_${budget.id}")
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-private fun formatPeriodLabel(isoDate: String, lang: String = "es"): String {
+internal fun formatPeriodRange(startIso: String, endIso: String, lang: String = "es"): String {
+    val isoDateRegex = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+    if (!isoDateRegex.matches(startIso) || !isoDateRegex.matches(endIso)) {
+        return "$startIso – $endIso"
+    }
     return try {
         val locale = Locale.forLanguageTag(lang)
-        val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(isoDate) ?: Date()
-        SimpleDateFormat("MMMM yyyy", locale).format(parsed)
+        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }
+        val startPos = ParsePosition(0)
+        val startDate = parser.parse(startIso, startPos)
+        if (startDate == null || startPos.index != startIso.length || startPos.errorIndex != -1) {
+            return "$startIso – $endIso"
+        }
+        val endPos = ParsePosition(0)
+        val endDate = parser.parse(endIso, endPos)
+        if (endDate == null || endPos.index != endIso.length || endPos.errorIndex != -1) {
+            return "$startIso – $endIso"
+        }
+
+        val startCal = Calendar.getInstance().apply { time = startDate }
+        val endCal = Calendar.getInstance().apply { time = endDate }
+
+        val startDay = startCal.get(Calendar.DAY_OF_MONTH)
+        val endDay = endCal.get(Calendar.DAY_OF_MONTH)
+        val startMonth = startCal.get(Calendar.MONTH)
+        val endMonth = endCal.get(Calendar.MONTH)
+        val startYear = startCal.get(Calendar.YEAR)
+        val endYear = endCal.get(Calendar.YEAR)
+
+        val monthFormatter = SimpleDateFormat("MMM", locale)
+        val startMonthLabel = monthFormatter.format(startDate)
+            .replace(".", "")
             .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+        val endMonthLabel = monthFormatter.format(endDate)
+            .replace(".", "")
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+
+        when {
+            startYear == endYear && startMonth == endMonth ->
+                "$startDay – $endDay $startMonthLabel $startYear"
+            startYear == endYear ->
+                "$startDay $startMonthLabel – $endDay $endMonthLabel $startYear"
+            else ->
+                "$startDay $startMonthLabel $startYear – $endDay $endMonthLabel $endYear"
+        }
     } catch (_: Exception) {
-        isoDate
+        "$startIso – $endIso"
     }
 }

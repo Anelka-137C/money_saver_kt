@@ -180,4 +180,54 @@ class CategorySelectionSheetTest {
             .performSemanticsAction(SemanticsActions.OnClick)
         assertEquals("Employment" to "", selectedPair)
     }
+
+    @Test
+    fun test_category_sheet_shows_three_dots_menu_with_edit_and_delete_when_onEditCategory_is_provided() {
+        var editedCategory: Category? = null
+        var deletedCategory: String? = null
+        val testCategories = listOf(
+            Category(name = "Alimentación", icon = "🍔", color = "#1CC88A", subcategories = listOf(Subcategory("Restaurante")))
+        )
+
+        composeTestRule.setContent {
+            CategorySelectionSheet(
+                categories = testCategories,
+                newCategoryName = "",
+                selectedColorHex = "#4E73DF",
+                categoryError = null,
+                newSubcategoryName = "",
+                subcategoryError = null,
+                onCategoryNameChange = {},
+                onColorSelect = {},
+                onCreateCategory = {},
+                onSubcategoryNameChange = {},
+                onCreateSubcategory = {},
+                onEditCategory = { editedCategory = it },
+                onDeleteCategory = { deletedCategory = it },
+                onDismiss = {},
+                onCategorySelected = { _, _ -> }
+            )
+        }
+
+        // Chevron ">" is not shown when three-dots options menu is active
+        composeTestRule.onNodeWithText(">").assertDoesNotExist()
+
+        // Open three-dots menu and click Edit
+        composeTestRule.onNodeWithTag("btn_options_category_Alimentación").assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_edit_category_Alimentación").assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        assertEquals("Alimentación", editedCategory?.name)
+
+        // Open three-dots menu and click Delete
+        composeTestRule.onNodeWithTag("btn_options_category_Alimentación")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_delete_category_Alimentación").assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        assertEquals("Alimentación", deletedCategory)
+    }
 }

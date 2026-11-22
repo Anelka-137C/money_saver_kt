@@ -28,7 +28,7 @@
       "title": "Registrar Gasto",
       "amount_label": "Monto",
       "amount_placeholder": "0.00",
-      "date_label": "Fecha",
+      "date_label": "Fecha y hora",
       "budget_label": "Presupuesto origen",
       "budget_placeholder": "Seleccionar presupuesto",
       "category_label": "Categoría",
@@ -49,7 +49,7 @@
       "title": "Modificar Gasto",
       "amount_label": "Monto",
       "amount_placeholder": "0.00",
-      "date_label": "Fecha",
+      "date_label": "Fecha y hora",
       "budget_label": "Presupuesto origen",
       "budget_placeholder": "Seleccionar presupuesto",
       "category_label": "Categoría",
@@ -66,6 +66,23 @@
     "category_sheet": {
       "title": "Seleccionar Categoría",
       "create_category": "Crear Categoría"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
+    },
+    "edit_category_dialog": {
+      "title": "Modificar Categoría",
+      "name_label": "Nombre de la categoría",
+      "name_placeholder": "Ej. Alimentación",
+      "color_label": "Color",
+      "cancel_button": "Cancelar",
+      "save_button": "Guardar"
+    },
+    "delete_category_dialog": {
+      "title": "¿Eliminar esta categoría?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
     }
   },
   "settings": {
@@ -213,6 +230,15 @@
     },
     "history": {
       "empty_message": "No hay presupuestos registrados en este período"
+    },
+    "options": {
+      "edit": "Modificar",
+      "delete": "Eliminar"
+    },
+    "delete_dialog": {
+      "title": "¿Eliminar este presupuesto?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
     },
     "delete_category_dialog": {
       "title": "¿Eliminar esta categoría?",

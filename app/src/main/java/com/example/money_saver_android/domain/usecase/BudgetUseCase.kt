@@ -118,4 +118,11 @@ class BudgetUseCase(
             BudgetResult.Success
         }
     }
+
+    suspend fun deleteBudget(id: Long): BudgetResult {
+        return budgetMutex.withLock {
+            budgetRepository.deleteBudget(id)
+            BudgetResult.Success
+        }
+    }
 }

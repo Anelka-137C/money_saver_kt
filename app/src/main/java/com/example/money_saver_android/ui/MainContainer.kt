@@ -1,5 +1,6 @@
 package com.example.money_saver_android.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -50,6 +51,16 @@ fun MainContainer(
     // Observe language changes to re-render texts in real-time
     val settingsState by settingsViewModel.uiState.collectAsState()
     val periodState = periodViewModel?.uiState?.collectAsState()?.value
+
+    if (periodViewModel != null && periodState?.isInitialCheckDone != true) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DarkBackground)
+        )
+        return
+    }
+
     val isPeriodLocked = periodState?.let { !it.isPeriodConfigured } ?: false
 
     var currentTab by rememberSaveable {

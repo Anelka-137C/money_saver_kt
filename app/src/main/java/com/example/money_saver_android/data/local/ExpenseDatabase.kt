@@ -68,7 +68,7 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses ORDER BY id DESC")
     fun getAll(): Flow<List<ExpenseEntity>>
 
-    @Query("SELECT * FROM expenses WHERE periodId = :periodId ORDER BY id DESC")
+    @Query("SELECT * FROM expenses WHERE COALESCE(periodId, 0) = :periodId ORDER BY id DESC")
     fun getByPeriod(periodId: Long): Flow<List<ExpenseEntity>>
 
     @Insert
@@ -116,6 +116,39 @@ interface CategoryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSubcategory(subcategory: SubcategoryEntity)
+
+    @Query("DELETE FROM expenses_categories WHERE name = :name")
+    suspend fun deleteCategoryByName(name: String)
+
+    @Query("DELETE FROM expenses_subcategories WHERE categoryName = :categoryName AND name = :subcategoryName")
+    suspend fun deleteSubcategoryByName(categoryName: String, subcategoryName: String)
+
+    @Query("SELECT COUNT(*) FROM expenses WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName))")
+    suspend fun countExpensesForCategory(categoryName: String): Int
+
+    @Query("SELECT COUNT(*) FROM expenses WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName)) AND LOWER(TRIM(COALESCE(subcategory, ''))) = LOWER(TRIM(:subcategoryName))")
+    suspend fun countExpensesForSubcategory(categoryName: String, subcategoryName: String): Int
+
+    @Query("UPDATE expenses_categories SET color = :color, icon = :icon WHERE name = :name")
+    suspend fun updateCategoryStyle(name: String, color: String, icon: String)
+
+    @Query("UPDATE expenses_subcategories SET categoryName = :newCategoryName WHERE categoryName = :oldCategoryName")
+    suspend fun reassignSubcategories(oldCategoryName: String, newCategoryName: String)
+
+    @Query("UPDATE expenses SET category = :newCategoryName WHERE LOWER(TRIM(category)) = LOWER(TRIM(:oldCategoryName))")
+    suspend fun reassignExpensesCategory(oldCategoryName: String, newCategoryName: String)
+
+    @Transaction
+    suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        if (oldName == newName) {
+            updateCategoryStyle(name = oldName, color = color, icon = icon)
+        } else {
+            insertCategory(CategoryEntity(name = newName, icon = icon, color = color))
+            reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
+            reassignExpensesCategory(oldCategoryName = oldName, newCategoryName = newName)
+            deleteCategoryByName(oldName)
+        }
+    }
 }
 
 @Database(

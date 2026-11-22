@@ -25,8 +25,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +38,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +58,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Category
+import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -94,6 +100,7 @@ fun CategorySelectionSheet(
     onCreateCategory: () -> Unit,
     onSubcategoryNameChange: (String) -> Unit,
     onCreateSubcategory: (categoryName: String) -> Unit,
+    onEditCategory: ((category: Category) -> Unit)? = null,
     onDeleteCategory: ((categoryName: String) -> Unit)? = null,
     onDeleteSubcategory: ((categoryName: String, subcategoryName: String) -> Unit)? = null,
     onClearSubcategoryError: (() -> Unit)? = null,
@@ -105,12 +112,14 @@ fun CategorySelectionSheet(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val selectedCategoryColor = parseHexColor(selectedColorHex)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = {
             onClearSubcategoryError?.invoke()
             onDismiss()
         },
+        sheetState = sheetState,
         containerColor = CardBackground,
         contentColor = TextPrimary
     ) {
@@ -290,34 +299,99 @@ fun CategorySelectionSheet(
                                 )
                             }
                             Row(
-                                modifier = Modifier.padding(end = 16.dp),
+                                modifier = Modifier.padding(end = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (onDeleteCategory != null) {
-                                    IconButton(
-                                        onClick = { onDeleteCategory(category.name) },
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .testTag("btn_delete_category_${category.name}")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Eliminar categoría",
-                                            tint = ErrorRed,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                if (onEditCategory != null) {
+                                    val editLabel = t("expenses.options.edit").let {
+                                        if (it == "expenses.options.edit") "Modificar" else it
                                     }
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    val deleteLabel = t("expenses.options.delete").let {
+                                        if (it == "expenses.options.delete") "Eliminar" else it
+                                    }
+                                    Box {
+                                        var menuExpanded by remember { mutableStateOf(false) }
+                                        IconButton(
+                                            onClick = { menuExpanded = true },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .testTag("btn_options_category_${category.name}")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.MoreVert,
+                                                contentDescription = "Opciones de categoría",
+                                                tint = TextSecondary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = menuExpanded,
+                                            onDismissRequest = { menuExpanded = false },
+                                            modifier = Modifier
+                                                .background(CardBackground)
+                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(editLabel, color = TextPrimary) },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = null,
+                                                        tint = TextSecondary
+                                                    )
+                                                },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    onEditCategory(category)
+                                                },
+                                                modifier = Modifier.testTag("btn_edit_category_${category.name}")
+                                            )
+                                            if (onDeleteCategory != null) {
+                                                DropdownMenuItem(
+                                                    text = { Text(deleteLabel, color = ErrorRed) },
+                                                    leadingIcon = {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Delete,
+                                                            contentDescription = null,
+                                                            tint = ErrorRed
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        menuExpanded = false
+                                                        onDeleteCategory(category.name)
+                                                    },
+                                                    modifier = Modifier.testTag("btn_delete_category_${category.name}")
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if (onDeleteCategory != null) {
+                                        IconButton(
+                                            onClick = { onDeleteCategory(category.name) },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .testTag("btn_delete_category_${category.name}")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Eliminar categoría",
+                                                tint = ErrorRed,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+                                    Text(
+                                        text = ">",
+                                        fontSize = 16.sp,
+                                        color = TextSecondary,
+                                        modifier = Modifier.clickable {
+                                            onClearSubcategoryError?.invoke()
+                                            selectedCategoryName = category.name
+                                        }
+                                    )
                                 }
-                                Text(
-                                    text = ">",
-                                    fontSize = 16.sp,
-                                    color = TextSecondary,
-                                    modifier = Modifier.clickable {
-                                        onClearSubcategoryError?.invoke()
-                                        selectedCategoryName = category.name
-                                    }
-                                )
                             }
                         }
                     }
