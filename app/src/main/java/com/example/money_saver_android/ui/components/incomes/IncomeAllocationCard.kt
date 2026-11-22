@@ -35,6 +35,7 @@ import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import kotlin.math.roundToInt
 
 @Composable
 fun IncomeAllocationCard(
@@ -45,11 +46,15 @@ fun IncomeAllocationCard(
     modifier: Modifier = Modifier
 ) {
     val budgeted = totalBudgeted
-    val budgetedPercent = if (totalIncome > 0) ((budgeted / totalIncome) * 100).toInt() else 0
-    val budgetedProgress = if (totalIncome > 0) (budgeted / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
+    val budgetedRatio = if (totalIncome > 0.0) budgeted / totalIncome else 0.0
+    val budgetedPct = budgetedRatio * 100.0
+    val budgetedPercent = if (budgetedPct.isFinite()) budgetedPct.roundToInt() else 0
+    val budgetedProgress = if (budgetedRatio.isFinite()) budgetedRatio.toFloat().coerceIn(0f, 1f) else 0f
     val savings = totalSaved
-    val savingsPercent = if (totalIncome > 0) ((savings / totalIncome) * 100).toInt() else 0
-    val savingsProgress = if (totalIncome > 0) (savings / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
+    val savingsRatio = if (totalIncome > 0.0) savings / totalIncome else 0.0
+    val savingsPct = savingsRatio * 100.0
+    val savingsPercent = if (savingsPct.isFinite()) savingsPct.roundToInt() else 0
+    val savingsProgress = if (savingsRatio.isFinite()) savingsRatio.toFloat().coerceIn(0f, 1f) else 0f
 
     Card(
         modifier = modifier

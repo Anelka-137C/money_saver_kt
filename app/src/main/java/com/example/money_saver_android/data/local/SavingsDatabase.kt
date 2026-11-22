@@ -46,10 +46,10 @@ interface SavingDao {
     @Query("DELETE FROM savings WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("SELECT COUNT(*) FROM savings WHERE category = :categoryName")
+    @Query("SELECT COUNT(*) FROM savings WHERE category = :categoryName COLLATE NOCASE")
     suspend fun countSavingsForCategory(categoryName: String): Int
 
-    @Query("SELECT COUNT(*) FROM savings WHERE category = :categoryName AND subcategory = :subcategoryName")
+    @Query("SELECT COUNT(*) FROM savings WHERE category = :categoryName COLLATE NOCASE AND subcategory = :subcategoryName COLLATE NOCASE")
     suspend fun countSavingsForSubcategory(categoryName: String, subcategoryName: String): Int
 }
 
@@ -102,10 +102,10 @@ interface SavingCategoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSubcategories(subcategories: List<SavingSubcategoryEntity>)
 
-    @Query("DELETE FROM saving_category WHERE name = :name")
+    @Query("DELETE FROM saving_category WHERE name = :name COLLATE NOCASE")
     suspend fun deleteCategoryByName(name: String)
 
-    @Query("DELETE FROM saving_subcategory WHERE categoryName = :categoryName AND name = :subcategoryName")
+    @Query("DELETE FROM saving_subcategory WHERE categoryName = :categoryName COLLATE NOCASE AND name = :subcategoryName COLLATE NOCASE")
     suspend fun deleteSubcategoryByName(categoryName: String, subcategoryName: String)
 
     @Query("SELECT COUNT(*) FROM saving_category")

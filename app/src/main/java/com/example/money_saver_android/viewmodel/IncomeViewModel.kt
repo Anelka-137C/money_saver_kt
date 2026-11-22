@@ -467,7 +467,7 @@ class IncomeViewModel(
     fun confirmDeleteIncome() {
         val income = _uiState.value.incomeToDelete ?: return
         viewModelScope.launch {
-            when (incomeUseCase.deleteIncome(income.id)) {
+            when (val result = incomeUseCase.deleteIncome(income.id)) {
                 is IncomeResult.Success -> {
                     _uiState.update {
                         it.copy(
@@ -477,7 +477,12 @@ class IncomeViewModel(
                     }
                 }
                 is IncomeResult.Error -> {
-                    // No-op
+                    _uiState.update {
+                        it.copy(
+                            incomeToDelete = null,
+                            errorMessage = result.message
+                        )
+                    }
                 }
             }
         }

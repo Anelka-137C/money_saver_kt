@@ -66,6 +66,9 @@ interface IncomeDao {
     @Query("SELECT * FROM incomes WHERE periodId = :periodId ORDER BY dateTime DESC, id DESC")
     fun getIncomesByPeriod(periodId: Long): Flow<List<IncomeEntity>>
 
+    @Query("SELECT * FROM incomes WHERE id = :id LIMIT 1")
+    suspend fun getIncomeById(id: Long): IncomeEntity?
+
     @Insert
     suspend fun insert(entity: IncomeEntity): Long
 

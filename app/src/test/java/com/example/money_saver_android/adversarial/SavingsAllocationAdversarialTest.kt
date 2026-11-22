@@ -186,6 +186,9 @@ class SavingsAllocationAdversarialTest {
                 list.filter { it.periodId == periodId }
             }
 
+        override suspend fun getIncomeById(id: Long): Income? =
+            _incomes.value.find { it.id == id }
+
         override suspend fun insertIncome(income: Income): Long {
             val assignedId = if (income.id > 0L) income.id else nextId++
             if (assignedId >= nextId) nextId = assignedId + 1L
@@ -733,7 +736,10 @@ class SavingsAllocationAdversarialTest {
     @Test
     fun test_adversarial_ui_income_allocation_and_savings_overview_ieee754_percentage_truncation() {
         val context = RuntimeEnvironment.getApplication()
-        val i18n = I18nManager(context, FakeLangRepo("es"))
+        val i18n = I18nManager().apply {
+            initFromContext(context)
+            setLanguage("es")
+        }
 
         composeTestRule.setContent {
             CompositionLocalProvider(LocalI18nManager provides i18n) {
@@ -780,7 +786,10 @@ class SavingsAllocationAdversarialTest {
     @Test
     fun test_adversarial_ui_infinite_amounts_nan_progress_and_malformed_hex_color_do_not_crash() {
         val context = RuntimeEnvironment.getApplication()
-        val i18n = I18nManager(context, FakeLangRepo("es"))
+        val i18n = I18nManager().apply {
+            initFromContext(context)
+            setLanguage("es")
+        }
         val malformedCategory = Category(
             name = "Categoría Corrupta 💥",
             icon = "",
@@ -830,7 +839,10 @@ class SavingsAllocationAdversarialTest {
     @Test
     fun test_adversarial_incomes_view_cross_tab_savings_allocation_and_period_switch_synchronization() {
         val context = RuntimeEnvironment.getApplication()
-        val i18n = I18nManager(context, FakeLangRepo("es"))
+        val i18n = I18nManager().apply {
+            initFromContext(context)
+            setLanguage("es")
+        }
         val incomeRepo = AdversarialIncomeRepo()
         val budgetRepo = AdversarialBudgetRepo()
         val savingsRepo = AdversarialSavingsRepo()
@@ -913,12 +925,13 @@ class SavingsAllocationAdversarialTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("container_savings_view").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("saving_item_1").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("list_savings_breakdown").performScrollTo()
+        composeTestRule.onNodeWithTag("saving_item_1").performScrollTo().assertIsDisplayed()
         assertEquals(200.0, savingsViewModel.uiState.value.totalSaved, 0.001)
         assertEquals(500.0, savingsViewModel.uiState.value.availableIncome, 0.001)
 
         // Switch period to Period 2 via selector_period
-        composeTestRule.onNodeWithTag("selector_period").performClick()
+        composeTestRule.onNodeWithTag("selector_period").performScrollTo().performClick()
         composeTestRule.onNodeWithTag("period_option_2").performClick()
         composeTestRule.waitForIdle()
 
@@ -926,7 +939,8 @@ class SavingsAllocationAdversarialTest {
         assertEquals(2L, savingsViewModel.uiState.value.selectedPeriodId)
         assertEquals(800.0, savingsViewModel.uiState.value.totalSaved, 0.001)
         assertEquals(1200.0, savingsViewModel.uiState.value.availableIncome, 0.001)
-        composeTestRule.onNodeWithTag("saving_item_2").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("list_savings_breakdown").performScrollTo()
+        composeTestRule.onNodeWithTag("saving_item_2").performScrollTo().assertIsDisplayed()
     }
 
     // =========================================================================================
@@ -940,7 +954,10 @@ class SavingsAllocationAdversarialTest {
     @Test
     fun test_adversarial_savings_tab_error_recovery_and_unicode_payloads_in_list_item() {
         val context = RuntimeEnvironment.getApplication()
-        val i18n = I18nManager(context, FakeLangRepo("es"))
+        val i18n = I18nManager().apply {
+            initFromContext(context)
+            setLanguage("es")
+        }
         val incomeRepo = AdversarialIncomeRepo()
         val budgetRepo = AdversarialBudgetRepo()
         val savingsRepo = AdversarialSavingsRepo()
@@ -972,7 +989,7 @@ class SavingsAllocationAdversarialTest {
         composeTestRule.onNodeWithTag("text_saving_error").assertIsDisplayed()
 
         // Close dialog and reopen -> error must be cleared
-        composeTestRule.onNodeWithTag("btn_close_saving_dialog").performClick()
+        composeTestRule.onNodeWithTag("btn_close_saving_dialog").performScrollTo().performClick()
         composeTestRule.waitForIdle()
         assertNull(viewModel.uiState.value.savingErrorMessage)
 

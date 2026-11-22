@@ -39,6 +39,7 @@ import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import kotlin.math.roundToInt
 
 private val SavingsAccent = Color(0xFF3B82F6)
 private val SavingsBadgeBg = Color(0xFF172554)
@@ -53,8 +54,9 @@ fun SavingsOverviewCard(
 ) {
     val formattedTotal = CurrencyFormatter.format(totalSaved, currency)
     val formattedAvailable = CurrencyFormatter.format(availableIncome, currency)
-    val progress = if (totalIncome > 0) (totalSaved / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
-    val percent = (progress * 100).toInt()
+    val ratio = if (totalIncome > 0.0) totalSaved / totalIncome else 0.0
+    val progress = if (ratio.isFinite()) ratio.toFloat().coerceIn(0f, 1f) else 0f
+    val percent = (progress * 100f).roundToInt()
     val badgeTemplate = t("savings.overview.assigned_badge")
     val badgeText = runCatching { String.format(badgeTemplate, percent) }.getOrDefault("$percent%")
     val bannerTitleTemplate = t("savings.overview.available_banner_title")

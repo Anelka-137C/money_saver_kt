@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.math.BigDecimal
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -25,9 +26,9 @@ sealed class SavingsResult {
 class SavingsUseCase(
     private val savingsRepository: SavingsRepository,
     private val incomeRepository: IncomeRepository,
-    private val budgetRepository: BudgetRepository? = null
+    private val budgetRepository: BudgetRepository? = null,
+    private val savingMutex: Mutex = FinancialAllocationLock.mutex
 ) {
-    private val savingMutex = Mutex()
 
     fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>> =
         savingsRepository.getSavingsByPeriod(periodId)
@@ -45,10 +46,7 @@ class SavingsUseCase(
         totalIncome: Double,
         totalBudgeted: Double,
         totalSaved: Double
-    ): Double {
-        val raw = totalIncome - totalBudgeted - totalSaved
-        return if (raw.isNaN()) 0.0 else maxOf(0.0, raw)
-    }
+    ): Double = calculateExactAvailableIncome(totalIncome, totalBudgeted, totalSaved)
 
     suspend fun saveSaving(
         amountInput: String,
@@ -63,7 +61,7 @@ class SavingsUseCase(
             return SavingsResult.Error("Período no seleccionado")
         }
 
-        val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
+        val amount = parseAmountInput(amountInput) ?: 0.0
         if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return SavingsResult.Error("El monto debe ser mayor a cero")
         }
@@ -87,19 +85,22 @@ class SavingsUseCase(
             val matchedIncome = periodIncomes.find { it.id == incomeId }
                 ?: return@withLock SavingsResult.Error("El ingreso seleccionado no corresponde al período activo")
 
-            val totalIncome = periodIncomes.sumOf { it.amount }
-            val totalBudgeted = budgetRepository?.getBudgetsByPeriod(periodId)?.first()?.sumOf { it.amount } ?: 0.0
+            val totalIncome = periodIncomes.map { it.amount }.sumBigDecimal()
+            val totalBudgeted = budgetRepository?.getBudgetsByPeriod(periodId)?.first()?.map { it.amount }?.sumBigDecimal()
+                ?: BigDecimal.ZERO
             val periodSavings = savingsRepository.getSavingsByPeriod(periodId).first()
-            val totalSaved = periodSavings.sumOf { it.amount }
+            val totalSaved = periodSavings.map { it.amount }.sumBigDecimal()
+            val amountDecimal = BigDecimal.valueOf(amount)
 
-            val savedFromIncome = periodSavings.filter { it.incomeId == matchedIncome.id }.sumOf { it.amount }
-            val incomeRemaining = matchedIncome.amount - savedFromIncome
-            if (amount > incomeRemaining) {
+            val savedFromIncome = periodSavings.filter { it.incomeId == matchedIncome.id }.map { it.amount }.sumBigDecimal()
+            val incomeAmount = if (matchedIncome.amount.isFinite()) BigDecimal.valueOf(matchedIncome.amount) else BigDecimal.ZERO
+            val incomeRemaining = incomeAmount.subtract(savedFromIncome)
+            if (amountDecimal > incomeRemaining) {
                 return@withLock SavingsResult.Error("El monto supera el disponible del ingreso seleccionado")
             }
 
-            val available = totalIncome - totalBudgeted - totalSaved
-            if (amount > available) {
+            val available = totalIncome.subtract(totalBudgeted).subtract(totalSaved)
+            if (amountDecimal > available) {
                 return@withLock SavingsResult.Error("El monto supera el ingreso disponible")
             }
 
@@ -139,7 +140,7 @@ class SavingsUseCase(
             return SavingsResult.Error("Período no seleccionado")
         }
 
-        val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
+        val amount = parseAmountInput(amountInput) ?: 0.0
         if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
             return SavingsResult.Error("El monto debe ser mayor a cero")
         }
@@ -169,20 +170,24 @@ class SavingsUseCase(
                 ?: return@withLock SavingsResult.Error("El ingreso seleccionado no corresponde al período activo")
 
             val otherSavings = periodSavings.filter { it.id != id }
-            val totalIncome = periodIncomes.sumOf { it.amount }
-            val totalBudgeted = budgetRepository?.getBudgetsByPeriod(periodId)?.first()?.sumOf { it.amount } ?: 0.0
-            val totalSavedWithoutCurrent = otherSavings.sumOf { it.amount }
+            val totalIncome = periodIncomes.map { it.amount }.sumBigDecimal()
+            val totalBudgeted = budgetRepository?.getBudgetsByPeriod(periodId)?.first()?.map { it.amount }?.sumBigDecimal()
+                ?: BigDecimal.ZERO
+            val totalSavedWithoutCurrent = otherSavings.map { it.amount }.sumBigDecimal()
+            val amountDecimal = BigDecimal.valueOf(amount)
 
             val savedFromIncomeWithoutCurrent = otherSavings
                 .filter { it.incomeId == matchedIncome.id }
-                .sumOf { it.amount }
-            val incomeRemaining = matchedIncome.amount - savedFromIncomeWithoutCurrent
-            if (amount > incomeRemaining) {
+                .map { it.amount }
+                .sumBigDecimal()
+            val incomeAmount = if (matchedIncome.amount.isFinite()) BigDecimal.valueOf(matchedIncome.amount) else BigDecimal.ZERO
+            val incomeRemaining = incomeAmount.subtract(savedFromIncomeWithoutCurrent)
+            if (amountDecimal > incomeRemaining) {
                 return@withLock SavingsResult.Error("El monto supera el disponible del ingreso seleccionado")
             }
 
-            val availableForUpdate = totalIncome - totalBudgeted - totalSavedWithoutCurrent
-            if (amount > availableForUpdate) {
+            val availableForUpdate = totalIncome.subtract(totalBudgeted).subtract(totalSavedWithoutCurrent)
+            if (amountDecimal > availableForUpdate) {
                 return@withLock SavingsResult.Error("El monto supera el ingreso disponible")
             }
 
@@ -265,16 +270,18 @@ class SavingsUseCase(
         categoryName: String,
         subcategoryNameInput: String
     ): SavingsResult {
+        val trimmedCategory = categoryName.trim()
         val trimmed = subcategoryNameInput.trim()
-        if (trimmed.isEmpty()) {
+        if (trimmedCategory.isEmpty() || trimmed.isEmpty()) {
             return SavingsResult.Error("El nombre de la subcategoría no puede estar vacío")
         }
         val existing = savingsRepository.getAllCategories().first()
-        val target = existing.find { it.name.equals(categoryName, ignoreCase = true) }
-        if (target?.subcategories?.any { it.name.equals(trimmed, ignoreCase = true) } == true) {
+        val target = existing.find { it.name.equals(trimmedCategory, ignoreCase = true) }
+            ?: return SavingsResult.Error("La categoría no existe")
+        if (target.subcategories.any { it.name.equals(trimmed, ignoreCase = true) }) {
             return SavingsResult.Error("Ya existe una subcategoría con este nombre")
         }
-        savingsRepository.insertSubcategory(categoryName, Subcategory(name = trimmed))
+        savingsRepository.insertSubcategory(target.name, Subcategory(name = trimmed))
         return SavingsResult.Success
     }
 
@@ -283,10 +290,13 @@ class SavingsUseCase(
         if (trimmed.isEmpty()) {
             return@withLock SavingsResult.Error("El nombre de la categoría no puede estar vacío")
         }
-        if (savingsRepository.countSavingsForCategory(trimmed) > 0) {
+        val canonicalName = savingsRepository.getAllCategories().first()
+            .find { it.name.equals(trimmed, ignoreCase = true) }
+            ?.name ?: trimmed
+        if (savingsRepository.countSavingsForCategory(canonicalName) > 0) {
             return@withLock SavingsResult.Error("No se puede eliminar la categoría porque tiene ahorros asociados")
         }
-        savingsRepository.deleteCategory(trimmed)
+        savingsRepository.deleteCategory(canonicalName)
         SavingsResult.Success
     }
 
@@ -296,10 +306,16 @@ class SavingsUseCase(
         if (trimmedCat.isEmpty() || trimmedSub.isEmpty()) {
             return@withLock SavingsResult.Error("El nombre no puede estar vacío")
         }
-        if (savingsRepository.countSavingsForSubcategory(trimmedCat, trimmedSub) > 0) {
+        val matchedCategory = savingsRepository.getAllCategories().first()
+            .find { it.name.equals(trimmedCat, ignoreCase = true) }
+        val canonicalCat = matchedCategory?.name ?: trimmedCat
+        val canonicalSub = matchedCategory?.subcategories
+            ?.find { it.name.equals(trimmedSub, ignoreCase = true) }
+            ?.name ?: trimmedSub
+        if (savingsRepository.countSavingsForSubcategory(canonicalCat, canonicalSub) > 0) {
             return@withLock SavingsResult.Error("No se puede eliminar la subcategoría porque tiene ahorros asociados")
         }
-        savingsRepository.deleteSubcategory(trimmedCat, trimmedSub)
+        savingsRepository.deleteSubcategory(canonicalCat, canonicalSub)
         SavingsResult.Success
     }
 }

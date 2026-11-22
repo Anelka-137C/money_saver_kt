@@ -107,12 +107,20 @@ class SavingsViewModel(
                     totalBudgeted = 0.0,
                     totalSaved = 0.0,
                     availableIncome = 0.0,
+                    savingAmountInput = "",
                     savingIncomeIdInput = null,
                     savingIncomeCategoryInput = "",
                     savingIncomeSubcategoryInput = "",
+                    savingCategoryInput = "",
+                    savingSubcategoryInput = "",
+                    savingDateTimeInput = "",
+                    savingNoteInput = "",
                     savingErrorMessage = null,
                     editingSaving = null,
-                    savingToDelete = null
+                    savingToDelete = null,
+                    categoryError = null,
+                    subcategoryError = null,
+                    savingCategoryToDelete = null
                 )
             } else {
                 current.copy(selectedPeriodId = periodId)

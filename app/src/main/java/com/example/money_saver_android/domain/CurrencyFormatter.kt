@@ -15,6 +15,7 @@ object CurrencyFormatter {
     }
 
     fun format(amount: Double, currency: Currency): String {
+        if (!amount.isFinite()) return format(BigDecimal.ZERO, currency)
         return format(BigDecimal.valueOf(amount), currency)
     }
 

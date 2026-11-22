@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.math.BigDecimal
 
 sealed class IncomeResult {
     object Success : IncomeResult()
@@ -37,7 +38,8 @@ class IncomeUseCase(
     private val budgetRepository: BudgetRepository? = null,
     budgetUseCase: BudgetUseCase? = null,
     private val expenseRepository: ExpenseRepository? = null,
-    private val savingsRepository: SavingsRepository? = null
+    private val savingsRepository: SavingsRepository? = null,
+    private val allocationMutex: Mutex = FinancialAllocationLock.mutex
 ) {
     private val budgetUseCase: BudgetUseCase? = budgetUseCase ?: budgetRepository?.let {
         BudgetUseCase(it, repository, savingsRepository)
@@ -162,6 +164,7 @@ class IncomeUseCase(
         periodId = periodId
     ) { income ->
         repository.insertIncome(income)
+        IncomeResult.Success
     }
 
     suspend fun updateIncome(
@@ -181,7 +184,32 @@ class IncomeUseCase(
         descriptionInput = descriptionInput,
         periodId = periodId
     ) { income ->
-        repository.updateIncome(income)
+        allocationMutex.withLock {
+            val periodIncomes = repository.getIncomesByPeriod(income.periodId).first()
+            val periodSavings = savingsRepository?.getSavingsByPeriod(income.periodId)?.first().orEmpty()
+            val newAmount = BigDecimal.valueOf(income.amount)
+            val savedFromIncome = periodSavings
+                .filter { it.incomeId == id }
+                .map { it.amount }
+                .sumBigDecimal()
+            if (newAmount < savedFromIncome) {
+                return@withLock IncomeResult.Error("El monto no puede ser menor a los ahorros asociados a este ingreso")
+            }
+
+            val totalBudgeted = budgetRepository?.getBudgetsByPeriod(income.periodId)?.first()
+                ?.map { it.amount }?.sumBigDecimal() ?: BigDecimal.ZERO
+            val totalSaved = periodSavings.map { it.amount }.sumBigDecimal()
+            val otherIncomesTotal = periodIncomes
+                .filter { it.id != id }
+                .map { it.amount }
+                .sumBigDecimal()
+            if (otherIncomesTotal.add(newAmount) < totalBudgeted.add(totalSaved)) {
+                return@withLock IncomeResult.Error("El monto no puede ser menor al total asignado en presupuestos y ahorros")
+            }
+
+            repository.updateIncome(income)
+            IncomeResult.Success
+        }
     }
 
     private suspend fun withValidatedIncome(
@@ -192,7 +220,7 @@ class IncomeUseCase(
         subcategoryInput: String,
         descriptionInput: String,
         periodId: Long?,
-        onValid: suspend (Income) -> Unit
+        onValid: suspend (Income) -> IncomeResult
     ): IncomeResult {
         val amount = amountInput.replace(",", "").toDoubleOrNull() ?: 0.0
         if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
@@ -208,7 +236,7 @@ class IncomeUseCase(
             return IncomeResult.Error("Período no seleccionado")
         }
 
-        onValid(
+        return onValid(
             Income(
                 id = id,
                 amount = amount,
@@ -219,12 +247,27 @@ class IncomeUseCase(
                 periodId = periodId
             )
         )
-        return IncomeResult.Success
     }
 
-    suspend fun deleteIncome(id: Long): IncomeResult {
+    suspend fun deleteIncome(id: Long): IncomeResult = allocationMutex.withLock {
+        val income = repository.getIncomeById(id)
+        if (income != null) {
+            val periodId = income.periodId
+            val periodSavings = savingsRepository?.getSavingsByPeriod(periodId)?.first().orEmpty()
+            if (periodSavings.any { it.incomeId == id }) {
+                return@withLock IncomeResult.Error("No se puede eliminar el ingreso porque tiene ahorros asociados")
+            }
+            val periodIncomes = repository.getIncomesByPeriod(periodId).first()
+            val remainingIncome = periodIncomes.filter { it.id != id }.map { it.amount }.sumBigDecimal()
+            val totalBudgeted = budgetRepository?.getBudgetsByPeriod(periodId)?.first()
+                ?.map { it.amount }?.sumBigDecimal() ?: BigDecimal.ZERO
+            val totalSaved = periodSavings.map { it.amount }.sumBigDecimal()
+            if (remainingIncome < totalBudgeted.add(totalSaved)) {
+                return@withLock IncomeResult.Error("No se puede eliminar el ingreso porque compromete presupuestos o ahorros existentes")
+            }
+        }
         repository.deleteIncome(id)
-        return IncomeResult.Success
+        IncomeResult.Success
     }
 
     fun getBudgetsByPeriod(periodId: Long): Flow<List<Budget>> {
@@ -241,7 +284,7 @@ class IncomeUseCase(
         totalSaved: Double = 0.0
     ): Double {
         return budgetUseCase?.calculateAvailableIncome(totalIncome, totalBudgeted, totalSaved)
-            ?: maxOf(0.0, totalIncome - totalBudgeted - totalSaved)
+            ?: calculateExactAvailableIncome(totalIncome, totalBudgeted, totalSaved)
     }
 
     fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>> {
