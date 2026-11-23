@@ -750,14 +750,11 @@ class IncomesViewTest {
             .assertTextEquals(CurrencyFormatter.format(200.0, defaultCurrencies.first()))
         composeTestRule.onNodeWithTag("mini_card_expense_Restaurante").assertDoesNotExist()
 
-        // Switch to Budget tab and verify global + category remaining balances
+        // Switch to Budget tab and verify PeriodSummaryCard total + category remaining balance
         composeTestRule.onNodeWithTag("tab_top_budget").performScrollTo().performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("text_budget_total_spent").performScrollTo()
-            .assertTextEquals(CurrencyFormatter.format(200.0, defaultCurrencies.first()))
-        composeTestRule.onNodeWithTag("text_budget_remaining").performScrollTo()
-            .assertTextEquals(CurrencyFormatter.format(300.0, defaultCurrencies.first()))
-        composeTestRule.onNodeWithTag("text_budget_available_banner").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_total_budgeted").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(500.0, defaultCurrencies.first()))
         composeTestRule.onNodeWithTag("text_budget_remaining_Food & Dining").performScrollTo()
             .assertTextEquals(CurrencyFormatter.format(300.0, defaultCurrencies.first()))
     }
@@ -804,7 +801,9 @@ class IncomesViewTest {
         // Remaining balance must clamp at 0.00 (no negative values) in Budget tab
         composeTestRule.onNodeWithTag("tab_top_budget").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("text_budget_remaining").performScrollTo()
+        composeTestRule.onNodeWithTag("text_total_budgeted").performScrollTo()
+            .assertTextEquals(CurrencyFormatter.format(100.0, defaultCurrencies.first()))
+        composeTestRule.onNodeWithTag("text_budget_remaining_Food & Dining").performScrollTo()
             .assertTextEquals(CurrencyFormatter.format(0.0, defaultCurrencies.first()))
 
         // Switch period to Period 2 (which has no budgets or expenses)

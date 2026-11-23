@@ -204,6 +204,17 @@ class ExpenseUseCase(
         return ExpenseResult.Success
     }
 
+    fun calculateExpenseCategorySummary(
+        expenses: List<Expense>,
+        categories: List<Category>
+    ): PeriodCategorySummary = buildPeriodCategorySummary(
+        entries = expenses,
+        categories = categories,
+        categorySelector = { it.category },
+        amountSelector = { it.amount },
+        defaultColorHex = "#EF4444"
+    )
+
     /**
      * Groups expenses strictly by expense category (subcategories consolidated).
      */

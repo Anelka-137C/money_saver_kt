@@ -10,6 +10,7 @@ import com.example.money_saver_android.domain.usecase.CategoryResult
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
+import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,7 @@ data class ExpenseUiState(
     val hasActiveBudget: Boolean = false,
     val totalBudgeted: Double = 0.0,
     val totalSpent: Double = 0.0,
+    val expenseSummary: PeriodCategorySummary = PeriodCategorySummary(),
     val amountInput: String = "",
     val dateInput: String = "",
     val descriptionInput: String = "",
@@ -86,7 +88,13 @@ class ExpenseViewModel(
         if (!expenseUseCase.requiresBudgetConditioning) {
             expensesJob = viewModelScope.launch {
                 expenseUseCase.getExpenses().collect { list ->
-                    _uiState.update { it.copy(expenses = list, totalSpent = list.sumOf { e -> e.amount }) }
+                    _uiState.update { current ->
+                        current.copy(
+                            expenses = list,
+                            totalSpent = list.sumOf { e -> e.amount },
+                            expenseSummary = expenseUseCase.calculateExpenseCategorySummary(list, current.categories)
+                        )
+                    }
                 }
             }
         }
@@ -94,7 +102,12 @@ class ExpenseViewModel(
             viewModelScope.launch {
                 uc.preloadDefaultCategoriesIfNeeded()
                 uc.getCategories().collect { list ->
-                    _uiState.update { it.copy(categories = list) }
+                    _uiState.update { current ->
+                        current.copy(
+                            categories = list,
+                            expenseSummary = expenseUseCase.calculateExpenseCategorySummary(current.expenses, list)
+                        )
+                    }
                 }
             }
         }
@@ -113,6 +126,7 @@ class ExpenseViewModel(
                     hasActiveBudget = false,
                     totalBudgeted = 0.0,
                     totalSpent = 0.0,
+                    expenseSummary = PeriodCategorySummary(),
                     amountInput = "",
                     descriptionInput = "",
                     categoryInput = "",
@@ -133,7 +147,13 @@ class ExpenseViewModel(
                 expenseUseCase.getExpensesByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { list ->
-                        _uiState.update { it.copy(expenses = list, totalSpent = list.sumOf { e -> e.amount }) }
+                        _uiState.update { current ->
+                            current.copy(
+                                expenses = list,
+                                totalSpent = list.sumOf { e -> e.amount },
+                                expenseSummary = expenseUseCase.calculateExpenseCategorySummary(list, current.categories)
+                            )
+                        }
                     }
             }
             budgetsJob = viewModelScope.launch {

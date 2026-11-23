@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.PeriodSummaryCard
 import com.example.money_saver_android.ui.components.expenses.AddEditExpenseDialog
 import com.example.money_saver_android.ui.components.expenses.AddExpenseCard
 import com.example.money_saver_android.ui.components.expenses.DeleteExpenseCategoryConfirmationDialog
@@ -59,7 +60,6 @@ import com.example.money_saver_android.ui.components.expenses.EditExpenseDialog
 import com.example.money_saver_android.ui.components.expenses.ExpenseAllocationCard
 import com.example.money_saver_android.ui.components.expenses.ExpenseCardItem
 import com.example.money_saver_android.ui.components.expenses.ExpenseEmptyState
-import com.example.money_saver_android.ui.components.expenses.ExpenseOverviewCard
 import com.example.money_saver_android.ui.components.expenses.ExpensesHeader
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
@@ -128,10 +128,15 @@ fun ExpensesTabContent(
             .testTag("container_expenses_view"),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        ExpenseOverviewCard(
-            totalSpent = state.totalSpent,
-            totalBudgeted = state.totalBudgeted,
-            currency = currency
+        PeriodSummaryCard(
+            title = t("expenses.overview.title"),
+            totalSubtitle = t("expenses.overview.total_spent"),
+            centerLabel = t("expenses.overview.center_label"),
+            emptyMessage = t("expenses.overview.empty_message"),
+            summary = state.expenseSummary,
+            currency = currency,
+            cardTestTag = "card_expense_overview",
+            totalTestTag = "text_expense_total_spent"
         )
 
         ExpenseAllocationCard(

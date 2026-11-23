@@ -53,6 +53,28 @@ class IncomeUseCase(
         return incomes.sumOf { it.amount }
     }
 
+    fun calculateIncomeCategorySummary(
+        incomes: List<Income>,
+        categories: List<Category>
+    ): PeriodCategorySummary = buildPeriodCategorySummary(
+        entries = incomes,
+        categories = categories,
+        categorySelector = { it.category },
+        amountSelector = { it.amount },
+        defaultColorHex = "#10B981"
+    )
+
+    fun calculateBudgetCategorySummary(
+        budgets: List<Budget>,
+        categories: List<Category>
+    ): PeriodCategorySummary = buildPeriodCategorySummary(
+        entries = budgets,
+        categories = categories,
+        categorySelector = { it.category },
+        amountSelector = { it.amount },
+        defaultColorHex = "#10B981"
+    )
+
     fun getCategories(): Flow<List<Category>> {
         return repository.getAllCategories()
     }

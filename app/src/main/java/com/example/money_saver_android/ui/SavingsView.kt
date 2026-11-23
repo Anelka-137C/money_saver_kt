@@ -44,11 +44,11 @@ import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.PeriodSummaryCard
 import com.example.money_saver_android.ui.components.savings.AddSavingDialog
 import com.example.money_saver_android.ui.components.savings.DeleteSavingCategoryConfirmationDialog
 import com.example.money_saver_android.ui.components.savings.DeleteSavingConfirmationDialog
 import com.example.money_saver_android.ui.components.savings.SavingListItem
-import com.example.money_saver_android.ui.components.savings.SavingsOverviewCard
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
@@ -103,11 +103,15 @@ fun SavingsTabContent(
             .testTag("container_savings_view"),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        SavingsOverviewCard(
-            totalSaved = state.totalSaved,
-            totalIncome = state.totalIncome,
-            availableIncome = state.availableIncome,
-            currency = currency
+        PeriodSummaryCard(
+            title = t("savings.overview.title"),
+            totalSubtitle = t("savings.overview.total_saved"),
+            centerLabel = t("savings.overview.center_label"),
+            emptyMessage = t("savings.overview.empty_message"),
+            summary = state.savingsSummary,
+            currency = currency,
+            cardTestTag = "card_savings_overview",
+            totalTestTag = "text_total_saved"
         )
 
         Button(

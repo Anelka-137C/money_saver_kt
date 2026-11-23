@@ -13,6 +13,7 @@ import com.example.money_saver_android.domain.usecase.BudgetResult
 import com.example.money_saver_android.domain.usecase.CategoryBudgetItem
 import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
+import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +60,7 @@ data class IncomeUiState(
     val incomes: List<Income> = emptyList(),
     val categories: List<Category> = emptyList(),
     val totalIncome: Double = 0.0,
+    val incomeSummary: PeriodCategorySummary = PeriodCategorySummary(),
     val newCategoryNameInput: String = "",
     val selectedColorHex: String = "#4E73DF",
     val categoryError: String? = null,
@@ -72,6 +74,7 @@ data class IncomeUiState(
     val budgets: List<Budget> = emptyList(),
     val budgetCategories: List<Category> = emptyList(),
     val totalBudgeted: Double = 0.0,
+    val budgetSummary: PeriodCategorySummary = PeriodCategorySummary(),
     val totalSaved: Double = 0.0,
     val availableIncome: Double = 0.0,
     val budgetAmountInput: String = "",
@@ -119,12 +122,22 @@ class IncomeViewModel(
         }
         viewModelScope.launch {
             incomeUseCase.getCategories().collect { list ->
-                _uiState.update { it.copy(categories = list) }
+                _uiState.update { current ->
+                    current.copy(
+                        categories = list,
+                        incomeSummary = incomeUseCase.calculateIncomeCategorySummary(current.incomes, list)
+                    )
+                }
             }
         }
         viewModelScope.launch {
             incomeUseCase.getBudgetCategories().collect { list ->
-                _uiState.update { it.copy(budgetCategories = list) }
+                _uiState.update { current ->
+                    current.copy(
+                        budgetCategories = list,
+                        budgetSummary = incomeUseCase.calculateBudgetCategorySummary(current.budgets, list)
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -163,8 +176,10 @@ class IncomeViewModel(
                     selectedPeriodId = periodId,
                     incomes = emptyList(),
                     totalIncome = 0.0,
+                    incomeSummary = PeriodCategorySummary(),
                     budgets = emptyList(),
                     totalBudgeted = 0.0,
+                    budgetSummary = PeriodCategorySummary(),
                     totalSaved = 0.0,
                     availableIncome = 0.0
                 )
@@ -180,7 +195,12 @@ class IncomeViewModel(
                         val total = incomeUseCase.calculateTotalIncome(incomeList)
                         _uiState.update { current ->
                             val available = incomeUseCase.calculateAvailableIncome(total, current.totalBudgeted, current.totalSaved)
-                            current.copy(incomes = incomeList, totalIncome = total, availableIncome = available)
+                            current.copy(
+                                incomes = incomeList,
+                                totalIncome = total,
+                                incomeSummary = incomeUseCase.calculateIncomeCategorySummary(incomeList, current.categories),
+                                availableIncome = available
+                            )
                         }
                     }
             }
@@ -191,7 +211,12 @@ class IncomeViewModel(
                         val totalBudgeted = incomeUseCase.calculateTotalBudgeted(budgetList)
                         _uiState.update { current ->
                             val available = incomeUseCase.calculateAvailableIncome(current.totalIncome, totalBudgeted, current.totalSaved)
-                            current.copy(budgets = budgetList, totalBudgeted = totalBudgeted, availableIncome = available)
+                            current.copy(
+                                budgets = budgetList,
+                                totalBudgeted = totalBudgeted,
+                                budgetSummary = incomeUseCase.calculateBudgetCategorySummary(budgetList, current.budgetCategories),
+                                availableIncome = available
+                            )
                         }
                     }
             }

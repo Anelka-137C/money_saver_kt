@@ -12,7 +12,9 @@
     "overview": {
       "title": "Resumen de Gastos",
       "total_spent": "Total gastado",
-      "budget_label": "Presupuesto"
+      "budget_label": "Presupuesto",
+      "center_label": "Total",
+      "empty_message": "Sin gastos registrados en este período"
     },
     "allocation": {
       "title": "Distribución de Gastos",
@@ -140,6 +142,8 @@
       "total_income": "Ingreso total",
       "trend": "↑ +12% vs mes ant.",
       "used": "Usado",
+      "center_label": "Total",
+      "empty_message": "Sin ingresos registrados en este período",
       "available_banner_title": "Tienes %s disponible",
       "available_banner_subtitle": "%s de tus ingresos sigue disponible para asignar."
     },
@@ -206,6 +210,8 @@
       "total_budgeted": "Total presupuestado",
       "spent_label": "Gastado",
       "remaining_label": "Restante global",
+      "center_label": "Total",
+      "empty_message": "Sin presupuestos registrados en este período",
       "available_banner_title": "Tienes %s disponible",
       "available_banner_subtitle": "%s de tus ingresos sigue disponible para presupuestar."
     },
@@ -256,6 +262,8 @@
       "title": "Resumen de Ahorros",
       "total_saved": "Total ahorrado",
       "assigned_badge": "%s%% ahorrado",
+      "center_label": "Total",
+      "empty_message": "Sin ahorros registrados en este período",
       "available_banner_title": "Tienes %s disponible",
       "available_banner_subtitle": "%s de tus ingresos sigue disponible para apartar."
     },

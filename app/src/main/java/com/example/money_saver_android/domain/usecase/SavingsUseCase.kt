@@ -42,6 +42,17 @@ class SavingsUseCase(
     fun calculateTotalSaved(savings: List<Saving>): Double =
         savings.sumOf { it.amount }
 
+    fun calculateSavingsCategorySummary(
+        savings: List<Saving>,
+        categories: List<Category>
+    ): PeriodCategorySummary = buildPeriodCategorySummary(
+        entries = savings,
+        categories = categories,
+        categorySelector = { it.category },
+        amountSelector = { it.amount },
+        defaultColorHex = "#3B82F6"
+    )
+
     fun calculateAvailableIncome(
         totalIncome: Double,
         totalBudgeted: Double,

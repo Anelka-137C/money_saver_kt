@@ -15,7 +15,7 @@ Expensive decisions: Offline-first con backups a Google Drive; multi-idioma; mon
 - [*] **#7** Como usuario, quiero registrar mis ingresos asignando o gestionando categorías y subcategorías dentro de mi período financiero, para estructurar mis fuentes de dinero. Requires: #6
 - [*] **#8** Como usuario, quiero definir mi presupuesto por categorías a partir de los ingresos registrados en el período, para planificar y limitar mis gastos por rubro. Requires: #7
 - [*] **#9** Como usuario, quiero que el registro de gastos quede condicionado a tener un presupuesto activo en el período, para asegurar que mis gastos se ajusten a lo presupuestado. Requires: #8
-- [ ] **#10** Como usuario, quiero apartar dinero de mis ingresos hacia ahorros clasificados por categoría. Requires: #7
+- [*] **#10** Como usuario, quiero apartar dinero de mis ingresos hacia ahorros clasificados por categoría. Requires: #7
 - [ ] **#11** Como usuario, quiero consultar el histórico de gastos, presupuesto, ingresos y ahorros filtrado por período financiero, para revisar y comparar mi desempeño económico en cada ciclo. Requires: #9, #10
 - [ ] **#12** Como usuario, quiero registrar un gasto especificando que los fondos provienen de mis ahorros, para cubrir salidas extraordinarias sin descontar de mi presupuesto corriente. Requires: #10
 - [ ] **#13** Como usuario, quiero generar un backup local y sincronizarlo con mi cuenta de Google Drive, para respaldar mi información offline en la nube.

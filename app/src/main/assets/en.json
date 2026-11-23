@@ -12,7 +12,9 @@
     "overview": {
       "title": "Expense Overview",
       "total_spent": "Total spent",
-      "budget_label": "Budget"
+      "budget_label": "Budget",
+      "center_label": "Total",
+      "empty_message": "No expenses in this period"
     },
     "allocation": {
       "title": "Expense Allocation",
@@ -140,6 +142,8 @@
       "total_income": "Total income",
       "trend": "↑ +12% vs Apr",
       "used": "Used",
+      "center_label": "Total",
+      "empty_message": "No income in this period",
       "available_banner_title": "You have %s available",
       "available_banner_subtitle": "%s of your income is still available to allocate."
     },
@@ -206,6 +210,8 @@
       "total_budgeted": "Total budgeted",
       "spent_label": "Spent",
       "remaining_label": "Remaining budget",
+      "center_label": "Total",
+      "empty_message": "No budgets in this period",
       "available_banner_title": "You have %s available",
       "available_banner_subtitle": "%s of your income remains available to budget."
     },
@@ -256,6 +262,8 @@
       "title": "Savings Overview",
       "total_saved": "Total saved",
       "assigned_badge": "%s%% saved",
+      "center_label": "Total",
+      "empty_message": "No savings in this period",
       "available_banner_title": "You have %s available",
       "available_banner_subtitle": "%s of your income is still available to set aside."
     },

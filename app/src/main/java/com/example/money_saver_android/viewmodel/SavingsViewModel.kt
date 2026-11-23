@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Saving
+import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import com.example.money_saver_android.domain.usecase.SavingsResult
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import kotlinx.coroutines.Job
@@ -38,6 +39,7 @@ data class SavingsUiState(
     val totalIncome: Double = 0.0,
     val totalBudgeted: Double = 0.0,
     val totalSaved: Double = 0.0,
+    val savingsSummary: PeriodCategorySummary = PeriodCategorySummary(),
     val availableIncome: Double = 0.0,
     val savingAmountInput: String = "",
     val savingIncomeIdInput: Long? = null,
@@ -87,7 +89,12 @@ class SavingsViewModel(
         }
         viewModelScope.launch {
             savingsUseCase.getCategories().collect { list ->
-                _uiState.update { it.copy(savingCategories = list) }
+                _uiState.update { current ->
+                    current.copy(
+                        savingCategories = list,
+                        savingsSummary = savingsUseCase.calculateSavingsCategorySummary(current.savings, list)
+                    )
+                }
             }
         }
     }
@@ -106,6 +113,7 @@ class SavingsViewModel(
                     totalIncome = 0.0,
                     totalBudgeted = 0.0,
                     totalSaved = 0.0,
+                    savingsSummary = PeriodCategorySummary(),
                     availableIncome = 0.0,
                     savingAmountInput = "",
                     savingIncomeIdInput = null,
@@ -175,6 +183,7 @@ class SavingsViewModel(
                             current.copy(
                                 savings = savingList,
                                 totalSaved = totalSaved,
+                                savingsSummary = savingsUseCase.calculateSavingsCategorySummary(savingList, current.savingCategories),
                                 availableIncome = available
                             )
                         }

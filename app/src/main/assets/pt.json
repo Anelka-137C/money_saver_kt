@@ -12,7 +12,9 @@
     "overview": {
       "title": "Resumo de Despesas",
       "total_spent": "Total gasto",
-      "budget_label": "Orçamento"
+      "budget_label": "Orçamento",
+      "center_label": "Total",
+      "empty_message": "Sem despesas neste período"
     },
     "allocation": {
       "title": "Distribuição de Despesas",
@@ -140,6 +142,8 @@
       "total_income": "Renda total",
       "trend": "↑ +12% vs mês ant.",
       "used": "Utilizado",
+      "center_label": "Total",
+      "empty_message": "Sem rendas neste período",
       "available_banner_title": "Tem %s disponível",
       "available_banner_subtitle": "%s da sua renda ainda está disponível para alocar."
     },
@@ -206,6 +210,8 @@
       "total_budgeted": "Total orçado",
       "spent_label": "Gasto",
       "remaining_label": "Restante global",
+      "center_label": "Total",
+      "empty_message": "Sem orçamentos neste período",
       "available_banner_title": "Tem %s disponível",
       "available_banner_subtitle": "%s das suas rendas continua disponível para orçamentar."
     },
@@ -256,6 +262,8 @@
       "title": "Resumo de Economias",
       "total_saved": "Total economizado",
       "assigned_badge": "%s%% economizado",
+      "center_label": "Total",
+      "empty_message": "Sem economias neste período",
       "available_banner_title": "Você tem %s disponível",
       "available_banner_subtitle": "%s da sua renda ainda está disponível para reservar."
     },

@@ -12,7 +12,9 @@
     "overview": {
       "title": "Ausgabenübersicht",
       "total_spent": "Gesamtausgaben",
-      "budget_label": "Budget"
+      "budget_label": "Budget",
+      "center_label": "Gesamt",
+      "empty_message": "Keine Ausgaben in diesem Zeitraum"
     },
     "allocation": {
       "title": "Ausgabenverteilung",
@@ -140,6 +142,8 @@
       "total_income": "Gesamteinkommen",
       "trend": "↑ +12% ggü. Vormonat",
       "used": "Verwendet",
+      "center_label": "Gesamt",
+      "empty_message": "Keine Einkommen in diesem Zeitraum",
       "available_banner_title": "Sie haben %s verfügbar",
       "available_banner_subtitle": "%s Ihres Einkommens steht noch zur Zuweisung bereit."
     },
@@ -206,6 +210,8 @@
       "total_budgeted": "Budget gesamt",
       "spent_label": "Ausgegeben",
       "remaining_label": "Restbudget",
+      "center_label": "Gesamt",
+      "empty_message": "Keine Budgets in diesem Zeitraum",
       "available_banner_title": "Sie haben %s verfügbar",
       "available_banner_subtitle": "%s Ihres Einkommens steht noch für Budgets zur Verfügung."
     },
@@ -256,6 +262,8 @@
       "title": "Übersicht Ersparnisse",
       "total_saved": "Gesamt gespart",
       "assigned_badge": "%s%% gespart",
+      "center_label": "Gesamt",
+      "empty_message": "Keine Ersparnisse in diesem Zeitraum",
       "available_banner_title": "Du hast %s verfügbar",
       "available_banner_subtitle": "%s deines Einkommens ist noch zum Sparen verfügbar."
     },

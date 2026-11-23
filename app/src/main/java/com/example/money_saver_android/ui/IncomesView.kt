@@ -65,9 +65,9 @@ import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.PeriodSummaryCard
 import com.example.money_saver_android.ui.components.budget.AddEditBudgetDialog
 import com.example.money_saver_android.ui.components.budget.BudgetAllocationCard
-import com.example.money_saver_android.ui.components.budget.BudgetOverviewCard
 import com.example.money_saver_android.ui.components.budget.DeleteBudgetCategoryConfirmationDialog
 import com.example.money_saver_android.ui.components.budget.DeleteBudgetConfirmationDialog
 import com.example.money_saver_android.ui.components.incomes.AddIncomeCard
@@ -76,7 +76,6 @@ import com.example.money_saver_android.ui.components.incomes.DeleteIncomeConfirm
 import com.example.money_saver_android.ui.components.incomes.EditIncomeDialog
 import com.example.money_saver_android.ui.components.incomes.FinanceTopTabs
 import com.example.money_saver_android.ui.components.incomes.IncomeAllocationCard
-import com.example.money_saver_android.ui.components.incomes.IncomeOverviewCard
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.DarkBackground
@@ -281,10 +280,16 @@ fun IncomesView(
 
             when (state.selectedTopTab) {
                 FinanceTopTab.INCOMES -> {
-                    // 2. Income Overview Card
-                    IncomeOverviewCard(
-                        totalIncome = state.totalIncome,
-                        currency = currency
+                    // 2. Income Summary Card
+                    PeriodSummaryCard(
+                        title = t("incomes.overview.title"),
+                        totalSubtitle = t("incomes.overview.total_income"),
+                        centerLabel = t("incomes.overview.center_label"),
+                        emptyMessage = t("incomes.overview.empty_message"),
+                        summary = state.incomeSummary,
+                        currency = currency,
+                        cardTestTag = "card_income_overview",
+                        totalTestTag = "text_total_income"
                     )
 
                     // 3. Income Allocation Card
@@ -386,20 +391,16 @@ fun IncomesView(
                             .testTag("container_budget_view"),
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
-                        // 1. Budget Overview Card
-                        val totalBudgetSpent = remember(state.budgets, state.expenses, activePeriod) {
-                            incomeViewModel.calculateTotalBudgetSpent(activePeriod)
-                        }
-                        val remainingBudget = remember(state.totalBudgeted, state.budgets, state.expenses, activePeriod) {
-                            incomeViewModel.calculateRemainingBudget(activePeriod)
-                        }
-                        BudgetOverviewCard(
-                            totalBudgeted = state.totalBudgeted,
-                            totalIncome = state.totalIncome,
-                            availableIncome = state.availableIncome,
-                            totalSpent = totalBudgetSpent,
-                            remainingBudget = remainingBudget,
-                            currency = currency
+                        // 1. Budget Summary Card
+                        PeriodSummaryCard(
+                            title = t("budget.overview.title"),
+                            totalSubtitle = t("budget.overview.total_budgeted"),
+                            centerLabel = t("budget.overview.center_label"),
+                            emptyMessage = t("budget.overview.empty_message"),
+                            summary = state.budgetSummary,
+                            currency = currency,
+                            cardTestTag = "card_budget_overview",
+                            totalTestTag = "text_total_budgeted"
                         )
 
                         // 2. Budget Allocation Card

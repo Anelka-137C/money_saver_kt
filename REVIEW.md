@@ -1,115 +1,98 @@
-# 🛡️ Revisión Adversarial y Suite de Pruebas: Story #10 — Apartar Dinero hacia Ahorros Clasificados por Categoría
+# Reporte de Revisión Adversarial & Edge Cases
 
-**Target:** Cambios correspondientes a la historia de usuario **#10: Apartar dinero de los ingresos hacia ahorros clasificados por categoría, persistencia en `SavingsDatabase`, descuento en ingreso disponible junto con presupuestos, e integración en Contabilidad (`FinanceTopTabs` y `SavingsView`)**.  
-**Archivos inspeccionados vía Git:**
-- `app/src/main/java/com/example/money_saver_android/MainActivity.kt`
-- `app/src/main/java/com/example/money_saver_android/data/local/SavingsDatabase.kt`
-- `app/src/main/java/com/example/money_saver_android/data/repository/SavingsRepository.kt`
-- `app/src/main/java/com/example/money_saver_android/domain/model/Saving.kt`
-- `app/src/main/java/com/example/money_saver_android/domain/usecase/SavingsUseCase.kt`
-- `app/src/main/java/com/example/money_saver_android/domain/usecase/BudgetUseCase.kt`
-- `app/src/main/java/com/example/money_saver_android/domain/usecase/IncomeUseCase.kt`
-- `app/src/main/java/com/example/money_saver_android/viewmodel/SavingsViewModel.kt`
-- `app/src/main/java/com/example/money_saver_android/viewmodel/IncomeViewModel.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/SavingsView.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/IncomesView.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/incomes/FinanceTopTabs.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/incomes/IncomeAllocationCard.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/savings/AddSavingDialog.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/savings/DeleteSavingCategoryConfirmationDialog.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/savings/DeleteSavingConfirmationDialog.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/savings/SavingListItem.kt`
-- `app/src/main/java/com/example/money_saver_android/ui/components/savings/SavingsOverviewCard.kt`
-- `app/src/main/assets/{de,en,es,pt}.json`
+## 1. Objetivo y Alcance
+Diseñar y ejecutar pruebas automatizadas adversariales orientadas a desafiar los límites de la lógica implementada para la **Story #11** ("*Consultar histórico de ingresos, presupuesto, gastos y ahorros filtrado por período financiero con un resumen visual por categorías al inicio de cada vista*"), poniendo a prueba la robustez del sistema bajo condiciones extremas sin alterar el código de producción.
 
 ---
 
-## 1. Hallazgos y Vulnerabilidades Detectadas (Adversarial Review)
+## 2. Detección de Código Evaluado mediante Git
+A partir de la inspección con `git status` y `git diff`, se identificaron los siguientes módulos y componentes impactados:
 
-### 🔴 Bug 1: Ruptura de Conservación Financiera al Eliminar o Reducir un Ingreso Comprometido en Ahorros/Presupuestos
-- **Severidad:** Crítica (Inconsistencia Financiera / Violación de Invariante de Conservación)
-- **Ubicación:** `IncomeUseCase.kt` (líneas 167-228)
-- **Causa Raíz:** `IncomeUseCase.updateIncome` y `IncomeUseCase.deleteIncome` modifican o borran el ingreso en `IncomeRepository` sin verificar si ya existen ahorros vinculados a su `incomeId` en `SavingsRepository` o si el nuevo `totalIncome` del período queda por debajo de `totalBudgeted + totalSaved`.
-- **Impacto:** Si un ingreso de `$1,000` ya tiene `$600` apartados en ahorros y `$300` en presupuestos, y el usuario edita el ingreso a `$400` o lo elimina, el período queda sobre-asignado (`totalBudgeted + totalSaved > totalIncome`) y los ahorros quedan huérfanos apuntando a un `incomeId` inexistente o con monto menor al ahorrado.
-
----
-
-### 🔴 Bug 2: Condición de Carrera Cruzada entre `BudgetUseCase` y `SavingsUseCase` (Doble `Mutex` Independiente)
-- **Severidad:** Crítica (Concurrencia / Sobre-asignación de Ingreso Disponible)
-- **Ubicación:** `BudgetUseCase.kt` (línea 22) y `SavingsUseCase.kt` (línea 30)
-- **Causa Raíz:** `BudgetUseCase` protege sus validaciones con `budgetMutex` y `SavingsUseCase` con `savingMutex` (dos instancias distintas e independientes de `Mutex`).
-- **Impacto:** Si se invocan concurrentemente `saveBudget("700")` y `saveSaving("700")` sobre un período con `$1,000` de ingreso disponible, ambas corrutinas leen `available = 1000.0` antes de que la otra inserte y ambas tienen éxito, comprometiendo `$1,400` sobre `$1,000` de ingresos.
-
----
-
-### 🔴 Bug 3: Violación de `ForeignKey` y Bypass de Protección de Borrado por Case-Sensitivity en `SavingsDatabase` (Room / SQLite)
-- **Severidad:** Alta (Persistencia / Integridad Referencial en SQLite)
-- **Ubicación:** `SavingsDatabase.kt` (líneas 49-79) y `SavingsUseCase.kt` (líneas 264-304)
-- **Causa Raíz:**
-  1. `SavingsUseCase.createSubcategory(categoryName, subcategoryNameInput)` busca `target` con `equals(..., ignoreCase = true)`, pero inserta en Room usando el parámetro crudo `categoryName` en vez de `target.name`. En SQLite, `FOREIGN KEY(categoryName) REFERENCES saving_category(name)` es **case-sensitive**, lanzando `SQLiteConstraintException` si difiere en mayúsculas/minúsculas o espacios laterales.
-  2. `SavingDao.countSavingsForCategory` y `countSavingsForSubcategory` comparan con `=` sin `COLLATE NOCASE`, permitiendo eliminar categorías o subcategorías con ahorros asociados si el nombre se pasa con distinto casing.
-- **Impacto:** Excepción no controlada (`SQLiteConstraintException`) al crear subcategorías con variación de mayúsculas/espacios y eliminación indebida de categorías en uso.
+- **Dominio / Casos de Uso:**
+  - `CategorySummary.kt` (`buildPeriodCategorySummary`): Agregación por categorías, cálculo de proporciones, porcentajes y resolución de colores.
+  - `ExpenseUseCase.kt` (`calculateExpenseCategorySummary`): Consolidación de gastos bajo su categoría principal.
+  - `IncomeUseCase.kt` (`calculateIncomeCategorySummary` y `calculateBudgetCategorySummary`): Consolidación de ingresos y presupuestos bajo su categoría principal.
+  - `SavingsUseCase.kt` (`calculateSavingsCategorySummary`): Consolidación de ahorros bajo su categoría principal.
+- **Gestión de Estado (ViewModels):**
+  - `ExpenseViewModel.kt`: Manejo reactivo de `expenseSummary` asociado a `selectedPeriodId`.
+  - `IncomeViewModel.kt`: Manejo reactivo de `incomeSummary` y `budgetSummary` asociado a `selectedPeriodId`.
+  - `SavingsViewModel.kt`: Manejo reactivo de `savingsSummary` asociado a `selectedPeriodId`.
+- **Componentes de Interfaz de Usuario (Compose Atoms):**
+  - `PeriodSummaryCard.kt`: Tarjeta superior contenedora con formateo de moneda y estado vacío.
+  - `PeriodSummaryDonutChart.kt`: Gráfica circular proporcional basada en Canvas con trazo de arcos acumulados.
+  - `PeriodSummaryLegend.kt`: Leyenda interactiva con nombre, monto formateado, porcentaje y punto de color.
 
 ---
 
-### 🔴 Bug 4: Falso Rechazo por Deriva de Punto Flotante IEEE 754 al Apartar el Saldo Exacto en Centavos
-- **Severidad:** Alta (Precisión Numérica / Bloqueo de Ahorro Válido)
-- **Ubicación:** `SavingsUseCase.kt` (líneas 95-104 y 176-187) y `BudgetUseCase.kt` (líneas 61-69 y 109-116)
-- **Causa Raíz:** En aritmética binaria IEEE 754 (`Double`), `0.10 + 0.20 = 0.30000000000000004`, por lo que `1.00 - (0.10 + 0.20) = 0.69999999999999995559`. Al evaluar `if (amount > incomeRemaining)` o `if (amount > available)` con `amount = 0.70`, la comparación `0.70 > 0.69999999999999995559` evalúa a `true`.
-- **Impacto:** El usuario intenta apartar exactamente los `$0.70` restantes de su ingreso de `$1.00` y el sistema rechaza la operación con `"El monto supera el disponible del ingreso seleccionado"`.
+## 3. Suite de Pruebas Implementada
+
+Se implementó la suite completa de pruebas adversariales en:
+- `app/src/test/java/com/example/money_saver_android/adversarial/PeriodSummaryAdversarialTest.kt`
+
+### Detalle de Escenarios y Cobertura:
+
+### A. Property-Based Testing (500 iteraciones aleatorias con semilla fija `Random(42)`)
+- **Invariante de Suma:** $\sum \text{items.amount} = \text{totalAmount}$ con precisión de punto flotante.
+- **Invariante de Proporción y Porcentaje:** Para todo elemento, $\text{proportion} \in [0.0, 1.0]$ y $\text{percentage} \in [0, 100]$.
+- **Invariante de Suma de Proporciones:** En resúmenes no vacíos, $\sum \text{proportion} \approx 1.0$ (tolerancia $[0.98, 1.02]$ por redondeo flotante).
+- **Invariante de Ordenación:** Los elementos se ordenan de manera estrictamente descendente según su monto acumulado ($\text{amount}_i \ge \text{amount}_{i+1}$).
+- **Invariante de Unicidad y Normalización:** No existen nombres de categoría duplicados en la salida; cualquier variante de mayúsculas/minúsculas o espaciado lateral se consolida en una única entrada.
+- **Invariante de Sanitización:** Registros con montos no finitos, menores o iguales a cero, o categorías vacías son descartados sin excepción.
+
+### B. Pruebas de Frontera y Fuzzing de Datos Corruptos
+- **Desbordamiento acumulativo (`Double.MAX_VALUE`):** Entradas múltiples cuya suma supera el valor máximo representable resultando en `Double.POSITIVE_INFINITY` son contenidas y retornan un resumen seguro vacío en vez de propagar el infinito o causar desbordamiento aritmético no controlado.
+- **Disparidad extrema de escalas:** Procesamiento conjunto de órdenes de magnitud astronómicos (1 billón / `1e12`) junto a fracciones infinitesimales (`1e-10`), verificando que los valores pequeños reciben 0% sin incurrir en divisiones por cero ni `NaN`.
+- **Valores numéricos corruptos:** Filtrado estricto de `NaN`, `+Infinity`, `-Infinity`, `-0.0`, `0.0` y montos negativos.
+- **Caracteres especiales y cadenas complejas:** Integración sin fallas de nombres con emojis (`🍔 Comida 🎉`), texto bidireccional árabe RTL (`رواتب`), inyecciones de código HTML/JS (`<script>alert('XSS')</script>`), saltos de línea (`\n`), tabulaciones (`\t`) y cadenas extensas de 500 caracteres.
+- **Colores ausentes o corruptos en el catálogo:** Fallback controlado a `defaultColorHex` cuando el catálogo carece de color o contiene cadenas en blanco.
+
+### C. Consolidación de Subcategorías en UseCases
+- Validación en `ExpenseUseCase`, `IncomeUseCase` y `SavingsUseCase` garantizando que gastos, ingresos, presupuestos y ahorros registrados con subcategorías independientes se consoliden de forma exclusiva en su categoría padre con el color correspondiente.
+
+### D. Aislamiento por Período y Manejo de Concurrencia
+- **Aislamiento estricto entre períodos:** Validación de transiciones entre Período 1 ($300), Período 2 ($50), Período 3 (vacío, $0.00) y `periodId = null`, asegurando ausencia total de fugas o estados residuales.
+- **Cancelación de coroutines en conmutación rápida:** Múltiples cambios consecutivos de período cancelan las emisiones en curso evitando condiciones de carrera donde respuestas lentas sobrescriban el período activo.
+- **Reactividad ante mutaciones:** Inserción y eliminación de registros provocan la actualización atómica del resumen en el ViewModel.
+
+### E. Estrés y Renderizado en Compose UI
+- Renderizado de tarjeta con ítem único (arco completo de 360° y `100%`).
+- Prueba de estrés con 50 categorías simultáneas para validar que ni el Canvas ni la leyenda sufren congelamientos de UI.
+- Protección ante valores hexadecimales inválidos (`"MALFORMED_HEX"`) en `PeriodSummaryCard`, comprobando que `parseHexColor` aplica el color por defecto sin lanzar excepción en tiempo de dibujo.
+- Estado vacío verificado contra insignias estáticas o comparativas heredadas (sin `+12%`, `vs Apr`, etc.).
 
 ---
 
-### 🟡 Bug 5: Fuga de Estado del Formulario y Diálogo de Eliminación de Categoría al Cambiar de Período en `SavingsViewModel`
-- **Severidad:** Media (Ciclo de Vida / Fuga de Estado entre Períodos)
-- **Ubicación:** `SavingsViewModel.kt` (líneas 95-120)
-- **Causa Raíz:** `onPeriodSelected` limpia `savingIncomeIdInput`, `savingErrorMessage`, `editingSaving` y `savingToDelete`, pero **no resetea** `savingAmountInput`, `savingCategoryInput`, `savingSubcategoryInput`, `savingDateTimeInput`, `savingNoteInput` ni `savingCategoryToDelete`.
-- **Impacto:** Los datos ingresados en el formulario o un diálogo de confirmación de borrado de categoría del Período 1 permanecen activos al cambiar al Período 2.
+## 4. Vulnerabilidades y Edge Cases Identificados
+
+> [!WARNING]
+> **Sensibilidad a espacios en el catálogo de categorías (`CategorySummary.kt`):**
+> En la implementación de `buildPeriodCategorySummary`:
+> ```kotlin
+> val rawName = categorySelector(group.first()).trim()
+> val matchedCategory = categories.find { it.name.equals(rawName, ignoreCase = true) }
+> ```
+> Mientras que `rawName` se limpia con `.trim()`, el nombre proveniente de la lista de categorías (`it.name`) **no** se recorta.
+> Si en la base de datos o el catálogo una categoría se almacena con espacios adicionales (por ejemplo, `" Employment "`), la coincidencia exacta falla:
+> `" Employment ".equals("Employment", ignoreCase = true) == false`
+> **Impacto:** La categoría se agrupa con el nombre recortado pero `matchedCategory` resulta nulo, perdiendo el color configurado y recurriendo al color por defecto (`#4E73DF`).
+> El test `test_untrimmed_category_name_in_catalog_lookup_behavior` en `PeriodSummaryAdversarialTest.kt` replica y expone este caso borde.
+
+> [!NOTE]
+> **Consistencia entre `totalSpent`/`totalIncome` y el resumen:**
+> `ExpenseViewModel` y `IncomeViewModel` calculan sus totales directos mediante `sumOf { it.amount }`, mientras que `buildPeriodCategorySummary` filtra registros con categorías en blanco o montos $\le 0$. Si la base de datos contuviera registros con categorías vacías, existiría una discrepancia entre la cifra de la tarjeta de resumen y los estados numéricos globales. Las validaciones de entrada previenen este caso en flujo normal, pero debe contemplarse en migraciones o importaciones de datos.
 
 ---
 
-### 🟡 Bug 6: Inflación Silenciosa `x100` con Coma Decimal (`"10,50"` -> `1050.0`) y Truncamiento IEEE 754 en Porcentajes de UI (`"28%"` / `"56%"`)
-- **Severidad:** Media (Validación de Entrada / Precisión en UI Compose)
-- **Ubicación:** `SavingsUseCase.kt` (líneas 66 y 142), `IncomeAllocationCard.kt` (líneas 48-51) y `SavingsOverviewCard.kt` (líneas 56-57)
-- **Causa Raíz:**
-  1. `amountInput.replace(",", "").toDoubleOrNull()` elimina la coma antes de parsear, convirtiendo `"10,50"` (coma decimal) en `1050.0`.
-  2. En `IncomeAllocationCard` y `SavingsOverviewCard`, `((29.0 / 100.0) * 100).toInt()` produce `28` (`"28%"`) y `((57.0 / 100.0) * 100).toInt()` produce `56` (`"56%"`) debido a que en IEEE 754 `0.29 * 100.0 == 28.999999999999996` y `0.57 * 100.0 == 56.99999999999999`.
-- **Impacto:** Multiplicación por 100 de montos con coma decimal y porcentajes visualmente truncados en las tarjetas de resumen.
+## 5. Instrucciones de Ejecución
 
----
-
-## 2. Suite de Pruebas Adversariales Creada
-
-Se ha creado la suite completa y autocontenida en:  
-📁 `app/src/test/java/com/example/money_saver_android/adversarial/SavingsAllocationAdversarialTest.kt`
-
-### Casos de prueba incluidos (12 escenarios):
-
-| Test Case | Categoría | Invariante / Vulnerabilidad Evaluada |
-| :--- | :--- | :--- |
-| `test_adversarial_income_delete_or_reduce_below_committed_savings_and_budgets_breaks_conservation_invariant` | Integridad Relacional / Dominio | **Expone Bug #1**: bloqueo de reducción o borrado de ingresos ya comprometidos en ahorros/presupuestos. |
-| `test_adversarial_cross_usecase_concurrent_budget_and_saving_race_condition_overallocates_income` | Concurrencia Cruzada | **Expone Bug #2**: condición de carrera concurrente entre `BudgetUseCase.saveBudget` y `SavingsUseCase.saveSaving`. |
-| `test_adversarial_room_savings_database_case_insensitive_foreign_key_and_delete_protection` | Persistencia Room (`SavingsDatabase`) | **Expone Bug #3**: prueba SQLite/Room real con `createSubcategory`, `deleteCategory` y `deleteSubcategory` con variaciones de mayúsculas/espacios. |
-| `test_adversarial_ieee754_floating_point_drift_falsely_rejects_exact_remaining_cents` | Precisión Numérica IEEE 754 | **Expone Bug #4**: apartar `$0.10 + $0.20 + $0.70` exactos sobre un ingreso de `$1.00`. |
-| `test_adversarial_savings_viewmodel_period_switch_leaks_form_inputs_and_category_delete_dialog` | Ciclo de Vida / ViewModel | **Expone Bug #5**: limpieza completa de estado temporal al cambiar de período en `SavingsViewModel`. |
-| `test_adversarial_savings_viewmodel_concurrent_double_save_and_double_delete_idempotency` | Concurrencia / Idempotencia | Idempotencia ante doble clic concurrente en `saveSaving()` en `SavingsViewModel`. |
-| `test_adversarial_savings_usecase_decimal_comma_inflation_and_strict_calendar_boundaries` | Valores Frontera / Validación | **Expone Bug #6 (Coma decimal)** y verifica fronteras de calendario (`2026-02-29`, `2026-04-31`, `24:00`, `NaN`, `Infinity`, `-0.0`). |
-| `test_adversarial_ui_income_allocation_and_savings_overview_ieee754_percentage_truncation` | UI Compose / IEEE 754 | **Expone Bug #6 (Porcentajes UI)**: exige `"29%"` y `"57%"` sin truncamiento binario en `IncomeAllocationCard` y `SavingsOverviewCard`. |
-| `test_adversarial_ui_infinite_amounts_nan_progress_and_malformed_hex_color_do_not_crash` | UI Compose (Frontera) | Resiliencia de Compose ante `Double.POSITIVE_INFINITY` (`progress = Float.NaN`) y colores hex corruptos. |
-| `test_adversarial_incomes_view_cross_tab_savings_allocation_and_period_switch_synchronization` | Integración UI (`IncomesView`) | Sincronización reactiva entre `INCOMES`, `BUDGET` y `SAVINGS` y cambio de período en `IncomesView`. |
-| `test_adversarial_savings_tab_error_recovery_and_unicode_payloads_in_list_item` | UI Compose (`SavingsTabContent`) | Limpieza de `savingErrorMessage` al cerrar y reabrir `AddSavingDialog` en `SavingsTabContent`. |
-| `test_property_based_invariant_savings_and_budgets_conservation_and_source_income_bounds` | Property-Based Testing | **500 iteraciones aleatorias + matriz de extremos numéricos**: invariantes de conservación global (`totalBudgeted + totalSaved <= totalIncome`), límite por ingreso origen, aislamiento de períodos y no-`NaN`. |
-
----
-
-## 3. Instrucciones de Ejecución Local
-
-Siguiendo la restricción estricta de no ejecutar comandos de compilación/terminal desde este agente, puedes ejecutar la suite localmente o en CI/CD mediante:
+Para ejecutar la suite de pruebas adversariales en el entorno local o en pipelines de CI/CD:
 
 ```bash
-# Ejecutar la nueva suite adversarial de Story #10:
-./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.SavingsAllocationAdversarialTest"
+./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.PeriodSummaryAdversarialTest"
+```
 
-# O ejecutar todas las suites adversariales del proyecto:
-./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.*"
+Para ejecutar el conjunto completo de pruebas unitarias y de Compose:
+
+```bash
+./gradlew testDebugUnitTest
 ```

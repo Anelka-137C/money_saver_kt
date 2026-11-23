@@ -504,25 +504,19 @@ class BudgetConditionedExpensesAdversarialTest {
         composeTestRule.onNodeWithTag("period_option_2").performClick()
         composeTestRule.waitForIdle()
 
-        // 1. Verificar que la pestaña Gastos muestra $250 gastados y $550 restantes en Período 2
+        // 1. Verificar que la pestaña Gastos muestra $250 gastados en Período 2
         composeTestRule.onNodeWithTag("tab_top_expenses").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("text_expense_total_spent")
             .performScrollTo()
             .assertTextEquals(CurrencyFormatter.format(250.0, currency))
-        composeTestRule.onNodeWithTag("text_expense_budget_remaining")
-            .performScrollTo()
-            .assertTextEquals(CurrencyFormatter.format(550.0, currency))
 
-        // 2. INVARIANTE: La pestaña Presupuesto del Período 2 DEBE mostrar exactamente los mismos $250 gastados y $550 sobrantes
+        // 2. INVARIANTE: La pestaña Presupuesto del Período 2 DEBE mostrar $800 presupuestados y $550 sobrantes
         composeTestRule.onNodeWithTag("tab_top_budget").performScrollTo().performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("text_budget_total_spent")
+        composeTestRule.onNodeWithTag("text_total_budgeted")
             .performScrollTo()
-            .assertTextEquals(CurrencyFormatter.format(250.0, currency))
-        composeTestRule.onNodeWithTag("text_budget_remaining")
-            .performScrollTo()
-            .assertTextEquals(CurrencyFormatter.format(550.0, currency))
+            .assertTextEquals(CurrencyFormatter.format(800.0, currency))
         composeTestRule.onNodeWithTag("text_budget_remaining_Transport")
             .performScrollTo()
             .assertTextEquals(CurrencyFormatter.format(550.0, currency))
