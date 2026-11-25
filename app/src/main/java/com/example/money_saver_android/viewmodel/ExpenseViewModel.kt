@@ -6,6 +6,7 @@ import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.ExpenseFundingSource
+import com.example.money_saver_android.domain.model.Saving
 import com.example.money_saver_android.domain.usecase.CategoryExpenseItem
 import com.example.money_saver_android.domain.usecase.CategoryResult
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
@@ -56,6 +57,7 @@ data class ExpenseUiState(
     val budgets: List<Budget> = emptyList(),
     val hasActiveBudget: Boolean = false,
     val savingsBalances: List<SavingsCategoryBalance> = emptyList(),
+    val editSavingsBalances: List<SavingsCategoryBalance> = emptyList(),
     val hasAvailableSavings: Boolean = false,
     val totalBudgeted: Double = 0.0,
     val totalSpent: Double = 0.0,
@@ -95,6 +97,10 @@ class ExpenseViewModel(
     private var expensesJob: Job? = null
     private var budgetsJob: Job? = null
     private var isSavingExpense: Boolean = false
+    private var isUpdatingExpense: Boolean = false
+    private var latestAllSavings: List<Saving> = emptyList()
+    private var latestAllExpenses: List<Expense> = emptyList()
+    private var latestSavingCategories: List<Category> = emptyList()
 
     init {
         if (!expenseUseCase.requiresBudgetConditioning) {
@@ -130,23 +136,57 @@ class ExpenseViewModel(
                 expenseUseCase.getExpenses().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
                 expenseUseCase.getSavingCategories().catch { emit(emptyList()) }.onStart { emit(emptyList()) }
             ) { allSavings, allExpenses, savingCategories ->
-                calculateSavingsNetBalances(allSavings, allExpenses, savingCategories)
-            }.collect { balances ->
+                Triple(allSavings, allExpenses, savingCategories)
+            }.collect { (allSavings, allExpenses, savingCategories) ->
+                latestAllSavings = allSavings
+                latestAllExpenses = allExpenses
+                latestSavingCategories = savingCategories
+                val balances = calculateSavingsNetBalances(allSavings, allExpenses, savingCategories)
                 _uiState.update { current ->
                     val hasAvailable = balances.any { it.netBalance > 0.0 }
-                    val nextSource = if (!current.hasActiveBudget && hasAvailable) {
-                        ExpenseFundingSource.SAVINGS
+                    val nextSource = resolveFundingSource(
+                        currentSource = current.fundingSourceInput,
+                        hasActiveBudget = current.hasActiveBudget,
+                        hasAvailableSavings = hasAvailable
+                    )
+                    val selectedSavingStillAvailable = current.savingCategoryInput.isNotBlank() &&
+                        balances.any {
+                            it.categoryName.equals(current.savingCategoryInput, ignoreCase = true) &&
+                                it.netBalance > 0.0
+                        }
+                    val nextSavingCategory = if (nextSource == ExpenseFundingSource.SAVINGS && selectedSavingStillAvailable) {
+                        current.savingCategoryInput
                     } else {
-                        current.fundingSourceInput
+                        ""
                     }
+                    val editBalances = current.editingExpense?.let { edit ->
+                        calculateSavingsNetBalances(
+                            savings = allSavings,
+                            expenses = allExpenses,
+                            categories = savingCategories,
+                            excludeExpenseId = edit.expenseId.takeIf { id -> id > 0L }
+                        )
+                    } ?: emptyList()
                     current.copy(
                         savingsBalances = balances,
+                        editSavingsBalances = editBalances,
                         hasAvailableSavings = hasAvailable,
-                        fundingSourceInput = nextSource
+                        fundingSourceInput = nextSource,
+                        savingCategoryInput = nextSavingCategory
                     )
                 }
             }
         }
+    }
+
+    private fun resolveFundingSource(
+        currentSource: ExpenseFundingSource,
+        hasActiveBudget: Boolean,
+        hasAvailableSavings: Boolean
+    ): ExpenseFundingSource = when {
+        !hasActiveBudget && hasAvailableSavings -> ExpenseFundingSource.SAVINGS
+        !hasAvailableSavings -> ExpenseFundingSource.BUDGET
+        else -> currentSource
     }
 
     fun onPeriodSelected(periodId: Long?) {
@@ -170,10 +210,15 @@ class ExpenseViewModel(
                     budgetIdInput = null,
                     budgetCategoryInput = "",
                     budgetSubcategoryInput = "",
-                    fundingSourceInput = ExpenseFundingSource.BUDGET,
+                    fundingSourceInput = if (periodId != null && !expenseUseCase.requiresBudgetConditioning && current.hasAvailableSavings) {
+                        ExpenseFundingSource.SAVINGS
+                    } else {
+                        ExpenseFundingSource.BUDGET
+                    },
                     savingCategoryInput = "",
                     errorMessage = null,
                     editingExpense = null,
+                    editSavingsBalances = emptyList(),
                     expenseToDelete = null
                 )
             } else {
@@ -206,11 +251,11 @@ class ExpenseViewModel(
                         )
                         _uiState.update {
                             val hasBudget = budgetList.isNotEmpty()
-                            val nextSource = when {
-                                !hasBudget && it.hasAvailableSavings -> ExpenseFundingSource.SAVINGS
-                                hasBudget && !it.hasAvailableSavings -> ExpenseFundingSource.BUDGET
-                                else -> it.fundingSourceInput
-                            }
+                            val nextSource = resolveFundingSource(
+                                currentSource = it.fundingSourceInput,
+                                hasActiveBudget = hasBudget,
+                                hasAvailableSavings = it.hasAvailableSavings
+                            )
                             it.copy(
                                 budgets = budgetList,
                                 hasActiveBudget = hasBudget,
@@ -281,8 +326,15 @@ class ExpenseViewModel(
         } else {
             null
         }
+        val editBalances = calculateSavingsNetBalances(
+            savings = latestAllSavings,
+            expenses = latestAllExpenses,
+            categories = latestSavingCategories,
+            excludeExpenseId = expense.id.takeIf { id -> id > 0L }
+        )
         _uiState.update {
             it.copy(
+                editSavingsBalances = editBalances,
                 editingExpense = EditExpenseState(
                     expenseId = expense.id,
                     amount = amountStr,
@@ -375,45 +427,52 @@ class ExpenseViewModel(
     }
 
     fun confirmEdit() {
+        if (isUpdatingExpense) return
         val editState = _uiState.value.editingExpense ?: return
         val periodId = editState.periodId.takeIf { it > 0L } ?: _uiState.value.selectedPeriodId
+        isUpdatingExpense = true
         viewModelScope.launch {
-            when (val result = expenseUseCase.updateExpense(
-                id = editState.expenseId,
-                amountInput = editState.amount,
-                dateInput = editState.date,
-                descriptionInput = editState.description,
-                categoryInput = editState.category,
-                subcategoryInput = editState.subcategory,
-                periodId = periodId,
-                budgetId = editState.budgetId,
-                budgetCategoryInput = editState.budgetCategory,
-                fundingSource = editState.fundingSource,
-                savingCategoryInput = editState.savingCategory
-            )) {
-                is ExpenseResult.Error -> {
-                    _uiState.update { state ->
-                        state.copy(
-                            editingExpense = state.editingExpense?.copy(
-                                errorMessage = result.message
+            try {
+                when (val result = expenseUseCase.updateExpense(
+                    id = editState.expenseId,
+                    amountInput = editState.amount,
+                    dateInput = editState.date,
+                    descriptionInput = editState.description,
+                    categoryInput = editState.category,
+                    subcategoryInput = editState.subcategory,
+                    periodId = periodId,
+                    budgetId = editState.budgetId,
+                    budgetCategoryInput = editState.budgetCategory,
+                    fundingSource = editState.fundingSource,
+                    savingCategoryInput = editState.savingCategory
+                )) {
+                    is ExpenseResult.Error -> {
+                        _uiState.update { state ->
+                            state.copy(
+                                editingExpense = state.editingExpense?.copy(
+                                    errorMessage = result.message
+                                )
                             )
-                        )
+                        }
+                    }
+                    is ExpenseResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                editingExpense = null,
+                                editSavingsBalances = emptyList(),
+                                toastMessage = "Gasto guardado"
+                            )
+                        }
                     }
                 }
-                is ExpenseResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            editingExpense = null,
-                            toastMessage = "Gasto guardado"
-                        )
-                    }
-                }
+            } finally {
+                isUpdatingExpense = false
             }
         }
     }
 
     fun cancelEditing() {
-        _uiState.update { it.copy(editingExpense = null) }
+        _uiState.update { it.copy(editingExpense = null, editSavingsBalances = emptyList()) }
     }
 
     fun requestDeleteExpense(expense: Expense) {

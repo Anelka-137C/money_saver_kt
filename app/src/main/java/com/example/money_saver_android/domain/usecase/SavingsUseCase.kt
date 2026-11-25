@@ -8,11 +8,13 @@ import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.math.BigDecimal
@@ -192,7 +194,8 @@ class SavingsUseCase(
 
         return savingMutex.withLock {
             val periodSavings = savingsRepository.getSavingsByPeriod(periodId).first()
-            if (id <= 0L || periodSavings.none { it.id == id }) {
+            val existingSaving = if (id > 0L) periodSavings.find { it.id == id } else null
+            if (existingSaving == null) {
                 return@withLock SavingsResult.Error("Ahorro no encontrado")
             }
 
@@ -222,6 +225,16 @@ class SavingsUseCase(
                 return@withLock SavingsResult.Error("El monto supera el ingreso disponible")
             }
 
+            if (wouldOverdrawSavingsExpenses(
+                    categoryToCheck = existingSaving.category,
+                    savingIdToReplace = id,
+                    replacementAmount = amountDecimal,
+                    replacementCategory = trimmedCategory
+                )
+            ) {
+                return@withLock SavingsResult.Error("El monto o categoría compromete gastos ya financiados con este ahorro")
+            }
+
             val incomeLabel = if (matchedIncome.subcategory.isNotBlank()) {
                 "${matchedIncome.category} • ${matchedIncome.subcategory}"
             } else {
@@ -246,8 +259,59 @@ class SavingsUseCase(
     }
 
     suspend fun deleteSaving(id: Long): SavingsResult = savingMutex.withLock {
+        val existingSaving = if (expenseRepository != null && id > 0L) {
+            savingsRepository.getSavingById(id)
+        } else {
+            null
+        }
+        if (existingSaving != null && wouldOverdrawSavingsExpenses(
+                categoryToCheck = existingSaving.category,
+                savingIdToReplace = existingSaving.id,
+                replacementAmount = BigDecimal.ZERO,
+                replacementCategory = null
+            )
+        ) {
+            return@withLock SavingsResult.Error("No se puede eliminar el ahorro porque respalda gastos registrados")
+        }
         savingsRepository.deleteSaving(id)
         SavingsResult.Success
+    }
+
+    private suspend fun wouldOverdrawSavingsExpenses(
+        categoryToCheck: String,
+        savingIdToReplace: Long,
+        replacementAmount: BigDecimal,
+        replacementCategory: String?
+    ): Boolean {
+        val expRepo = expenseRepository ?: return false
+        val normalizedCheck = categoryToCheck.trim()
+        if (normalizedCheck.isEmpty()) return false
+        val allExpenses = expRepo.getAllExpenses().firstOrNull() ?: emptyList()
+        val totalSpent = allExpenses
+            .filter {
+                it.fundingSource == ExpenseFundingSource.SAVINGS &&
+                    it.amount.isFinite() &&
+                    it.amount > 0.0 &&
+                    it.savingCategory.trim().equals(normalizedCheck, ignoreCase = true)
+            }
+            .map { it.amount }
+            .sumBigDecimal()
+        if (totalSpent <= BigDecimal.ZERO) return false
+
+        val allSavings = savingsRepository.getAllSavings().firstOrNull() ?: emptyList()
+        val baseSaved = allSavings
+            .filter {
+                it.id != savingIdToReplace &&
+                    it.amount.isFinite() &&
+                    it.amount > 0.0 &&
+                    it.category.trim().equals(normalizedCheck, ignoreCase = true)
+            }
+            .map { it.amount }
+            .sumBigDecimal()
+        val replacementMatches = replacementCategory != null &&
+            replacementCategory.trim().equals(normalizedCheck, ignoreCase = true)
+        val totalSavedAfter = if (replacementMatches) baseSaved.add(replacementAmount) else baseSaved
+        return totalSpent > totalSavedAfter
     }
 
     private fun isValidSavingDateTime(dateStr: String): Boolean {

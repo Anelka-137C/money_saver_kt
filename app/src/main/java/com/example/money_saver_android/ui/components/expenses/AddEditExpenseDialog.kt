@@ -277,7 +277,8 @@ fun AddEditExpenseDialog(
                             onDismissRequest = { savingMenuExpanded = false },
                             modifier = Modifier.background(CardBackground)
                         ) {
-                            if (savingsBalances.isEmpty()) {
+                            val availableBalances = savingsBalances.filter { it.netBalance > 0.0 }
+                            if (availableBalances.isEmpty()) {
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -290,7 +291,7 @@ fun AddEditExpenseDialog(
                                     onClick = {}
                                 )
                             } else {
-                                savingsBalances.forEach { balance ->
+                                availableBalances.forEach { balance ->
                                     val formattedBalance = CurrencyFormatter.format(balance.netBalance, currency)
                                     DropdownMenuItem(
                                         text = {

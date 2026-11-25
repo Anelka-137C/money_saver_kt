@@ -14,9 +14,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.roundToInt
 
 sealed class ExpenseResult {
     object Success : ExpenseResult()
@@ -343,27 +345,31 @@ class ExpenseUseCase(
         expenses: List<Expense>,
         categories: List<Category>
     ): List<CategoryExpenseItem> {
-        val budgetExpenses = expenses.filter { it.fundingSource != ExpenseFundingSource.SAVINGS }
+        val budgetExpenses = expenses.filter {
+            it.fundingSource != ExpenseFundingSource.SAVINGS &&
+                it.amount.isFinite() &&
+                it.amount > 0.0 &&
+                it.category.trim().isNotEmpty()
+        }
         if (budgetExpenses.isEmpty()) return emptyList()
-        val totalSpent = budgetExpenses.sumOf { it.amount }
+        val totalSpentDec = budgetExpenses.map { it.amount }.sumBigDecimal()
+        if (totalSpentDec <= BigDecimal.ZERO) return emptyList()
         return budgetExpenses.groupBy { it.category.trim().lowercase() }
             .map { (_, catExpenses) ->
                 val rawName = catExpenses.first().category.trim()
                 val category = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
-                val spent = catExpenses.sumOf { it.amount }
-                val ratio = when {
-                    totalSpent.isInfinite() -> if (spent.isInfinite()) 1.0 else 0.0
-                    totalSpent > 0.0 -> spent / totalSpent
-                    else -> 0.0
-                }
+                val spentDec = catExpenses.map { it.amount }.sumBigDecimal()
+                val ratio = spentDec.divide(totalSpentDec, 8, RoundingMode.HALF_UP)
+                    .toDouble()
+                    .coerceIn(0.0, 1.0)
                 val progress = if (ratio.isFinite()) ratio.toFloat().coerceIn(0f, 1f) else 0f
                 CategoryExpenseItem(
                     categoryName = category?.name?.trim()?.ifEmpty { rawName } ?: rawName,
                     icon = category?.icon?.ifBlank { "💸" } ?: "💸",
                     colorHex = category?.color?.trim()?.ifEmpty { "#EF4444" } ?: "#EF4444",
-                    spentAmount = spent,
+                    spentAmount = spentDec.toDouble(),
                     progress = progress,
-                    percent = (progress * 100).toInt()
+                    percent = (ratio * 100.0).roundToInt().coerceIn(0, 100)
                 )
             }
             .sortedByDescending { it.spentAmount }

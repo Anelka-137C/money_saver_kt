@@ -452,13 +452,14 @@ class IncomeUseCase(
             .map { (_, catBudgets) ->
                 val rawName = catBudgets.first().category.trim()
                 val category = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
-                val totalBudget = catBudgets.sumOf { it.amount }
-                val spent = expenses.filter { expense ->
+                val totalBudgetDec = catBudgets.map { it.amount }.sumBigDecimal()
+                val spentDec = expenses.filter { expense ->
                     expense.matchesPeriod(periodStartDate, periodEndDate, periodId) &&
                         expense.matchesBudgetGroup(catBudgets, rawName)
-                }.sumOf { it.amount }
-                val rawRemaining = totalBudget - spent
-                val remaining = if (rawRemaining.isNaN()) 0.0 else maxOf(0.0, rawRemaining)
+                }.map { it.amount }.sumBigDecimal()
+                val totalBudget = totalBudgetDec.toDouble()
+                val spent = spentDec.toDouble()
+                val remaining = totalBudgetDec.subtract(spentDec).max(BigDecimal.ZERO).toDouble()
                 val ratio = when {
                     totalBudget.isInfinite() -> if (remaining.isInfinite()) 1.0 else 0.0
                     totalBudget > 0.0 -> remaining / totalBudget
@@ -492,7 +493,7 @@ class IncomeUseCase(
                 budgetsByCat.any { (_, catBudgets) ->
                     expense.matchesBudgetGroup(catBudgets, catBudgets.first().category.trim())
                 }
-        }.sumOf { it.amount }
+        }.map { it.amount }.sumBigDecimal().toDouble()
     }
 
     fun calculateRemainingBudget(totalBudgeted: Double, totalSpent: Double): Double {

@@ -313,7 +313,7 @@ fun ExpensesTabContent(
                 currency = currency,
                 fundingSource = editState.fundingSource,
                 savingCategory = editState.savingCategory,
-                savingsBalances = state.savingsBalances,
+                savingsBalances = state.editSavingsBalances,
                 onFundingSourceSelected = viewModel::onEditFundingSourceSelected,
                 onSavingCategorySelected = viewModel::onEditSavingCategorySelected,
                 onAmountChange = viewModel::onEditAmountChange,
