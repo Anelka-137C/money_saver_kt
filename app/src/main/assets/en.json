@@ -213,6 +213,11 @@
     "options": {
       "edit": "Edit",
       "delete": "Delete"
+    },
+    "delete_category_dialog": {
+      "title": "Delete this category?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
     }
   },
   "budget": {
@@ -334,6 +339,7 @@
       "updated": "Saving updated successfully",
       "deleted": "Saving deleted successfully",
       "category_created": "Category created successfully",
+      "category_updated": "Category updated successfully",
       "subcategory_created": "Subcategory created successfully",
       "category_deleted": "Category deleted successfully",
       "subcategory_deleted": "Subcategory deleted successfully"

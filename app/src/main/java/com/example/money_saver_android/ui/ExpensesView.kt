@@ -50,15 +50,15 @@ import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.CategoryManagerSheet
 import com.example.money_saver_android.ui.components.atom.PeriodSummaryCard
 import com.example.money_saver_android.ui.components.expenses.AddEditExpenseDialog
 import com.example.money_saver_android.ui.components.expenses.AddExpenseCard
-import com.example.money_saver_android.ui.components.expenses.DeleteExpenseCategoryConfirmationDialog
 import com.example.money_saver_android.ui.components.expenses.DeleteExpenseConfirmationDialog
-import com.example.money_saver_android.ui.components.expenses.EditExpenseCategoryDialog
 import com.example.money_saver_android.ui.components.expenses.EditExpenseDialog
 import com.example.money_saver_android.ui.components.expenses.ExpenseAllocationCard
 import com.example.money_saver_android.ui.components.expenses.ExpenseCardItem
+import com.example.money_saver_android.ui.components.expenses.ExpenseCategoryManagerTestTags
 import com.example.money_saver_android.ui.components.expenses.ExpenseEmptyState
 import com.example.money_saver_android.ui.components.expenses.ExpensesHeader
 import com.example.money_saver_android.ui.theme.BorderColor
@@ -333,21 +333,20 @@ fun ExpensesTabContent(
         }
     }
 
-    if (showCategorySheet) {
-        ExpenseCategorySheet(
-            state = state,
-            viewModel = viewModel,
-            onDismiss = { showCategorySheet = false },
-            onCategorySelected = { category, subcategory ->
-                if (isCategorySheetForEdit) {
-                    viewModel.onEditCategoryChange(category, subcategory)
-                } else {
-                    viewModel.onCategoryChange(category, subcategory)
-                }
-                showCategorySheet = false
+    ExpenseCategoryManagerSheet(
+        visible = showCategorySheet,
+        state = state,
+        viewModel = viewModel,
+        onDismiss = { showCategorySheet = false },
+        onCategorySelected = { category, subcategory ->
+            if (isCategorySheetForEdit) {
+                viewModel.onEditCategoryChange(category, subcategory)
+            } else {
+                viewModel.onCategoryChange(category, subcategory)
             }
-        )
-    }
+            showCategorySheet = false
+        }
+    )
 
     state.expenseToDelete?.let { expenseToDelete ->
         DeleteExpenseConfirmationDialog(
@@ -356,58 +355,48 @@ fun ExpensesTabContent(
             onDismiss = viewModel::dismissDeleteConfirmation
         )
     }
-
-    state.editingCategory?.let { editCategoryState ->
-        EditExpenseCategoryDialog(
-            editState = editCategoryState,
-            onNameChange = viewModel::onEditCategoryNameChange,
-            onColorSelect = viewModel::onEditCategoryColorChange,
-            onConfirm = {
-                hideKeyboard(context, view, keyboardController, focusManager)
-                viewModel.confirmEditCategory()
-            },
-            onDismiss = viewModel::cancelEditingCategory
-        )
-    }
-
-    state.categoryToDelete?.let { categoryToDelete ->
-        DeleteExpenseCategoryConfirmationDialog(
-            category = categoryToDelete,
-            onConfirm = viewModel::confirmDeleteCategory,
-            onDismiss = viewModel::dismissDeleteCategoryConfirmation
-        )
-    }
 }
 
 @Composable
-private fun ExpenseCategorySheet(
+private fun ExpenseCategoryManagerSheet(
+    visible: Boolean,
     state: ExpenseUiState,
     viewModel: ExpenseViewModel,
     onDismiss: () -> Unit,
     onCategorySelected: (String, String) -> Unit
 ) {
-    CategorySelectionSheet(
+    CategoryManagerSheet(
+        visible = visible,
         categories = state.categories,
         newCategoryName = state.newCategoryNameInput,
         selectedColorHex = state.newCategoryColorInput,
         categoryError = state.categoryErrorMessage,
         newSubcategoryName = state.newSubcategoryNameInput,
         subcategoryError = state.subcategoryErrorMessage,
+        editingCategory = state.editingCategory,
+        categoryToDelete = state.categoryToDelete,
         onCategoryNameChange = viewModel::onNewCategoryNameChange,
         onColorSelect = viewModel::onNewCategoryColorChange,
         onCreateCategory = viewModel::createCategory,
         onSubcategoryNameChange = viewModel::onNewSubcategoryNameChange,
         onCreateSubcategory = viewModel::createSubcategory,
-        onEditCategory = viewModel::startEditingCategory,
-        onDeleteCategory = { viewModel.requestDeleteCategory(it) },
+        onEditCategoryClick = viewModel::startEditingCategory,
+        onEditCategoryNameChange = viewModel::onEditCategoryNameChange,
+        onEditCategoryColorSelect = viewModel::onEditCategoryColorChange,
+        onConfirmEditCategory = viewModel::confirmEditCategory,
+        onDismissEditCategory = viewModel::cancelEditingCategory,
+        onDeleteCategoryClick = { viewModel.requestDeleteCategory(it) },
+        onConfirmDeleteCategory = viewModel::confirmDeleteCategory,
+        onDismissDeleteCategory = viewModel::dismissDeleteCategoryConfirmation,
         onDeleteSubcategory = { cat, sub -> viewModel.deleteSubcategory(cat, sub) },
+        onClearCategoryError = viewModel::clearCategoryError,
         onClearSubcategoryError = viewModel::clearSubcategoryError,
-        onDismiss = {
-            onDismiss()
-            viewModel.clearCategoryError()
-            viewModel.clearSubcategoryError()
-        },
-        onCategorySelected = onCategorySelected
+        onDismiss = onDismiss,
+        onCategorySelected = onCategorySelected,
+        testTags = ExpenseCategoryManagerTestTags,
+        deleteDialogTitle = t("expenses.delete_category_dialog.title"),
+        deleteDialogWarning = t("expenses.delete_category_dialog.warning_message"),
+        deleteDialogCancel = t("expenses.delete_category_dialog.cancel_button")
     )
 }
 
@@ -422,7 +411,7 @@ fun ExpensesView(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     var showCategorySheet by remember { mutableStateOf(false) }
-    var showEditCategorySheet by remember { mutableStateOf(false) }
+    var isCategorySheetForEdit by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.toastMessage) {
         state.toastMessage?.let { message ->
@@ -462,7 +451,10 @@ fun ExpensesView(
                     onAmountChange = viewModel::onAmountChange,
                     onDateChange = viewModel::onDateChange,
                     onDescriptionChange = viewModel::onDescriptionChange,
-                    onSelectCategoryClick = { showCategorySheet = true },
+                    onSelectCategoryClick = {
+                        isCategorySheetForEdit = false
+                        showCategorySheet = true
+                    },
                     onSaveClick = {
                         hideKeyboard(context, view, keyboardController, focusManager)
                         viewModel.saveExpense()
@@ -497,27 +489,18 @@ fun ExpensesView(
             }
         }
 
-        if (showCategorySheet) {
-            ExpenseCategorySheet(
-                state = state,
-                viewModel = viewModel,
-                onDismiss = { showCategorySheet = false },
-                onCategorySelected = { category, subcategory ->
-                    viewModel.onCategoryChange(category, subcategory)
-                    showCategorySheet = false
-                }
-            )
-        }
-
         val editState = state.editingExpense
-        if (editState != null) {
+        if (!showCategorySheet && editState != null) {
             EditExpenseDialog(
                 editState = editState,
                 currency = currency,
                 onAmountChange = viewModel::onEditAmountChange,
                 onDateChange = viewModel::onEditDateChange,
                 onDescriptionChange = viewModel::onEditDescriptionChange,
-                onSelectCategoryClick = { showEditCategorySheet = true },
+                onSelectCategoryClick = {
+                    isCategorySheetForEdit = true
+                    showCategorySheet = true
+                },
                 onConfirm = {
                     hideKeyboard(context, view, keyboardController, focusManager)
                     viewModel.confirmEdit()
@@ -526,17 +509,20 @@ fun ExpensesView(
             )
         }
 
-        if (showEditCategorySheet) {
-            ExpenseCategorySheet(
-                state = state,
-                viewModel = viewModel,
-                onDismiss = { showEditCategorySheet = false },
-                onCategorySelected = { category, subcategory ->
+        ExpenseCategoryManagerSheet(
+            visible = showCategorySheet,
+            state = state,
+            viewModel = viewModel,
+            onDismiss = { showCategorySheet = false },
+            onCategorySelected = { category, subcategory ->
+                if (isCategorySheetForEdit) {
                     viewModel.onEditCategoryChange(category, subcategory)
-                    showEditCategorySheet = false
+                } else {
+                    viewModel.onCategoryChange(category, subcategory)
                 }
-            )
-        }
+                showCategorySheet = false
+            }
+        )
 
         val expenseToDelete = state.expenseToDelete
         if (expenseToDelete != null) {
@@ -544,27 +530,6 @@ fun ExpensesView(
                 expense = expenseToDelete,
                 onConfirm = viewModel::confirmDeleteExpense,
                 onDismiss = viewModel::dismissDeleteConfirmation
-            )
-        }
-
-        state.editingCategory?.let { editCategoryState ->
-            EditExpenseCategoryDialog(
-                editState = editCategoryState,
-                onNameChange = viewModel::onEditCategoryNameChange,
-                onColorSelect = viewModel::onEditCategoryColorChange,
-                onConfirm = {
-                    hideKeyboard(context, view, keyboardController, focusManager)
-                    viewModel.confirmEditCategory()
-                },
-                onDismiss = viewModel::cancelEditingCategory
-            )
-        }
-
-        state.categoryToDelete?.let { categoryToDelete ->
-            DeleteExpenseCategoryConfirmationDialog(
-                category = categoryToDelete,
-                onConfirm = viewModel::confirmDeleteCategory,
-                onDismiss = viewModel::dismissDeleteCategoryConfirmation
             )
         }
     }

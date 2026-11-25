@@ -65,10 +65,12 @@ import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.CategoryManagerSheet
+import com.example.money_saver_android.ui.components.atom.CategoryManagerTestTags
 import com.example.money_saver_android.ui.components.atom.PeriodSummaryCard
 import com.example.money_saver_android.ui.components.budget.AddEditBudgetDialog
 import com.example.money_saver_android.ui.components.budget.BudgetAllocationCard
-import com.example.money_saver_android.ui.components.budget.DeleteBudgetCategoryConfirmationDialog
+import com.example.money_saver_android.ui.components.budget.BudgetCategoryManagerTestTags
 import com.example.money_saver_android.ui.components.budget.DeleteBudgetConfirmationDialog
 import com.example.money_saver_android.ui.components.incomes.AddIncomeCard
 import com.example.money_saver_android.ui.components.incomes.AddIncomeDialog
@@ -112,12 +114,12 @@ fun IncomesView(
 
     var periodMenuExpanded by remember { mutableStateOf(false) }
     var showAddForm by remember { mutableStateOf(false) }
-    var showCategorySheet by remember { mutableStateOf(false) }
-    var showEditCategorySheet by remember { mutableStateOf(false) }
+    var showIncomeCategorySheet by remember { mutableStateOf(false) }
+    var isIncomeCategorySheetForEdit by remember { mutableStateOf(false) }
 
     var showAddBudgetDialog by remember { mutableStateOf(false) }
     var showBudgetCategorySheet by remember { mutableStateOf(false) }
-    var showBudgetEditCategorySheet by remember { mutableStateOf(false) }
+    var isBudgetCategorySheetForEdit by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.toastMessage) {
         state.toastMessage?.let { message ->
@@ -139,27 +141,15 @@ fun IncomesView(
         }
     }
 
-    LaunchedEffect(state.errorMessage) {
-        if (state.errorMessage != null) {
-            showCategorySheet = false
+    LaunchedEffect(state.errorMessage, state.editingIncome?.errorMessage) {
+        if (state.errorMessage != null || state.editingIncome?.errorMessage != null) {
+            showIncomeCategorySheet = false
         }
     }
 
-    LaunchedEffect(state.budgetErrorMessage) {
-        if (state.budgetErrorMessage != null) {
+    LaunchedEffect(state.budgetErrorMessage, state.editingBudget?.errorMessage) {
+        if (state.budgetErrorMessage != null || state.editingBudget?.errorMessage != null) {
             showBudgetCategorySheet = false
-        }
-    }
-
-    LaunchedEffect(state.editingIncome?.errorMessage) {
-        if (state.editingIncome?.errorMessage != null) {
-            showEditCategorySheet = false
-        }
-    }
-
-    LaunchedEffect(state.editingBudget?.errorMessage) {
-        if (state.editingBudget?.errorMessage != null) {
-            showBudgetEditCategorySheet = false
         }
     }
 
@@ -536,14 +526,17 @@ fun IncomesView(
         }
     }
 
-    if (showAddForm) {
+    if (showAddForm && !showIncomeCategorySheet) {
         AddIncomeDialog(
             state = state,
             currency = currency,
             onAmountChange = incomeViewModel::onAmountChange,
             onDateTimeChange = incomeViewModel::onDateTimeChange,
             onDescriptionChange = incomeViewModel::onDescriptionChange,
-            onSelectCategoryClick = { showCategorySheet = true },
+            onSelectCategoryClick = {
+                isIncomeCategorySheetForEdit = false
+                showIncomeCategorySheet = true
+            },
             onSaveClick = {
                 hideKeyboard(context, view, keyboardController, focusManager)
                 incomeViewModel.saveIncome()
@@ -555,51 +548,79 @@ fun IncomesView(
         )
     }
 
-    if (showCategorySheet) {
-        CategorySelectionSheet(
-            categories = state.categories,
-            newCategoryName = state.newCategoryNameInput,
-            selectedColorHex = state.selectedColorHex,
-            categoryError = state.categoryError,
-            newSubcategoryName = state.newSubcategoryNameInput,
-            subcategoryError = state.subcategoryError,
-            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
-            onColorSelect = incomeViewModel::onColorSelect,
-            onCreateCategory = incomeViewModel::createCategory,
-            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
-            onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
-            onDeleteCategory = { incomeViewModel.deleteCategory(it) },
-            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteSubcategory(cat, sub) },
-            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
-            onDismiss = {
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showCategorySheet = false
-            },
-            onCategorySelected = { cat, sub ->
-                incomeViewModel.onCategorySelected(cat, sub)
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showCategorySheet = false
-            }
-        )
+    if (!showIncomeCategorySheet) {
+        state.editingIncome?.let { editState ->
+            EditIncomeDialog(
+                editState = editState,
+                currency = currency,
+                onAmountChange = incomeViewModel::onEditAmountChange,
+                onDateTimeChange = incomeViewModel::onEditDateTimeChange,
+                onDescriptionChange = incomeViewModel::onEditDescriptionChange,
+                onSelectCategoryClick = {
+                    isIncomeCategorySheetForEdit = true
+                    showIncomeCategorySheet = true
+                },
+                onConfirm = {
+                    hideKeyboard(context, view, keyboardController, focusManager)
+                    incomeViewModel.confirmEdit()
+                },
+                onDismiss = { incomeViewModel.cancelEditing() }
+            )
+        }
     }
 
-    state.editingIncome?.let { editState ->
-        EditIncomeDialog(
-            editState = editState,
-            currency = currency,
-            onAmountChange = incomeViewModel::onEditAmountChange,
-            onDateTimeChange = incomeViewModel::onEditDateTimeChange,
-            onDescriptionChange = incomeViewModel::onEditDescriptionChange,
-            onSelectCategoryClick = { showEditCategorySheet = true },
-            onConfirm = {
-                hideKeyboard(context, view, keyboardController, focusManager)
-                incomeViewModel.confirmEdit()
-            },
-            onDismiss = { incomeViewModel.cancelEditing() }
+    CategoryManagerSheet(
+        visible = showIncomeCategorySheet,
+        categories = state.categories,
+        newCategoryName = state.newCategoryNameInput,
+        selectedColorHex = state.selectedColorHex,
+        categoryError = state.categoryError,
+        newSubcategoryName = state.newSubcategoryNameInput,
+        subcategoryError = state.subcategoryError,
+        editingCategory = state.editingCategory,
+        categoryToDelete = state.categoryToDelete,
+        onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
+        onColorSelect = incomeViewModel::onColorSelect,
+        onCreateCategory = incomeViewModel::createCategory,
+        onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
+        onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
+        onEditCategoryClick = incomeViewModel::startEditingCategory,
+        onEditCategoryNameChange = incomeViewModel::onEditCategoryNameChange,
+        onEditCategoryColorSelect = incomeViewModel::onEditCategoryColorChange,
+        onConfirmEditCategory = incomeViewModel::confirmEditCategory,
+        onDismissEditCategory = incomeViewModel::cancelEditingCategory,
+        onDeleteCategoryClick = { incomeViewModel.requestDeleteCategory(it) },
+        onConfirmDeleteCategory = incomeViewModel::confirmDeleteCategory,
+        onDismissDeleteCategory = incomeViewModel::dismissDeleteCategoryConfirmation,
+        onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteSubcategory(cat, sub) },
+        onClearCategoryError = incomeViewModel::clearCategoryError,
+        onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
+        onDismiss = { showIncomeCategorySheet = false },
+        onCategorySelected = { cat, sub ->
+            if (isIncomeCategorySheetForEdit) {
+                incomeViewModel.onEditCategoryChange(cat, sub)
+            } else {
+                incomeViewModel.onCategorySelected(cat, sub)
+            }
+            showIncomeCategorySheet = false
+        },
+        testTags = IncomeCategoryManagerTestTags,
+        deleteDialogTitle = resolveDeleteDialogText(
+            primaryKey = "incomes.delete_category_dialog.title",
+            fallbackKey = "expenses.delete_category_dialog.title",
+            defaultText = "¿Eliminar esta categoría?"
+        ),
+        deleteDialogWarning = resolveDeleteDialogText(
+            primaryKey = "incomes.delete_category_dialog.warning_message",
+            fallbackKey = "expenses.delete_category_dialog.warning_message",
+            defaultText = "Esta acción no se puede deshacer. Desliza el botón para confirmar."
+        ),
+        deleteDialogCancel = resolveDeleteDialogText(
+            primaryKey = "incomes.delete_category_dialog.cancel_button",
+            fallbackKey = "expenses.delete_category_dialog.cancel_button",
+            defaultText = "Cancelar"
         )
-    }
+    )
 
     state.incomeToDelete?.let { incomeToDelete ->
         DeleteIncomeConfirmationDialog(
@@ -610,37 +631,7 @@ fun IncomesView(
         )
     }
 
-    if (showEditCategorySheet) {
-        CategorySelectionSheet(
-            categories = state.categories,
-            newCategoryName = state.newCategoryNameInput,
-            selectedColorHex = state.selectedColorHex,
-            categoryError = state.categoryError,
-            newSubcategoryName = state.newSubcategoryNameInput,
-            subcategoryError = state.subcategoryError,
-            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
-            onColorSelect = incomeViewModel::onColorSelect,
-            onCreateCategory = incomeViewModel::createCategory,
-            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
-            onCreateSubcategory = { parentName -> incomeViewModel.createSubcategory(parentName) },
-            onDeleteCategory = { incomeViewModel.deleteCategory(it) },
-            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteSubcategory(cat, sub) },
-            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
-            onDismiss = {
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showEditCategorySheet = false
-            },
-            onCategorySelected = { cat, sub ->
-                incomeViewModel.onEditCategoryChange(cat, sub)
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showEditCategorySheet = false
-            }
-        )
-    }
-
-    if (showAddBudgetDialog) {
+    if (showAddBudgetDialog && !showBudgetCategorySheet) {
         AddEditBudgetDialog(
             isEditing = false,
             amount = state.budgetAmountInput,
@@ -649,7 +640,10 @@ fun IncomesView(
             errorMessage = state.budgetErrorMessage,
             currency = currency,
             onAmountChange = incomeViewModel::onBudgetAmountChange,
-            onSelectCategoryClick = { showBudgetCategorySheet = true },
+            onSelectCategoryClick = {
+                isBudgetCategorySheetForEdit = false
+                showBudgetCategorySheet = true
+            },
             onSaveClick = {
                 hideKeyboard(context, view, keyboardController, focusManager)
                 incomeViewModel.saveBudget()
@@ -661,85 +655,83 @@ fun IncomesView(
         )
     }
 
-    state.editingBudget?.let { editing ->
-        AddEditBudgetDialog(
-            isEditing = true,
-            amount = editing.amount,
-            category = editing.category,
-            subcategory = editing.subcategory,
-            errorMessage = editing.errorMessage,
-            currency = currency,
-            onAmountChange = incomeViewModel::onEditBudgetAmountChange,
-            onSelectCategoryClick = { showBudgetEditCategorySheet = true },
-            onSaveClick = {
-                hideKeyboard(context, view, keyboardController, focusManager)
-                incomeViewModel.saveEditedBudget()
-            },
-            onCloseClick = {
-                incomeViewModel.cancelEditingBudget()
-            }
-        )
+    if (!showBudgetCategorySheet) {
+        state.editingBudget?.let { editing ->
+            AddEditBudgetDialog(
+                isEditing = true,
+                amount = editing.amount,
+                category = editing.category,
+                subcategory = editing.subcategory,
+                errorMessage = editing.errorMessage,
+                currency = currency,
+                onAmountChange = incomeViewModel::onEditBudgetAmountChange,
+                onSelectCategoryClick = {
+                    isBudgetCategorySheetForEdit = true
+                    showBudgetCategorySheet = true
+                },
+                onSaveClick = {
+                    hideKeyboard(context, view, keyboardController, focusManager)
+                    incomeViewModel.saveEditedBudget()
+                },
+                onCloseClick = {
+                    incomeViewModel.cancelEditingBudget()
+                }
+            )
+        }
     }
 
-    if (showBudgetCategorySheet) {
-        CategorySelectionSheet(
-            categories = state.budgetCategories,
-            newCategoryName = state.newCategoryNameInput,
-            selectedColorHex = state.selectedColorHex,
-            categoryError = state.categoryError,
-            newSubcategoryName = state.newSubcategoryNameInput,
-            subcategoryError = state.subcategoryError,
-            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
-            onColorSelect = incomeViewModel::onColorSelect,
-            onCreateCategory = incomeViewModel::createBudgetCategory,
-            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
-            onCreateSubcategory = { parentName -> incomeViewModel.createBudgetSubcategory(parentName) },
-            onDeleteCategory = { incomeViewModel.requestDeleteBudgetCategory(it) },
-            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteBudgetSubcategory(cat, sub) },
-            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
-            onDismiss = {
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showBudgetCategorySheet = false
-            },
-            onCategorySelected = { cat, sub ->
-                incomeViewModel.onBudgetCategorySelected(cat, sub)
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showBudgetCategorySheet = false
-            }
-        )
-    }
-
-    if (showBudgetEditCategorySheet) {
-        CategorySelectionSheet(
-            categories = state.budgetCategories,
-            newCategoryName = state.newCategoryNameInput,
-            selectedColorHex = state.selectedColorHex,
-            categoryError = state.categoryError,
-            newSubcategoryName = state.newSubcategoryNameInput,
-            subcategoryError = state.subcategoryError,
-            onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
-            onColorSelect = incomeViewModel::onColorSelect,
-            onCreateCategory = incomeViewModel::createBudgetCategory,
-            onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
-            onCreateSubcategory = { parentName -> incomeViewModel.createBudgetSubcategory(parentName) },
-            onDeleteCategory = { incomeViewModel.requestDeleteBudgetCategory(it) },
-            onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteBudgetSubcategory(cat, sub) },
-            onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
-            onDismiss = {
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showBudgetEditCategorySheet = false
-            },
-            onCategorySelected = { cat, sub ->
+    CategoryManagerSheet(
+        visible = showBudgetCategorySheet,
+        categories = state.budgetCategories,
+        newCategoryName = state.newCategoryNameInput,
+        selectedColorHex = state.selectedColorHex,
+        categoryError = state.categoryError,
+        newSubcategoryName = state.newSubcategoryNameInput,
+        subcategoryError = state.subcategoryError,
+        editingCategory = state.editingBudgetCategory,
+        categoryToDelete = state.budgetCategoryToDelete,
+        onCategoryNameChange = incomeViewModel::onNewCategoryNameChange,
+        onColorSelect = incomeViewModel::onColorSelect,
+        onCreateCategory = incomeViewModel::createBudgetCategory,
+        onSubcategoryNameChange = incomeViewModel::onNewSubcategoryNameChange,
+        onCreateSubcategory = { parentName -> incomeViewModel.createBudgetSubcategory(parentName) },
+        onEditCategoryClick = incomeViewModel::startEditingBudgetCategory,
+        onEditCategoryNameChange = incomeViewModel::onEditBudgetCategoryNameChange,
+        onEditCategoryColorSelect = incomeViewModel::onEditBudgetCategoryColorChange,
+        onConfirmEditCategory = incomeViewModel::confirmEditBudgetCategory,
+        onDismissEditCategory = incomeViewModel::cancelEditingBudgetCategory,
+        onDeleteCategoryClick = { incomeViewModel.requestDeleteBudgetCategory(it) },
+        onConfirmDeleteCategory = incomeViewModel::confirmDeleteBudgetCategory,
+        onDismissDeleteCategory = incomeViewModel::dismissDeleteBudgetCategoryConfirmation,
+        onDeleteSubcategory = { cat, sub -> incomeViewModel.deleteBudgetSubcategory(cat, sub) },
+        onClearCategoryError = incomeViewModel::clearCategoryError,
+        onClearSubcategoryError = incomeViewModel::clearSubcategoryError,
+        onDismiss = { showBudgetCategorySheet = false },
+        onCategorySelected = { cat, sub ->
+            if (isBudgetCategorySheetForEdit) {
                 incomeViewModel.onEditBudgetCategorySelected(cat, sub)
-                incomeViewModel.clearCategoryError()
-                incomeViewModel.clearSubcategoryError()
-                showBudgetEditCategorySheet = false
+            } else {
+                incomeViewModel.onBudgetCategorySelected(cat, sub)
             }
+            showBudgetCategorySheet = false
+        },
+        testTags = BudgetCategoryManagerTestTags,
+        deleteDialogTitle = resolveDeleteDialogText(
+            primaryKey = "budget.delete_category_dialog.title",
+            fallbackKey = "expenses.delete_category_dialog.title",
+            defaultText = "¿Eliminar esta categoría?"
+        ),
+        deleteDialogWarning = resolveDeleteDialogText(
+            primaryKey = "budget.delete_category_dialog.warning_message",
+            fallbackKey = "expenses.delete_category_dialog.warning_message",
+            defaultText = "Esta acción no se puede deshacer. Desliza el botón para confirmar."
+        ),
+        deleteDialogCancel = resolveDeleteDialogText(
+            primaryKey = "budget.delete_category_dialog.cancel_button",
+            fallbackKey = "expenses.delete_category_dialog.cancel_button",
+            defaultText = "Cancelar"
         )
-    }
+    )
 
     state.budgetToDelete?.let { budgetToDelete ->
         val category = state.budgetCategories.find { it.name.equals(budgetToDelete.category, ignoreCase = true) }
@@ -754,14 +746,30 @@ fun IncomesView(
             onDismiss = { incomeViewModel.dismissDeleteBudgetConfirmation() }
         )
     }
+}
 
-    state.budgetCategoryToDelete?.let { categoryToDelete ->
-        DeleteBudgetCategoryConfirmationDialog(
-            category = categoryToDelete,
-            onConfirm = { incomeViewModel.confirmDeleteBudgetCategory() },
-            onDismiss = { incomeViewModel.dismissDeleteBudgetCategoryConfirmation() }
-        )
-    }
+private val IncomeCategoryManagerTestTags = CategoryManagerTestTags(
+    editDialog = "dialog_edit_income_category",
+    editNameInput = "input_edit_income_category_name",
+    editColorOptionPrefix = "color_option_edit_category_",
+    editErrorText = "text_edit_income_category_error",
+    editCancelButton = "btn_cancel_edit_income_category",
+    editSaveButton = "btn_save_edit_income_category",
+    deleteDialog = "dialog_delete_income_category",
+    deleteConfirmButton = "btn_slide_to_confirm_delete_income_category",
+    deleteCancelButton = "btn_cancel_delete_income_category"
+)
+
+@Composable
+private fun resolveDeleteDialogText(
+    primaryKey: String,
+    fallbackKey: String,
+    defaultText: String
+): String {
+    val primary = t(primaryKey)
+    if (primary != primaryKey) return primary
+    val fallback = t(fallbackKey)
+    return if (fallback != fallbackKey) fallback else defaultText
 }
 
 @Composable

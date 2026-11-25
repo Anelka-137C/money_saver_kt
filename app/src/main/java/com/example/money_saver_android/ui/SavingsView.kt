@@ -44,10 +44,11 @@ import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.CategoryManagerSheet
 import com.example.money_saver_android.ui.components.atom.PeriodSummaryCard
 import com.example.money_saver_android.ui.components.savings.AddSavingDialog
-import com.example.money_saver_android.ui.components.savings.DeleteSavingCategoryConfirmationDialog
 import com.example.money_saver_android.ui.components.savings.DeleteSavingConfirmationDialog
+import com.example.money_saver_android.ui.components.savings.SavingCategoryManagerTestTags
 import com.example.money_saver_android.ui.components.savings.SavingListItem
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
@@ -265,39 +266,46 @@ fun SavingsTabContent(
         }
     }
 
-    if (showSavingCategorySheet) {
-        CategorySelectionSheet(
-            categories = state.savingCategories,
-            newCategoryName = state.newCategoryNameInput,
-            selectedColorHex = state.selectedColorHex,
-            categoryError = state.categoryError,
-            newSubcategoryName = state.newSubcategoryNameInput,
-            subcategoryError = state.subcategoryError,
-            onCategoryNameChange = viewModel::onNewCategoryNameChange,
-            onColorSelect = viewModel::onColorSelect,
-            onCreateCategory = { viewModel.createSavingCategory() },
-            onSubcategoryNameChange = viewModel::onNewSubcategoryNameChange,
-            onCreateSubcategory = { parentName -> viewModel.createSavingSubcategory(parentName) },
-            onDeleteCategory = { viewModel.requestDeleteSavingCategory(it) },
-            onDeleteSubcategory = { cat, sub -> viewModel.deleteSavingSubcategory(cat, sub) },
-            onClearSubcategoryError = viewModel::clearSubcategoryError,
-            onDismiss = {
-                viewModel.clearCategoryError()
-                viewModel.clearSubcategoryError()
-                showSavingCategorySheet = false
-            },
-            onCategorySelected = { cat, sub ->
-                if (isCategorySheetForEdit) {
-                    viewModel.onEditCategorySelected(cat, sub)
-                } else {
-                    viewModel.onCategorySelected(cat, sub)
-                }
-                viewModel.clearCategoryError()
-                viewModel.clearSubcategoryError()
-                showSavingCategorySheet = false
+    CategoryManagerSheet(
+        visible = showSavingCategorySheet,
+        categories = state.savingCategories,
+        newCategoryName = state.newCategoryNameInput,
+        selectedColorHex = state.selectedColorHex,
+        categoryError = state.categoryError,
+        newSubcategoryName = state.newSubcategoryNameInput,
+        subcategoryError = state.subcategoryError,
+        editingCategory = state.editingSavingCategory,
+        categoryToDelete = state.savingCategoryToDelete,
+        onCategoryNameChange = viewModel::onNewCategoryNameChange,
+        onColorSelect = viewModel::onColorSelect,
+        onCreateCategory = { viewModel.createSavingCategory() },
+        onSubcategoryNameChange = viewModel::onNewSubcategoryNameChange,
+        onCreateSubcategory = { parentName -> viewModel.createSavingSubcategory(parentName) },
+        onEditCategoryClick = viewModel::startEditingSavingCategory,
+        onEditCategoryNameChange = viewModel::onEditSavingCategoryNameChange,
+        onEditCategoryColorSelect = viewModel::onEditSavingCategoryColorChange,
+        onConfirmEditCategory = viewModel::confirmEditSavingCategory,
+        onDismissEditCategory = viewModel::cancelEditingSavingCategory,
+        onDeleteCategoryClick = { viewModel.requestDeleteSavingCategory(it) },
+        onConfirmDeleteCategory = viewModel::confirmDeleteSavingCategory,
+        onDismissDeleteCategory = viewModel::dismissDeleteSavingCategoryConfirmation,
+        onDeleteSubcategory = { cat, sub -> viewModel.deleteSavingSubcategory(cat, sub) },
+        onClearCategoryError = viewModel::clearCategoryError,
+        onClearSubcategoryError = viewModel::clearSubcategoryError,
+        onDismiss = { showSavingCategorySheet = false },
+        onCategorySelected = { cat, sub ->
+            if (isCategorySheetForEdit) {
+                viewModel.onEditCategorySelected(cat, sub)
+            } else {
+                viewModel.onCategorySelected(cat, sub)
             }
-        )
-    }
+            showSavingCategorySheet = false
+        },
+        testTags = SavingCategoryManagerTestTags,
+        deleteDialogTitle = t("savings.delete_category_dialog.title"),
+        deleteDialogWarning = t("savings.delete_category_dialog.warning_message"),
+        deleteDialogCancel = t("savings.delete_category_dialog.cancel_button")
+    )
 
     state.savingToDelete?.let { savingToDelete ->
         DeleteSavingConfirmationDialog(
@@ -305,14 +313,6 @@ fun SavingsTabContent(
             currency = currency,
             onConfirm = { viewModel.confirmDeleteSaving() },
             onDismiss = { viewModel.dismissDeleteSavingConfirmation() }
-        )
-    }
-
-    state.savingCategoryToDelete?.let { categoryToDelete ->
-        DeleteSavingCategoryConfirmationDialog(
-            category = categoryToDelete,
-            onConfirm = { viewModel.confirmDeleteSavingCategory() },
-            onDismiss = { viewModel.dismissDeleteSavingCategoryConfirmation() }
         )
     }
 }

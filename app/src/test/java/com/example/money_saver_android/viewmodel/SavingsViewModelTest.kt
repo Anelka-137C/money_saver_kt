@@ -215,4 +215,50 @@ class SavingsViewModelTest {
         assertEquals(1000.0, viewModel.uiState.value.availableIncome, 0.001)
         assertEquals(SavingsViewModel.MSG_SAVING_DELETED, viewModel.uiState.value.savingToastMessage)
     }
+
+    @Test
+    fun editSavingCategory_reconcilesSelectionAndEditingSaving_andClearsOnPeriodSwitch() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        viewModel.onNewCategoryNameChange("Viajes")
+        viewModel.onColorSelect("#4E73DF")
+        viewModel.createSavingCategory()
+        advanceUntilIdle()
+
+        val createdCat = viewModel.uiState.value.savingCategories.first { it.name == "Viajes" }
+        viewModel.onCategorySelected("Viajes", "")
+        viewModel.startEditingSaving(
+            com.example.money_saver_android.domain.model.Saving(
+                id = 99L,
+                amount = 100.0,
+                category = "Viajes",
+                periodId = 1L,
+                incomeId = 1L,
+                dateTime = "2026-11-10 10:00"
+            )
+        )
+
+        viewModel.startEditingSavingCategory(createdCat)
+        viewModel.onEditSavingCategoryNameChange("  ")
+        viewModel.confirmEditSavingCategory()
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.editingSavingCategory?.errorMessage)
+
+        viewModel.onEditSavingCategoryNameChange("Vacaciones")
+        viewModel.onEditSavingCategoryColorChange("#1CC88A")
+        viewModel.confirmEditSavingCategory()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editingSavingCategory)
+        assertEquals("Vacaciones", viewModel.uiState.value.savingCategoryInput)
+        assertEquals("Vacaciones", viewModel.uiState.value.editingSaving?.category)
+        assertEquals(SavingsViewModel.MSG_CATEGORY_UPDATED, viewModel.uiState.value.savingToastMessage)
+
+        // Switching period clears active editingSavingCategory
+        val updatedCat = viewModel.uiState.value.savingCategories.first { it.name == "Vacaciones" }
+        viewModel.startEditingSavingCategory(updatedCat)
+        assertNotNull(viewModel.uiState.value.editingSavingCategory)
+        viewModel.onPeriodSelected(2L)
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.editingSavingCategory)
+    }
 }

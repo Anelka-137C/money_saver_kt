@@ -16,6 +16,7 @@ import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
 import com.example.money_saver_android.domain.usecase.calculateSavingsNetBalances
 import com.example.money_saver_android.domain.usecase.calculateValidPeriodTotal
+import com.example.money_saver_android.ui.components.atom.CategoryEditState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,13 +44,7 @@ data class EditExpenseState(
     val errorMessage: String? = null
 )
 
-data class EditExpenseCategoryState(
-    val originalName: String = "",
-    val name: String = "",
-    val color: String = "#4E73DF",
-    val icon: String = "💰",
-    val errorMessage: String? = null
-)
+typealias EditExpenseCategoryState = CategoryEditState
 
 data class ExpenseUiState(
     val expenses: List<Expense> = emptyList(),

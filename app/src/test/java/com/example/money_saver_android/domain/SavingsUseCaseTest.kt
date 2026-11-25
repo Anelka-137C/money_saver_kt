@@ -67,6 +67,15 @@ class FakeSavingsRepository : SavingsRepository {
         _categories.value = _categories.value.filter { it.name != categoryName }
     }
 
+    override suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        _categories.value = _categories.value.map {
+            if (it.name == oldName) it.copy(name = newName, color = color, icon = icon) else it
+        }
+        _savings.value = _savings.value.map {
+            if (it.category.equals(oldName, ignoreCase = true)) it.copy(category = newName) else it
+        }
+    }
+
     override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {
         _categories.value = _categories.value.map {
             if (it.name == categoryName) {
@@ -341,5 +350,31 @@ class SavingsUseCaseTest {
 
         assertTrue(result is SavingsResult.Success)
         assertTrue(useCase.getSavingsByPeriod(periodId).first().isEmpty())
+    }
+
+    @Test
+    fun updateCategory_validatesAndReassignsExpenseSavingCategory() = runBlocking {
+        savingsRepository.insertCategory(Category(name = "Emergency", icon = "🛟", color = "#4E73DF", subcategories = emptyList()))
+        savingsRepository.insertCategory(Category(name = "Travel", icon = "✈️", color = "#1CC88A", subcategories = emptyList()))
+
+        val reassignedPairs = mutableListOf<Pair<String, String>>()
+        val trackingExpenseRepo = object : com.example.money_saver_android.data.repository.ExpenseRepository {
+            override fun getAllExpenses(): Flow<List<com.example.money_saver_android.domain.model.Expense>> = kotlinx.coroutines.flow.flowOf(emptyList())
+            override suspend fun insertExpense(expense: com.example.money_saver_android.domain.model.Expense) {}
+            override suspend fun updateExpense(expense: com.example.money_saver_android.domain.model.Expense) {}
+            override suspend fun deleteExpense(id: Long) {}
+            override suspend fun reassignSavingCategory(oldName: String, newName: String) {
+                reassignedPairs.add(oldName to newName)
+            }
+        }
+        val uc = SavingsUseCase(savingsRepository, incomeRepository, budgetRepository, expenseRepository = trackingExpenseRepo)
+
+        assertTrue(uc.updateCategory("Emergency", "   ", "#F6C23E") is SavingsResult.Error)
+        assertTrue(uc.updateCategory("Missing", "Other", "#F6C23E") is SavingsResult.Error)
+        assertTrue(uc.updateCategory("Emergency", "travel", "#F6C23E") is SavingsResult.Error)
+
+        val ok = uc.updateCategory("Emergency", "Emergencias", "#F6C23E")
+        assertTrue(ok is SavingsResult.Success)
+        assertEquals(listOf("Emergency" to "Emergencias"), reassignedPairs)
     }
 }

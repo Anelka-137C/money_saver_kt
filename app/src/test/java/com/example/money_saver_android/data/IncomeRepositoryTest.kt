@@ -128,4 +128,44 @@ class IncomeRepositoryTest {
         assertTrue(empCategory.subcategories.none { it.name == "Bonus" })
         assertTrue(empCategory.subcategories.any { it.name == "Salary" })
     }
+
+    @Test
+    fun test_update_income_category_transaction_migrates_subcategories_and_incomes() = runBlocking {
+        repository.insertCategory(
+            Category(
+                name = "salario",
+                icon = "💼",
+                color = "#4E73DF",
+                subcategories = listOf(Subcategory("Nómina"), Subcategory("Bono"))
+            )
+        )
+        repository.insertIncome(
+            Income(
+                amount = 1500.0,
+                dateTime = "2026-05-10 09:00",
+                category = "salario",
+                subcategory = "Nómina",
+                periodId = 1L
+            )
+        )
+
+        repository.updateCategory(
+            oldName = "salario",
+            newName = "Salario Mensual",
+            color = "#1CC88A",
+            icon = "💵"
+        )
+
+        val categories = repository.getAllCategories().first()
+        assertTrue(categories.none { it.name == "salario" })
+        val updated = categories.first { it.name == "Salario Mensual" }
+        assertEquals("#1CC88A", updated.color)
+        assertEquals("💵", updated.icon)
+        assertEquals(listOf("Bono", "Nómina"), updated.subcategories.map { it.name }.sorted())
+
+        val incomes = repository.getIncomesByPeriod(1L).first()
+        assertEquals(1, incomes.size)
+        assertEquals("Salario Mensual", incomes.first().category)
+        assertEquals(1, repository.countIncomesForCategory("  salario mensual "))
+    }
 }

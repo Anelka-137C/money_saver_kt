@@ -3,11 +3,13 @@ package com.example.money_saver_android.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import com.example.money_saver_android.FakeCategoryRepoForVm
 import com.example.money_saver_android.FakeExpenseRepository
@@ -23,6 +26,7 @@ import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.FakeBudgetRepository
+import com.example.money_saver_android.domain.FakeSavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.FinancialPeriod
@@ -30,6 +34,7 @@ import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
+import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
@@ -39,6 +44,7 @@ import com.example.money_saver_android.viewmodel.FakeIncomeRepository
 import com.example.money_saver_android.viewmodel.FinanceTopTab
 import com.example.money_saver_android.viewmodel.IncomeViewModel
 import com.example.money_saver_android.viewmodel.PeriodViewModel
+import com.example.money_saver_android.viewmodel.SavingsViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -60,9 +66,11 @@ class IncomesViewTest {
     private lateinit var budgetRepository: FakeBudgetRepository
     private lateinit var expenseRepository: FakeExpenseRepository
     private lateinit var expenseCategoryRepository: FakeCategoryRepoForVm
+    private lateinit var savingsRepository: FakeSavingsRepository
     private lateinit var periodRepository: FakeFinancialPeriodRepository
     private lateinit var incomeViewModel: IncomeViewModel
     private lateinit var expenseViewModel: ExpenseViewModel
+    private lateinit var savingsViewModel: SavingsViewModel
     private lateinit var i18nManager: I18nManager
 
     private val period1 = FinancialPeriod(id = 1L, startDate = "2026-05-01", endDate = "2026-05-31")
@@ -74,6 +82,7 @@ class IncomesViewTest {
         budgetRepository = FakeBudgetRepository()
         expenseRepository = FakeExpenseRepository()
         expenseCategoryRepository = FakeCategoryRepoForVm()
+        savingsRepository = FakeSavingsRepository()
         periodRepository = FakeFinancialPeriodRepository(initialPeriod = period1)
         runBlocking {
             periodRepository.savePeriod(period2)
@@ -113,16 +122,21 @@ class IncomesViewTest {
         expenseViewModel = ExpenseViewModel(expenseUseCase, CategoryUseCase(expenseCategoryRepository))
         expenseViewModel.onPeriodSelected(1L)
 
+        val savingsUseCase = SavingsUseCase(savingsRepository, incomeRepository, budgetRepository, expenseRepository)
+        savingsViewModel = SavingsViewModel(savingsUseCase)
+        savingsViewModel.onPeriodSelected(1L)
+
         i18nManager = I18nManager()
         val esJson = """
             {
               "incomes": {
-                "tabs": { "incomes": "Ingresos", "budget": "Presupuesto", "expenses": "Gastos" },
+                "tabs": { "incomes": "Ingresos", "budget": "Presupuesto", "expenses": "Gastos", "savings": "Ahorros" },
                 "header": { "title": "Ingresos", "add_button": "Registrar Ingreso", "select_period": "Seleccionar período" },
                 "overview": { "title": "Resumen de Ingresos", "total_income": "Ingreso total", "trend": "↑ +12% vs mes ant.", "used": "Usado" },
                 "allocation": { "title": "Asignación de Ingresos", "details": "Detalles >", "budgeted": "Presupuestado", "savings": "Ahorros", "spent": "Spent", "available": "Disponible" },
                 "breakdown": { "title": "Desglose de Ingresos" },
-                "history": { "empty_message": "No hay ingresos registrados en este período" }
+                "history": { "empty_message": "No hay ingresos registrados en este período" },
+                "delete_category_dialog": { "title": "¿Eliminar esta categoría?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" }
               },
               "expenses": {
                 "overview": { "title": "Resumen de Gastos", "total_spent": "Total gastado", "budget_label": "Presupuesto" },
@@ -145,6 +159,15 @@ class IncomesViewTest {
                 "history": { "empty_message": "No hay presupuestos registrados en este período" },
                 "options": { "edit": "Modificar", "delete": "Eliminar" },
                 "delete_dialog": { "title": "¿Eliminar este presupuesto?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" },
+                "delete_category_dialog": { "title": "¿Eliminar esta categoría?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" }
+              },
+              "savings": {
+                "header": { "title": "Ahorros", "add_button": "Apartar Ahorro" },
+                "overview": { "title": "Resumen de Ahorros", "total_saved": "Total ahorrado", "center_label": "Total", "empty_message": "Sin ahorros registrados en este período" },
+                "net_overview": { "title": "Saldo neto en ahorros", "total_available": "Total disponible acumulado", "center_label": "Disponible", "empty_message": "Sin saldo disponible en ahorros" },
+                "add_dialog": { "title": "Apartar Ahorro", "amount_label": "Monto", "amount_placeholder": "0.00", "income_label": "Ingreso origen", "select_income": "Seleccionar ingreso", "no_incomes_available": "No hay ingresos registrados", "category_label": "Categoría", "select_category": "Seleccionar categoría", "date_time_label": "Fecha y hora", "note_label": "Nota", "note_placeholder": "Nota...", "save_button": "Guardar" },
+                "breakdown": { "title": "Desglose de ahorros" },
+                "history": { "empty_message": "No hay ahorros registrados en este período" },
                 "delete_category_dialog": { "title": "¿Eliminar esta categoría?", "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.", "cancel_button": "Cancelar" }
               }
             }
@@ -1062,5 +1085,152 @@ class IncomesViewTest {
         composeTestRule.onNode(
             hasTestTag("selector_period") and hasText(expectedCrossMonth)
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun test_all_four_tabs_present_three_dots_menu_edit_dialog_and_slide_delete_dialog() {
+        runBlocking {
+            budgetRepository.insertBudget(
+                Budget(
+                    amount = 500.0,
+                    category = "Food & Dining",
+                    subcategory = "Supermarket",
+                    periodId = 1L
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                IncomesView(
+                    incomeViewModel = incomeViewModel,
+                    expenseViewModel = expenseViewModel,
+                    savingsViewModel = savingsViewModel,
+                    allPeriods = listOf(period1, period2),
+                    selectedPeriodId = 1L,
+                    onPeriodSelected = {
+                        incomeViewModel.onPeriodSelected(it)
+                        expenseViewModel.onPeriodSelected(it)
+                        savingsViewModel.onPeriodSelected(it)
+                    },
+                    i18nManager = i18nManager
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. INCOMES TAB
+        composeTestRule.onNodeWithTag("btn_toggle_add_income").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_select_income_category").performClick()
+        composeTestRule.waitForIdle()
+        verifyThreeDotsEditAndSlideDelete(
+            categoryName = "Employment",
+            editDialogTag = "dialog_edit_income_category",
+            editCancelTag = "btn_cancel_edit_income_category",
+            deleteDialogTag = "dialog_delete_income_category",
+            deleteSlideTag = "btn_slide_to_confirm_delete_income_category",
+            deleteCancelTag = "btn_cancel_delete_income_category"
+        )
+        composeTestRule.onNodeWithTag("btn_close_category_sheet")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_close_add_income")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+
+        // 2. BUDGET TAB
+        composeTestRule.onNodeWithTag("tab_top_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_toggle_add_budget").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("selector_budget_category").performClick()
+        composeTestRule.waitForIdle()
+        verifyThreeDotsEditAndSlideDelete(
+            categoryName = "Food & Dining",
+            editDialogTag = "dialog_edit_budget_category",
+            editCancelTag = "btn_cancel_edit_budget_category",
+            deleteDialogTag = "dialog_delete_budget_category",
+            deleteSlideTag = "btn_slide_to_confirm_delete_budget_category",
+            deleteCancelTag = "btn_cancel_delete_budget_category"
+        )
+        composeTestRule.onNodeWithTag("btn_close_category_sheet")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_close_budget_dialog")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+
+        // 3. EXPENSES TAB
+        composeTestRule.onNodeWithTag("tab_top_expenses").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_open_add_expense").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("selector_expense_category").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        verifyThreeDotsEditAndSlideDelete(
+            categoryName = "Alimentación",
+            editDialogTag = "dialog_edit_expense_category",
+            editCancelTag = "btn_cancel_edit_expense_category",
+            deleteDialogTag = "dialog_delete_expense_category",
+            deleteSlideTag = "btn_slide_to_confirm_delete_expense_category",
+            deleteCancelTag = "btn_cancel_delete_expense_category"
+        )
+        composeTestRule.onNodeWithTag("btn_close_category_sheet")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_close_expense_dialog")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+
+        // 4. SAVINGS TAB
+        composeTestRule.onNodeWithTag("tab_top_savings").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_toggle_add_saving").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("selector_saving_category").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        verifyThreeDotsEditAndSlideDelete(
+            categoryName = "Employment",
+            editDialogTag = "dialog_edit_saving_category",
+            editCancelTag = "btn_cancel_edit_saving_category",
+            deleteDialogTag = "dialog_delete_saving_category",
+            deleteSlideTag = "btn_slide_to_confirm_delete_saving_category",
+            deleteCancelTag = "btn_cancel_delete_saving_category"
+        )
+    }
+
+    private fun verifyThreeDotsEditAndSlideDelete(
+        categoryName: String,
+        editDialogTag: String,
+        editCancelTag: String,
+        deleteDialogTag: String,
+        deleteSlideTag: String,
+        deleteCancelTag: String
+    ) {
+        composeTestRule.onNodeWithTag("btn_options_category_$categoryName")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_edit_category_$categoryName")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(editDialogTag).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(editCancelTag).performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_options_category_$categoryName")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("btn_delete_category_$categoryName")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(deleteDialogTag).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(deleteSlideTag).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(deleteCancelTag).performClick()
+        composeTestRule.waitForIdle()
     }
 }

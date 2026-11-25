@@ -157,6 +157,22 @@ class IncomeUseCase(
         IncomeResult.Success
     }
 
+    suspend fun updateCategory(
+        oldName: String,
+        newNameInput: String,
+        colorInput: String,
+        iconInput: String? = null
+    ): IncomeResult = updateCategoryInternal(
+        oldName = oldName,
+        newNameInput = newNameInput,
+        colorInput = colorInput,
+        iconInput = iconInput,
+        loadCategories = { repository.getAllCategories().first() },
+        persistUpdate = { targetName, newName, color, icon ->
+            repository.updateCategory(oldName = targetName, newName = newName, color = color, icon = icon)
+        }
+    )
+
     suspend fun deleteSubcategory(categoryName: String, subcategoryName: String): IncomeResult = deletionMutex.withLock {
         val trimmedCategory = categoryName.trim()
         val trimmedSubcategory = subcategoryName.trim()
@@ -418,6 +434,61 @@ class IncomeUseCase(
         }
         repo.deleteCategory(trimmed)
         return IncomeResult.Success
+    }
+
+    suspend fun updateBudgetCategory(
+        oldName: String,
+        newNameInput: String,
+        colorInput: String,
+        iconInput: String? = null
+    ): IncomeResult {
+        val repo = budgetRepository ?: return IncomeResult.Error("Módulo de presupuestos no configurado")
+        return updateCategoryInternal(
+            oldName = oldName,
+            newNameInput = newNameInput,
+            colorInput = colorInput,
+            iconInput = iconInput,
+            loadCategories = { repo.getAllCategories().first() },
+            persistUpdate = { targetName, newName, color, icon ->
+                repo.updateCategory(oldName = targetName, newName = newName, color = color, icon = icon)
+                if (targetName != newName) {
+                    expenseRepository?.reassignBudgetCategory(targetName, newName)
+                }
+            }
+        )
+    }
+
+    private suspend fun updateCategoryInternal(
+        oldName: String,
+        newNameInput: String,
+        colorInput: String,
+        iconInput: String?,
+        loadCategories: suspend () -> List<Category>,
+        persistUpdate: suspend (targetName: String, newName: String, color: String, icon: String) -> Unit
+    ): IncomeResult = deletionMutex.withLock {
+        val trimmedOldName = oldName.trim()
+        val trimmedNewName = newNameInput.trim()
+        if (trimmedNewName.isEmpty()) {
+            return@withLock IncomeResult.Error("El nombre de la categoría no puede estar vacío")
+        }
+
+        val existingCategories = loadCategories()
+        val targetCategory = existingCategories.find { it.name.equals(trimmedOldName, ignoreCase = true) }
+            ?: return@withLock IncomeResult.Error("Categoría no encontrada")
+
+        val isDuplicate = existingCategories.any {
+            !it.name.equals(targetCategory.name, ignoreCase = true) &&
+                it.name.equals(trimmedNewName, ignoreCase = true)
+        }
+        if (isDuplicate) {
+            return@withLock IncomeResult.Error("Ya existe una categoría con este nombre")
+        }
+
+        val resolvedColor = if (colorInput.isBlank()) targetCategory.color else colorInput
+        val resolvedIcon = iconInput?.takeIf { it.isNotBlank() } ?: targetCategory.icon
+
+        persistUpdate(targetCategory.name, trimmedNewName, resolvedColor, resolvedIcon)
+        IncomeResult.Success
     }
 
     suspend fun deleteBudgetSubcategory(categoryName: String, subcategoryName: String): IncomeResult {

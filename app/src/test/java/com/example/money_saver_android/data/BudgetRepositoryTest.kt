@@ -94,4 +94,43 @@ class BudgetRepositoryTest {
         val foundUpdated = categoriesWithNewSub.find { it.name == "Inversiones" }
         assertEquals(3, foundUpdated?.subcategories?.size)
     }
+
+    @Test
+    fun test_update_budget_category_transaction_migrates_subcategories_and_budgets() = runBlocking {
+        repository.insertCategory(
+            Category(
+                name = "comida",
+                icon = "🍔",
+                color = "#4E73DF",
+                subcategories = listOf(Subcategory("Supermercado"), Subcategory("Restaurante"))
+            )
+        )
+        repository.insertBudget(
+            Budget(
+                amount = 600.0,
+                category = "comida",
+                subcategory = "Supermercado",
+                periodId = 1L
+            )
+        )
+
+        repository.updateCategory(
+            oldName = "comida",
+            newName = "Alimentación",
+            color = "#F6C23E",
+            icon = "🥗"
+        )
+
+        val categories = repository.getAllCategories().first()
+        assertEquals(null, categories.find { it.name == "comida" })
+        val renamed = categories.first { it.name == "Alimentación" }
+        assertEquals("#F6C23E", renamed.color)
+        assertEquals("🥗", renamed.icon)
+        assertEquals(listOf("Restaurante", "Supermercado"), renamed.subcategories.map { it.name }.sorted())
+
+        val budgets = repository.getBudgetsByPeriod(1L).first()
+        assertEquals(1, budgets.size)
+        assertEquals("Alimentación", budgets.first().category)
+        assertEquals(1, repository.countBudgetsForCategory("  alimentación "))
+    }
 }

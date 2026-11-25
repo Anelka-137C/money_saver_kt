@@ -67,6 +67,15 @@ class FakeIncomeRepository : IncomeRepository {
         _categories.value = _categories.value.filter { it.name != categoryName }
     }
 
+    override suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        _categories.value = _categories.value.map {
+            if (it.name == oldName) it.copy(name = newName, color = color, icon = icon) else it
+        }
+        _incomes.value = _incomes.value.map {
+            if (it.category.equals(oldName, ignoreCase = true)) it.copy(category = newName) else it
+        }
+    }
+
     override suspend fun countIncomesForCategory(categoryName: String): Int {
         return _incomes.value.count { it.category == categoryName }
     }
@@ -254,7 +263,8 @@ class IncomeViewModelTest {
         viewModel.deleteCategory("Employment")
         advanceUntilIdle()
 
-        assertEquals("No se puede eliminar la categoría porque tiene ingresos asociados", viewModel.uiState.value.errorMessage)
+        assertEquals("No se puede eliminar la categoría porque tiene ingresos asociados", viewModel.uiState.value.categoryError)
+        assertNull(viewModel.uiState.value.errorMessage)
         val categories = repository.getAllCategories().first()
         assertTrue(categories.any { it.name == "Employment" })
     }
@@ -464,5 +474,70 @@ class IncomeViewModelTest {
         val vm = IncomeViewModel(incomeUseCase)
         advanceUntilIdle()
         assertEquals(listOf(expense), vm.uiState.value.expenses)
+    }
+
+    @Test
+    fun test_income_category_edit_and_delete_confirmation_reconciles_state() = runTest {
+        val cat = Category(name = "Employment", icon = "💼", color = "#4E73DF", subcategories = emptyList())
+        repository.insertCategory(cat)
+        advanceUntilIdle()
+
+        viewModel.onCategorySelected("Employment", "")
+        viewModel.startEditing(
+            Income(id = 1L, amount = 500.0, dateTime = "2026-05-01 09:00", category = "Employment", periodId = 1L)
+        )
+
+        // Edit income category -> empty name shows error inside editingCategory
+        viewModel.startEditingCategory(cat)
+        viewModel.onEditCategoryNameChange("  ")
+        viewModel.confirmEditCategory()
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.editingCategory?.errorMessage)
+
+        // Valid rename + color change reconciles form and editingIncome
+        viewModel.onEditCategoryNameChange("Trabajo")
+        viewModel.onEditCategoryColorChange("#1CC88A")
+        viewModel.confirmEditCategory()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editingCategory)
+        assertEquals("Trabajo", viewModel.uiState.value.categoryInput)
+        assertEquals("Trabajo", viewModel.uiState.value.editingIncome?.category)
+        assertEquals(IncomeViewModel.MSG_CATEGORY_UPDATED, viewModel.uiState.value.toastMessage)
+
+        // Delete confirmation flow
+        viewModel.requestDeleteCategory("Trabajo")
+        assertEquals("Trabajo", viewModel.uiState.value.categoryToDelete?.name)
+        viewModel.dismissDeleteCategoryConfirmation()
+        assertNull(viewModel.uiState.value.categoryToDelete)
+
+        viewModel.requestDeleteCategory("Trabajo")
+        viewModel.confirmDeleteCategory()
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.categoryToDelete)
+        assertTrue(repository.getAllCategories().first().none { it.name == "Trabajo" })
+    }
+
+    @Test
+    fun test_budget_category_edit_reconciles_form_and_editing_budget() = runTest {
+        val fakeBudgetRepo = FakeBudgetRepository()
+        val cat = Category(name = "Food & Dining", icon = "🍔", color = "#4E73DF", subcategories = emptyList())
+        fakeBudgetRepo.insertCategory(cat)
+        val vm = IncomeViewModel(IncomeUseCase(repository = repository, budgetRepository = fakeBudgetRepo))
+        advanceUntilIdle()
+
+        vm.onBudgetCategorySelected("Food & Dining", "")
+        vm.startEditingBudget(Budget(id = 1L, amount = 250.0, category = "Food & Dining", periodId = 1L))
+
+        vm.startEditingBudgetCategory(cat)
+        vm.onEditBudgetCategoryNameChange("Comida")
+        vm.onEditBudgetCategoryColorChange("#F6C23E")
+        vm.confirmEditBudgetCategory()
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.editingBudgetCategory)
+        assertEquals("Comida", vm.uiState.value.budgetCategoryInput)
+        assertEquals("Comida", vm.uiState.value.editingBudget?.category)
+        assertEquals(IncomeViewModel.MSG_CATEGORY_UPDATED, vm.uiState.value.budgetToastMessage)
     }
 }

@@ -9,6 +9,7 @@ import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import com.example.money_saver_android.domain.usecase.SavingsResult
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import com.example.money_saver_android.domain.usecase.calculateValidPeriodTotal
+import com.example.money_saver_android.ui.components.atom.CategoryEditState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +63,7 @@ data class SavingsUiState(
     val categoryError: String? = null,
     val newSubcategoryNameInput: String = "",
     val subcategoryError: String? = null,
+    val editingSavingCategory: CategoryEditState? = null,
     val savingCategoryToDelete: Category? = null
 )
 
@@ -74,6 +76,7 @@ class SavingsViewModel(
         const val MSG_SAVING_UPDATED = "savings.messages.updated"
         const val MSG_SAVING_DELETED = "savings.messages.deleted"
         const val MSG_CATEGORY_CREATED = "savings.messages.category_created"
+        const val MSG_CATEGORY_UPDATED = "savings.messages.category_updated"
         const val MSG_SUBCATEGORY_CREATED = "savings.messages.subcategory_created"
         const val MSG_CATEGORY_DELETED = "savings.messages.category_deleted"
         const val MSG_SUBCATEGORY_DELETED = "savings.messages.subcategory_deleted"
@@ -143,6 +146,7 @@ class SavingsViewModel(
                     savingToDelete = null,
                     categoryError = null,
                     subcategoryError = null,
+                    editingSavingCategory = null,
                     savingCategoryToDelete = null
                 )
             } else {
@@ -490,6 +494,84 @@ class SavingsViewModel(
                     it.copy(newSubcategoryNameInput = "", subcategoryError = null, savingToastMessage = MSG_SUBCATEGORY_CREATED)
                 }
                 is SavingsResult.Error -> _uiState.update { it.copy(subcategoryError = result.message) }
+            }
+        }
+    }
+
+    fun startEditingSavingCategory(category: Category) {
+        _uiState.update {
+            it.copy(
+                editingSavingCategory = CategoryEditState(
+                    originalName = category.name,
+                    name = category.name,
+                    color = category.color,
+                    icon = category.icon
+                )
+            )
+        }
+    }
+
+    fun onEditSavingCategoryNameChange(name: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingSavingCategory = current.editingSavingCategory?.copy(name = name, errorMessage = null)
+            )
+        }
+    }
+
+    fun onEditSavingCategoryColorChange(color: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingSavingCategory = current.editingSavingCategory?.copy(color = color)
+            )
+        }
+    }
+
+    fun cancelEditingSavingCategory() {
+        _uiState.update { it.copy(editingSavingCategory = null) }
+    }
+
+    fun confirmEditSavingCategory() {
+        val editState = _uiState.value.editingSavingCategory ?: return
+        viewModelScope.launch {
+            when (val result = savingsUseCase.updateCategory(
+                oldName = editState.originalName,
+                newNameInput = editState.name,
+                colorInput = editState.color,
+                iconInput = editState.icon
+            )) {
+                is SavingsResult.Error -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            editingSavingCategory = current.editingSavingCategory?.copy(errorMessage = result.message)
+                        )
+                    }
+                }
+                is SavingsResult.Success -> {
+                    val trimmedNewName = editState.name.trim()
+                    val oldName = editState.originalName.trim()
+                    _uiState.update { current ->
+                        val updatedCategoryInput = if (current.savingCategoryInput.equals(oldName, ignoreCase = true)) {
+                            trimmedNewName
+                        } else {
+                            current.savingCategoryInput
+                        }
+                        val updatedEditingSaving = current.editingSaving?.let { saving ->
+                            if (saving.category.equals(oldName, ignoreCase = true)) {
+                                saving.copy(category = trimmedNewName)
+                            } else {
+                                saving
+                            }
+                        }
+                        current.copy(
+                            savingCategoryInput = updatedCategoryInput,
+                            editingSaving = updatedEditingSaving,
+                            editingSavingCategory = null,
+                            categoryError = null,
+                            savingToastMessage = MSG_CATEGORY_UPDATED
+                        )
+                    }
+                }
             }
         }
     }

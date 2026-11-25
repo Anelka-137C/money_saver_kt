@@ -15,6 +15,7 @@ import com.example.money_saver_android.domain.usecase.IncomeResult
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import com.example.money_saver_android.domain.usecase.calculateValidPeriodTotal
+import com.example.money_saver_android.ui.components.atom.CategoryEditState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +87,9 @@ data class IncomeUiState(
     val editingBudget: EditBudgetState? = null,
     val budgetToDelete: Budget? = null,
     val budgetCategoryToDelete: Category? = null,
+    val editingCategory: CategoryEditState? = null,
+    val categoryToDelete: Category? = null,
+    val editingBudgetCategory: CategoryEditState? = null,
     val expenses: List<Expense> = emptyList()
 )
 
@@ -100,6 +104,7 @@ class IncomeViewModel(
         const val MSG_BUDGET_UPDATED = "Presupuesto actualizado exitosamente"
         const val MSG_BUDGET_DELETED = "Presupuesto eliminado exitosamente"
         const val MSG_CATEGORY_CREATED = "Categoría creada exitosamente"
+        const val MSG_CATEGORY_UPDATED = "Categoría actualizada exitosamente"
         const val MSG_SUBCATEGORY_CREATED = "Subcategoría creada exitosamente"
         const val MSG_CATEGORY_DELETED = "Categoría eliminada exitosamente"
         const val MSG_SUBCATEGORY_DELETED = "Subcategoría eliminada exitosamente"
@@ -273,6 +278,105 @@ class IncomeViewModel(
         }
     }
 
+    fun startEditingCategory(category: Category) {
+        _uiState.update {
+            it.copy(
+                editingCategory = CategoryEditState(
+                    originalName = category.name,
+                    name = category.name,
+                    color = category.color,
+                    icon = category.icon
+                )
+            )
+        }
+    }
+
+    fun onEditCategoryNameChange(name: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingCategory = current.editingCategory?.copy(name = name, errorMessage = null)
+            )
+        }
+    }
+
+    fun onEditCategoryColorChange(color: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingCategory = current.editingCategory?.copy(color = color)
+            )
+        }
+    }
+
+    fun cancelEditingCategory() {
+        _uiState.update { it.copy(editingCategory = null) }
+    }
+
+    fun confirmEditCategory() {
+        val editState = _uiState.value.editingCategory ?: return
+        viewModelScope.launch {
+            when (val result = incomeUseCase.updateCategory(
+                oldName = editState.originalName,
+                newNameInput = editState.name,
+                colorInput = editState.color,
+                iconInput = editState.icon
+            )) {
+                is IncomeResult.Error -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            editingCategory = current.editingCategory?.copy(errorMessage = result.message)
+                        )
+                    }
+                }
+                is IncomeResult.Success -> {
+                    val trimmedNewName = editState.name.trim()
+                    val oldName = editState.originalName.trim()
+                    _uiState.update { current ->
+                        val updatedCategoryInput = if (current.categoryInput.equals(oldName, ignoreCase = true)) {
+                            trimmedNewName
+                        } else {
+                            current.categoryInput
+                        }
+                        val updatedEditingIncome = current.editingIncome?.let { inc ->
+                            if (inc.category.equals(oldName, ignoreCase = true)) {
+                                inc.copy(category = trimmedNewName)
+                            } else {
+                                inc
+                            }
+                        }
+                        current.copy(
+                            categoryInput = updatedCategoryInput,
+                            editingIncome = updatedEditingIncome,
+                            editingCategory = null,
+                            categoryError = null,
+                            toastMessage = MSG_CATEGORY_UPDATED
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun requestDeleteCategory(category: Category) {
+        _uiState.update { it.copy(categoryToDelete = category) }
+    }
+
+    fun requestDeleteCategory(categoryName: String) {
+        val trimmed = categoryName.trim()
+        val category = _uiState.value.categories.find { it.name.equals(trimmed, ignoreCase = true) }
+            ?: Category(name = trimmed, icon = "📁", color = "#4E73DF", subcategories = emptyList())
+        requestDeleteCategory(category)
+    }
+
+    fun dismissDeleteCategoryConfirmation() {
+        _uiState.update { it.copy(categoryToDelete = null) }
+    }
+
+    fun confirmDeleteCategory() {
+        val category = _uiState.value.categoryToDelete ?: return
+        _uiState.update { it.copy(categoryToDelete = null) }
+        deleteCategory(category.name)
+    }
+
     fun deleteCategory(categoryName: String) {
         viewModelScope.launch {
             when (val result = incomeUseCase.deleteCategory(categoryName)) {
@@ -285,13 +389,13 @@ class IncomeViewModel(
                             categoryInput = if (shouldClearForm) "" else current.categoryInput,
                             subcategoryInput = if (shouldClearForm) "" else current.subcategoryInput,
                             editingIncome = if (shouldClearEdit) current.editingIncome?.copy(category = "", subcategory = "") else current.editingIncome,
-                            errorMessage = null,
+                            categoryError = null,
                             toastMessage = MSG_CATEGORY_DELETED
                         )
                     }
                 }
                 is IncomeResult.Error -> {
-                    _uiState.update { it.copy(errorMessage = result.message) }
+                    _uiState.update { it.copy(categoryError = result.message) }
                 }
             }
         }
@@ -697,6 +801,84 @@ class IncomeViewModel(
                 }
                 is IncomeResult.Error -> {
                     _uiState.update { it.copy(subcategoryError = result.message) }
+                }
+            }
+        }
+    }
+
+    fun startEditingBudgetCategory(category: Category) {
+        _uiState.update {
+            it.copy(
+                editingBudgetCategory = CategoryEditState(
+                    originalName = category.name,
+                    name = category.name,
+                    color = category.color,
+                    icon = category.icon
+                )
+            )
+        }
+    }
+
+    fun onEditBudgetCategoryNameChange(name: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingBudgetCategory = current.editingBudgetCategory?.copy(name = name, errorMessage = null)
+            )
+        }
+    }
+
+    fun onEditBudgetCategoryColorChange(color: String) {
+        _uiState.update { current ->
+            current.copy(
+                editingBudgetCategory = current.editingBudgetCategory?.copy(color = color)
+            )
+        }
+    }
+
+    fun cancelEditingBudgetCategory() {
+        _uiState.update { it.copy(editingBudgetCategory = null) }
+    }
+
+    fun confirmEditBudgetCategory() {
+        val editState = _uiState.value.editingBudgetCategory ?: return
+        viewModelScope.launch {
+            when (val result = incomeUseCase.updateBudgetCategory(
+                oldName = editState.originalName,
+                newNameInput = editState.name,
+                colorInput = editState.color,
+                iconInput = editState.icon
+            )) {
+                is IncomeResult.Error -> {
+                    _uiState.update { current ->
+                        current.copy(
+                            editingBudgetCategory = current.editingBudgetCategory?.copy(errorMessage = result.message)
+                        )
+                    }
+                }
+                is IncomeResult.Success -> {
+                    val trimmedNewName = editState.name.trim()
+                    val oldName = editState.originalName.trim()
+                    _uiState.update { current ->
+                        val updatedBudgetCategoryInput = if (current.budgetCategoryInput.equals(oldName, ignoreCase = true)) {
+                            trimmedNewName
+                        } else {
+                            current.budgetCategoryInput
+                        }
+                        val updatedEditingBudget = current.editingBudget?.let { budget ->
+                            if (budget.category.equals(oldName, ignoreCase = true)) {
+                                budget.copy(category = trimmedNewName)
+                            } else {
+                                budget
+                            }
+                        }
+                        current.copy(
+                            budgetCategoryInput = updatedBudgetCategoryInput,
+                            editingBudget = updatedEditingBudget,
+                            editingBudgetCategory = null,
+                            categoryError = null,
+                            budgetToastMessage = MSG_CATEGORY_UPDATED
+                        )
+                    }
                 }
             }
         }

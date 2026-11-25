@@ -213,6 +213,11 @@
     "options": {
       "edit": "Bearbeiten",
       "delete": "Löschen"
+    },
+    "delete_category_dialog": {
+      "title": "Diese Kategorie löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Schieben Sie den Button zur Bestätigung.",
+      "cancel_button": "Abbrechen"
     }
   },
   "budget": {
@@ -334,6 +339,7 @@
       "updated": "Ersparnis erfolgreich aktualisiert",
       "deleted": "Ersparnis erfolgreich gelöscht",
       "category_created": "Kategorie erfolgreich erstellt",
+      "category_updated": "Kategorie erfolgreich aktualisiert",
       "subcategory_created": "Unterkategorie erfolgreich erstellt",
       "category_deleted": "Kategorie erfolgreich gelöscht",
       "subcategory_deleted": "Unterkategorie erfolgreich gelöscht"

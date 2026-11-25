@@ -380,6 +380,45 @@ class SavingsUseCase(
         return SavingsResult.Success
     }
 
+    suspend fun updateCategory(
+        oldName: String,
+        newNameInput: String,
+        colorInput: String,
+        iconInput: String? = null
+    ): SavingsResult = savingMutex.withLock {
+        val trimmedOldName = oldName.trim()
+        val trimmedNewName = newNameInput.trim()
+        if (trimmedNewName.isEmpty()) {
+            return@withLock SavingsResult.Error("El nombre de la categoría no puede estar vacío")
+        }
+
+        val existingCategories = savingsRepository.getAllCategories().first()
+        val targetCategory = existingCategories.find { it.name.equals(trimmedOldName, ignoreCase = true) }
+            ?: return@withLock SavingsResult.Error("Categoría no encontrada")
+
+        val isDuplicate = existingCategories.any {
+            !it.name.equals(targetCategory.name, ignoreCase = true) &&
+                it.name.equals(trimmedNewName, ignoreCase = true)
+        }
+        if (isDuplicate) {
+            return@withLock SavingsResult.Error("Ya existe una categoría con este nombre")
+        }
+
+        val resolvedColor = if (colorInput.isBlank()) targetCategory.color else colorInput
+        val resolvedIcon = iconInput?.takeIf { it.isNotBlank() } ?: targetCategory.icon
+
+        savingsRepository.updateCategory(
+            oldName = targetCategory.name,
+            newName = trimmedNewName,
+            color = resolvedColor,
+            icon = resolvedIcon
+        )
+        if (targetCategory.name != trimmedNewName) {
+            expenseRepository?.reassignSavingCategory(targetCategory.name, trimmedNewName)
+        }
+        SavingsResult.Success
+    }
+
     suspend fun deleteCategory(categoryName: String): SavingsResult = savingMutex.withLock {
         val trimmed = categoryName.trim()
         if (trimmed.isEmpty()) {

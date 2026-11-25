@@ -81,6 +81,12 @@ interface ExpenseDao {
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("UPDATE expenses SET budgetCategory = :newCategoryName WHERE LOWER(TRIM(COALESCE(budgetCategory, ''))) = LOWER(TRIM(:oldCategoryName))")
+    suspend fun reassignBudgetCategory(oldCategoryName: String, newCategoryName: String)
+
+    @Query("UPDATE expenses SET savingCategory = :newCategoryName WHERE LOWER(TRIM(COALESCE(savingCategory, ''))) = LOWER(TRIM(:oldCategoryName))")
+    suspend fun reassignSavingCategory(oldCategoryName: String, newCategoryName: String)
 }
 
 @Dao

@@ -23,6 +23,7 @@ interface BudgetRepository {
     fun getAllCategories(): Flow<List<Category>>
     suspend fun insertCategory(category: Category)
     suspend fun insertSubcategory(categoryName: String, subcategory: Subcategory)
+    suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {}
     suspend fun deleteCategory(categoryName: String)
     suspend fun deleteSubcategory(categoryName: String, subcategoryName: String)
     suspend fun countBudgetsForCategory(categoryName: String): Int
@@ -108,6 +109,10 @@ class RoomBudgetRepository(
 
     override suspend fun deleteCategory(categoryName: String) {
         categoryDao?.deleteCategoryByName(categoryName)
+    }
+
+    override suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        categoryDao?.updateCategory(oldName = oldName, newName = newName, color = color, icon = icon)
     }
 
     override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {

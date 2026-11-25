@@ -11,4 +11,6 @@ interface ExpenseRepository {
     suspend fun insertExpense(expense: Expense)
     suspend fun updateExpense(expense: Expense)
     suspend fun deleteExpense(id: Long)
+    suspend fun reassignBudgetCategory(oldName: String, newName: String) {}
+    suspend fun reassignSavingCategory(oldName: String, newName: String) {}
 }

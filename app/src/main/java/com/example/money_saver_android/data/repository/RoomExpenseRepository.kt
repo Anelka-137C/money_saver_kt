@@ -28,6 +28,14 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
         dao.deleteById(id)
     }
 
+    override suspend fun reassignBudgetCategory(oldName: String, newName: String) {
+        dao.reassignBudgetCategory(oldCategoryName = oldName, newCategoryName = newName)
+    }
+
+    override suspend fun reassignSavingCategory(oldName: String, newName: String) {
+        dao.reassignSavingCategory(oldCategoryName = oldName, newCategoryName = newName)
+    }
+
     private fun ExpenseEntity.toDomain(): Expense = Expense(
         id = id,
         amount = amount,

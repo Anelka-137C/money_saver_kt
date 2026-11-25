@@ -348,4 +348,48 @@ class IncomeUseCaseTest {
         assertEquals(350.0, useCase.calculateRemainingBudget(500.0, totalSpent), 0.0)
         assertEquals(0.0, useCase.calculateRemainingBudget(100.0, totalSpent), 0.0)
     }
+
+    @Test
+    fun updateCategory_validatesEmptyNotFoundDuplicate_andUpdatesSuccessfully() = runBlocking {
+        repository.insertCategory(Category(name = "Employment", icon = "💼", color = "#4E73DF", subcategories = emptyList()))
+        repository.insertCategory(Category(name = "Investments", icon = "📈", color = "#1CC88A", subcategories = emptyList()))
+
+        val emptyRes = useCase.updateCategory("Employment", "   ", "#F6C23E")
+        assertTrue(emptyRes is IncomeResult.Error)
+
+        val notFoundRes = useCase.updateCategory("Missing", "Other", "#F6C23E")
+        assertTrue(notFoundRes is IncomeResult.Error)
+
+        val duplicateRes = useCase.updateCategory("Employment", "investments", "#F6C23E")
+        assertTrue(duplicateRes is IncomeResult.Error)
+
+        val okRes = useCase.updateCategory("Employment", "Trabajo", "#F6C23E", "🏢")
+        assertTrue(okRes is IncomeResult.Success)
+    }
+
+    @Test
+    fun updateBudgetCategory_validatesAndReassignsExpenseBudgetCategory() = runBlocking {
+        val fakeBudgetRepo = FakeBudgetRepository()
+        fakeBudgetRepo.insertCategory(Category(name = "Food & Dining", icon = "🍔", color = "#4E73DF", subcategories = emptyList()))
+        fakeBudgetRepo.insertCategory(Category(name = "Transport", icon = "🚗", color = "#1CC88A", subcategories = emptyList()))
+
+        val reassignedPairs = mutableListOf<Pair<String, String>>()
+        val trackingExpenseRepo = object : com.example.money_saver_android.data.repository.ExpenseRepository {
+            override fun getAllExpenses(): Flow<List<Expense>> = kotlinx.coroutines.flow.flowOf(emptyList())
+            override suspend fun insertExpense(expense: Expense) {}
+            override suspend fun updateExpense(expense: Expense) {}
+            override suspend fun deleteExpense(id: Long) {}
+            override suspend fun reassignBudgetCategory(oldName: String, newName: String) {
+                reassignedPairs.add(oldName to newName)
+            }
+        }
+        val uc = IncomeUseCase(repository = repository, budgetRepository = fakeBudgetRepo, expenseRepository = trackingExpenseRepo)
+
+        assertTrue(uc.updateBudgetCategory("Food & Dining", "transport", "#F6C23E") is IncomeResult.Error)
+        assertTrue(uc.updateBudgetCategory("Food & Dining", "", "#F6C23E") is IncomeResult.Error)
+
+        val res = uc.updateBudgetCategory("Food & Dining", "Alimentación", "#F6C23E")
+        assertTrue(res is IncomeResult.Success)
+        assertEquals(listOf("Food & Dining" to "Alimentación"), reassignedPairs)
+    }
 }

@@ -213,6 +213,11 @@
     "options": {
       "edit": "Modificar",
       "delete": "Eliminar"
+    },
+    "delete_category_dialog": {
+      "title": "¿Eliminar esta categoría?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
     }
   },
   "budget": {
@@ -334,6 +339,7 @@
       "updated": "Ahorro actualizado exitosamente",
       "deleted": "Ahorro eliminado exitosamente",
       "category_created": "Categoría creada exitosamente",
+      "category_updated": "Categoría actualizada exitosamente",
       "subcategory_created": "Subcategoría creada exitosamente",
       "category_deleted": "Categoría eliminada exitosamente",
       "subcategory_deleted": "Subcategoría eliminada exitosamente"

@@ -78,10 +78,10 @@ interface IncomeDao {
     @Query("DELETE FROM incomes WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("SELECT COUNT(*) FROM incomes WHERE category = :categoryName")
+    @Query("SELECT COUNT(*) FROM incomes WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName))")
     suspend fun countIncomesForCategory(categoryName: String): Int
 
-    @Query("SELECT COUNT(*) FROM incomes WHERE category = :categoryName AND subcategory = :subcategoryName")
+    @Query("SELECT COUNT(*) FROM incomes WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName)) AND LOWER(TRIM(subcategory)) = LOWER(TRIM(:subcategoryName))")
     suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int
 }
 
@@ -111,6 +111,27 @@ interface IncomeCategoryDao {
 
     @Query("SELECT COUNT(*) FROM incomes_category")
     suspend fun getCategoryCount(): Int
+
+    @Query("UPDATE incomes_category SET color = :color, icon = :icon WHERE name = :name")
+    suspend fun updateCategoryStyle(name: String, color: String, icon: String)
+
+    @Query("UPDATE incomes_subcategory SET categoryName = :newCategoryName WHERE categoryName = :oldCategoryName")
+    suspend fun reassignSubcategories(oldCategoryName: String, newCategoryName: String)
+
+    @Query("UPDATE incomes SET category = :newCategoryName WHERE LOWER(TRIM(category)) = LOWER(TRIM(:oldCategoryName))")
+    suspend fun reassignIncomesCategory(oldCategoryName: String, newCategoryName: String)
+
+    @Transaction
+    suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        if (oldName == newName) {
+            updateCategoryStyle(name = oldName, color = color, icon = icon)
+        } else {
+            insertCategory(IncomeCategoryEntity(name = newName, icon = icon, color = color))
+            reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
+            reassignIncomesCategory(oldCategoryName = oldName, newCategoryName = newName)
+            deleteCategoryByName(oldName)
+        }
+    }
 }
 
 @Database(

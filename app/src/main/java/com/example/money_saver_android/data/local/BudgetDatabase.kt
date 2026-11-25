@@ -42,10 +42,10 @@ interface BudgetDao {
     @Query("DELETE FROM budgets WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("SELECT COUNT(*) FROM budgets WHERE category = :categoryName")
+    @Query("SELECT COUNT(*) FROM budgets WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName))")
     suspend fun countBudgetsForCategory(categoryName: String): Int
 
-    @Query("SELECT COUNT(*) FROM budgets WHERE category = :categoryName AND subcategory = :subcategoryName")
+    @Query("SELECT COUNT(*) FROM budgets WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName)) AND LOWER(TRIM(subcategory)) = LOWER(TRIM(:subcategoryName))")
     suspend fun countBudgetsForSubcategory(categoryName: String, subcategoryName: String): Int
 }
 
@@ -109,6 +109,27 @@ interface BudgetCategoryDao {
 
     @Query("SELECT COUNT(*) FROM budget_category")
     suspend fun getCategoryCount(): Int
+
+    @Query("UPDATE budget_category SET color = :color, icon = :icon WHERE name = :name")
+    suspend fun updateCategoryStyle(name: String, color: String, icon: String)
+
+    @Query("UPDATE budget_subcategory SET categoryName = :newCategoryName WHERE categoryName = :oldCategoryName")
+    suspend fun reassignSubcategories(oldCategoryName: String, newCategoryName: String)
+
+    @Query("UPDATE budgets SET category = :newCategoryName WHERE LOWER(TRIM(category)) = LOWER(TRIM(:oldCategoryName))")
+    suspend fun reassignBudgetsCategory(oldCategoryName: String, newCategoryName: String)
+
+    @Transaction
+    suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        if (oldName == newName) {
+            updateCategoryStyle(name = oldName, color = color, icon = icon)
+        } else {
+            insertCategory(BudgetCategoryEntity(name = newName, icon = icon, color = color))
+            reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
+            reassignBudgetsCategory(oldCategoryName = oldName, newCategoryName = newName)
+            deleteCategoryByName(oldName)
+        }
+    }
 }
 
 @Database(

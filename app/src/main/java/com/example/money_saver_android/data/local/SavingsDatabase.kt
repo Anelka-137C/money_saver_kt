@@ -113,6 +113,30 @@ interface SavingCategoryDao {
 
     @Query("SELECT COUNT(*) FROM saving_category")
     suspend fun getCategoryCount(): Int
+
+    @Query("UPDATE saving_category SET color = :color, icon = :icon WHERE name = :name")
+    suspend fun updateCategoryStyle(name: String, color: String, icon: String)
+
+    @Query("UPDATE saving_subcategory SET categoryName = :newCategoryName WHERE categoryName = :oldCategoryName")
+    suspend fun reassignSubcategories(oldCategoryName: String, newCategoryName: String)
+
+    @Query("UPDATE savings SET category = :newCategoryName WHERE LOWER(TRIM(category)) = LOWER(TRIM(:oldCategoryName))")
+    suspend fun reassignSavingsCategory(oldCategoryName: String, newCategoryName: String)
+
+    @Query("DELETE FROM saving_category WHERE name = :name")
+    suspend fun deleteCategoryByExactName(name: String)
+
+    @Transaction
+    suspend fun updateCategory(oldName: String, newName: String, color: String, icon: String) {
+        if (oldName == newName) {
+            updateCategoryStyle(name = oldName, color = color, icon = icon)
+        } else {
+            insertCategory(SavingCategoryEntity(name = newName, icon = icon, color = color))
+            reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
+            reassignSavingsCategory(oldCategoryName = oldName, newCategoryName = newName)
+            deleteCategoryByExactName(oldName)
+        }
+    }
 }
 
 @Database(
