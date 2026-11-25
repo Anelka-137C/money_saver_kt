@@ -138,6 +138,17 @@ fun SavingsTabContent(
             )
         }
 
+        PeriodSummaryCard(
+            title = t("savings.net_overview.title"),
+            totalSubtitle = t("savings.net_overview.total_available"),
+            centerLabel = t("savings.net_overview.center_label"),
+            emptyMessage = t("savings.net_overview.empty_message"),
+            summary = state.netSavingsSummary,
+            currency = currency,
+            cardTestTag = "card_savings_net_overview",
+            totalTestTag = "text_total_net_savings"
+        )
+
         Text(
             text = t("savings.breakdown.title"),
             color = TextPrimary,

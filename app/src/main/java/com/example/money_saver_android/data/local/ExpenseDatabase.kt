@@ -26,7 +26,9 @@ data class ExpenseEntity(
     val subcategory: String? = null,
     val periodId: Long? = null,
     val budgetId: Long? = null,
-    val budgetCategory: String? = null
+    val budgetCategory: String? = null,
+    val fundingSource: String? = null,
+    val savingCategory: String? = null
 )
 
 @Entity(tableName = "expenses_categories")
@@ -160,7 +162,7 @@ interface CategoryDao {
         IncomeCategoryEntity::class,
         IncomeSubcategoryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

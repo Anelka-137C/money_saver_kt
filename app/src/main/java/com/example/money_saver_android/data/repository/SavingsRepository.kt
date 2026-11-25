@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
 
 interface SavingsRepository {
+    fun getAllSavings(): Flow<List<Saving>> = emptyFlow()
     fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>>
     suspend fun getSavingById(id: Long): Saving?
     suspend fun insertSaving(saving: Saving): Long
@@ -34,6 +35,12 @@ class RoomSavingsRepository(
     private val savingDao: SavingDao,
     private val categoryDao: SavingCategoryDao? = null
 ) : SavingsRepository {
+
+    override fun getAllSavings(): Flow<List<Saving>> {
+        return savingDao.getAllSavings().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
 
     override fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>> {
         return savingDao.getSavingsByPeriod(periodId).map { entities ->

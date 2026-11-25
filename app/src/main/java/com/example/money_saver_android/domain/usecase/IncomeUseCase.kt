@@ -8,6 +8,7 @@ import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
@@ -515,6 +516,9 @@ class IncomeUseCase(
     }
 
     private fun Expense.matchesBudgetGroup(catBudgets: List<Budget>, categoryName: String): Boolean {
+        if (fundingSource == ExpenseFundingSource.SAVINGS) {
+            return false
+        }
         if (budgetId > 0L) {
             return catBudgets.any { it.id == budgetId }
         }

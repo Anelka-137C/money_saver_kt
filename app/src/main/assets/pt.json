@@ -31,8 +31,14 @@
       "amount_label": "Valor",
       "amount_placeholder": "0.00",
       "date_label": "Data e hora",
+      "funding_source_label": "Fonte de recursos",
+      "source_budget": "Orçamento",
+      "source_savings": "Economias",
       "budget_label": "Orçamento de origem",
       "budget_placeholder": "Selecionar orçamento",
+      "saving_source_label": "Categoria de economia de origem",
+      "saving_source_placeholder": "Selecionar categoria de economia",
+      "no_savings_available": "Nenhuma economia disponível",
       "category_label": "Categoria",
       "category_placeholder": "Selecionar categoria",
       "description_label": "Nota (opcional)",
@@ -41,6 +47,9 @@
     },
     "breakdown": {
       "title": "Discriminação de despesas"
+    },
+    "item": {
+      "savings_badge_prefix": "Economia"
     },
     "history": {
       "title": "Histórico de despesas",
@@ -52,8 +61,14 @@
       "amount_label": "Valor",
       "amount_placeholder": "0.00",
       "date_label": "Data e hora",
+      "funding_source_label": "Fonte de recursos",
+      "source_budget": "Orçamento",
+      "source_savings": "Economias",
       "budget_label": "Orçamento de origem",
       "budget_placeholder": "Selecionar orçamento",
+      "saving_source_label": "Categoria de economia de origem",
+      "saving_source_placeholder": "Selecionar categoria de economia",
+      "no_savings_available": "Nenhuma economia disponível",
       "category_label": "Categoria",
       "category_placeholder": "Selecionar categoria",
       "description_label": "Descrição (opcional)",
@@ -266,6 +281,12 @@
       "empty_message": "Sem economias neste período",
       "available_banner_title": "Você tem %s disponível",
       "available_banner_subtitle": "%s da sua renda ainda está disponível para reservar."
+    },
+    "net_overview": {
+      "title": "Saldo líquido em economias",
+      "total_available": "Total disponível acumulado",
+      "center_label": "Disponível",
+      "empty_message": "Sem saldo disponível em economias"
     },
     "add_dialog": {
       "title": "Reservar Economia",

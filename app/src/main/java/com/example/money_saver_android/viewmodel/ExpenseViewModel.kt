@@ -5,18 +5,23 @@ import androidx.lifecycle.viewModelScope
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.usecase.CategoryExpenseItem
 import com.example.money_saver_android.domain.usecase.CategoryResult
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
+import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
+import com.example.money_saver_android.domain.usecase.calculateSavingsNetBalances
 import com.example.money_saver_android.domain.usecase.calculateValidPeriodTotal
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -32,6 +37,8 @@ data class EditExpenseState(
     val budgetId: Long? = null,
     val budgetCategory: String = "",
     val budgetSubcategory: String = "",
+    val fundingSource: ExpenseFundingSource = ExpenseFundingSource.BUDGET,
+    val savingCategory: String = "",
     val errorMessage: String? = null
 )
 
@@ -48,6 +55,8 @@ data class ExpenseUiState(
     val selectedPeriodId: Long? = null,
     val budgets: List<Budget> = emptyList(),
     val hasActiveBudget: Boolean = false,
+    val savingsBalances: List<SavingsCategoryBalance> = emptyList(),
+    val hasAvailableSavings: Boolean = false,
     val totalBudgeted: Double = 0.0,
     val totalSpent: Double = 0.0,
     val expenseSummary: PeriodCategorySummary = PeriodCategorySummary(),
@@ -59,6 +68,8 @@ data class ExpenseUiState(
     val budgetIdInput: Long? = null,
     val budgetCategoryInput: String = "",
     val budgetSubcategoryInput: String = "",
+    val fundingSourceInput: ExpenseFundingSource = ExpenseFundingSource.BUDGET,
+    val savingCategoryInput: String = "",
     val errorMessage: String? = null,
     val toastMessage: String? = null,
     val editingExpense: EditExpenseState? = null,
@@ -113,6 +124,29 @@ class ExpenseViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            combine(
+                expenseUseCase.getAllSavings().catch { emit(emptyList()) },
+                expenseUseCase.getExpenses().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
+                expenseUseCase.getSavingCategories().catch { emit(emptyList()) }.onStart { emit(emptyList()) }
+            ) { allSavings, allExpenses, savingCategories ->
+                calculateSavingsNetBalances(allSavings, allExpenses, savingCategories)
+            }.collect { balances ->
+                _uiState.update { current ->
+                    val hasAvailable = balances.any { it.netBalance > 0.0 }
+                    val nextSource = if (!current.hasActiveBudget && hasAvailable) {
+                        ExpenseFundingSource.SAVINGS
+                    } else {
+                        current.fundingSourceInput
+                    }
+                    current.copy(
+                        savingsBalances = balances,
+                        hasAvailableSavings = hasAvailable,
+                        fundingSourceInput = nextSource
+                    )
+                }
+            }
+        }
     }
 
     fun onPeriodSelected(periodId: Long?) {
@@ -136,6 +170,8 @@ class ExpenseViewModel(
                     budgetIdInput = null,
                     budgetCategoryInput = "",
                     budgetSubcategoryInput = "",
+                    fundingSourceInput = ExpenseFundingSource.BUDGET,
+                    savingCategoryInput = "",
                     errorMessage = null,
                     editingExpense = null,
                     expenseToDelete = null
@@ -169,10 +205,17 @@ class ExpenseViewModel(
                             amountSelector = { it.amount }
                         )
                         _uiState.update {
+                            val hasBudget = budgetList.isNotEmpty()
+                            val nextSource = when {
+                                !hasBudget && it.hasAvailableSavings -> ExpenseFundingSource.SAVINGS
+                                hasBudget && !it.hasAvailableSavings -> ExpenseFundingSource.BUDGET
+                                else -> it.fundingSourceInput
+                            }
                             it.copy(
                                 budgets = budgetList,
-                                hasActiveBudget = budgetList.isNotEmpty(),
-                                totalBudgeted = totalBudgeted
+                                hasActiveBudget = hasBudget,
+                                totalBudgeted = totalBudgeted,
+                                fundingSourceInput = nextSource
                             )
                         }
                     }
@@ -186,9 +229,30 @@ class ExpenseViewModel(
     fun onBudgetSelected(budget: Budget) {
         _uiState.update {
             it.copy(
+                fundingSourceInput = ExpenseFundingSource.BUDGET,
                 budgetIdInput = budget.id,
                 budgetCategoryInput = budget.category,
                 budgetSubcategoryInput = budget.subcategory,
+                savingCategoryInput = "",
+                errorMessage = null
+            )
+        }
+    }
+
+    fun onFundingSourceSelected(source: ExpenseFundingSource) {
+        _uiState.update {
+            it.copy(
+                fundingSourceInput = source,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun onSavingCategorySelected(category: String) {
+        _uiState.update {
+            it.copy(
+                fundingSourceInput = ExpenseFundingSource.SAVINGS,
+                savingCategoryInput = category,
                 errorMessage = null
             )
         }
@@ -229,7 +293,9 @@ class ExpenseViewModel(
                     periodId = expense.periodId.takeIf { id -> id > 0L } ?: (it.selectedPeriodId ?: 0L),
                     budgetId = expense.budgetId.takeIf { id -> id > 0L },
                     budgetCategory = matchingBudget?.category ?: expense.budgetCategory,
-                    budgetSubcategory = matchingBudget?.subcategory.orEmpty()
+                    budgetSubcategory = matchingBudget?.subcategory.orEmpty(),
+                    fundingSource = expense.fundingSource,
+                    savingCategory = expense.savingCategory
                 )
             )
         }
@@ -244,9 +310,34 @@ class ExpenseViewModel(
         _uiState.update { state ->
             state.copy(
                 editingExpense = state.editingExpense?.copy(
+                    fundingSource = ExpenseFundingSource.BUDGET,
                     budgetId = budget.id,
                     budgetCategory = budget.category,
                     budgetSubcategory = budget.subcategory,
+                    savingCategory = "",
+                    errorMessage = null
+                )
+            )
+        }
+    }
+
+    fun onEditFundingSourceSelected(source: ExpenseFundingSource) {
+        _uiState.update { state ->
+            state.copy(
+                editingExpense = state.editingExpense?.copy(
+                    fundingSource = source,
+                    errorMessage = null
+                )
+            )
+        }
+    }
+
+    fun onEditSavingCategorySelected(category: String) {
+        _uiState.update { state ->
+            state.copy(
+                editingExpense = state.editingExpense?.copy(
+                    fundingSource = ExpenseFundingSource.SAVINGS,
+                    savingCategory = category,
                     errorMessage = null
                 )
             )
@@ -296,7 +387,9 @@ class ExpenseViewModel(
                 subcategoryInput = editState.subcategory,
                 periodId = periodId,
                 budgetId = editState.budgetId,
-                budgetCategoryInput = editState.budgetCategory
+                budgetCategoryInput = editState.budgetCategory,
+                fundingSource = editState.fundingSource,
+                savingCategoryInput = editState.savingCategory
             )) {
                 is ExpenseResult.Error -> {
                     _uiState.update { state ->
@@ -372,7 +465,9 @@ class ExpenseViewModel(
                     subcategoryInput = current.subcategoryInput,
                     periodId = current.selectedPeriodId,
                     budgetId = current.budgetIdInput,
-                    budgetCategoryInput = current.budgetCategoryInput
+                    budgetCategoryInput = current.budgetCategoryInput,
+                    fundingSource = current.fundingSourceInput,
+                    savingCategoryInput = current.savingCategoryInput
                 )) {
                     is ExpenseResult.Error -> {
                         _uiState.update { it.copy(errorMessage = result.message) }
@@ -387,6 +482,8 @@ class ExpenseViewModel(
                                 budgetIdInput = null,
                                 budgetCategoryInput = "",
                                 budgetSubcategoryInput = "",
+                                fundingSourceInput = if (it.hasActiveBudget) ExpenseFundingSource.BUDGET else if (it.hasAvailableSavings) ExpenseFundingSource.SAVINGS else ExpenseFundingSource.BUDGET,
+                                savingCategoryInput = "",
                                 errorMessage = null,
                                 toastMessage = "Gasto guardado"
                             )

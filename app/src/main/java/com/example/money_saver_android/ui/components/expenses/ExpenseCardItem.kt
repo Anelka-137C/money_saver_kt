@@ -34,14 +34,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
+import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
@@ -69,6 +74,9 @@ fun ExpenseCardItem(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            val isSavingsFunded = expense.fundingSource == ExpenseFundingSource.SAVINGS
+            val accentColor = if (isSavingsFunded) Color(0xFF3B82F6) else GreenAccent
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -77,10 +85,10 @@ fun ExpenseCardItem(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(GreenAccent.copy(alpha = 0.15f)),
+                        .background(accentColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = currency.symbol, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GreenAccent)
+                    Text(text = currency.symbol, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = accentColor)
                 }
 
                 Spacer(modifier = Modifier.width(14.dp))
@@ -179,16 +187,26 @@ fun ExpenseCardItem(
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = GreenAccent.copy(alpha = 0.15f)
+                val badgeText = if (isSavingsFunded) {
+                    val prefix = t("expenses.item.savings_badge_prefix")
+                    if (expense.savingCategory.isNotBlank()) "$prefix: ${expense.savingCategory}" else prefix
+                } else {
+                    "Guardado"
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .then(if (isSavingsFunded) Modifier.testTag("badge_expense_savings_source") else Modifier)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Guardado",
+                        text = badgeText,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = GreenAccent,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        color = accentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

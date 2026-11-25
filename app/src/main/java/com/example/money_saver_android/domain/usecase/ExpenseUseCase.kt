@@ -3,11 +3,17 @@ package com.example.money_saver_android.domain.usecase
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.repository.BudgetRepository
 import com.example.money_saver_android.data.repository.ExpenseRepository
+import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
+import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.math.BigDecimal
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -28,7 +34,9 @@ data class CategoryExpenseItem(
 
 class ExpenseUseCase(
     private val repository: ExpenseRepository,
-    private val budgetRepository: BudgetRepository? = null
+    private val budgetRepository: BudgetRepository? = null,
+    private val savingsRepository: SavingsRepository? = null,
+    private val expenseMutex: Mutex = FinancialAllocationLock.mutex
 ) {
     val requiresBudgetConditioning: Boolean
         get() = budgetRepository != null
@@ -45,6 +53,14 @@ class ExpenseUseCase(
         return budgetRepository?.getBudgetsByPeriod(periodId) ?: emptyFlow()
     }
 
+    fun getAllSavings(): Flow<List<Saving>> {
+        return savingsRepository?.getAllSavings() ?: emptyFlow()
+    }
+
+    fun getSavingCategories(): Flow<List<Category>> {
+        return savingsRepository?.getAllCategories() ?: emptyFlow()
+    }
+
     suspend fun saveExpense(
         amountInput: String,
         dateInput: String,
@@ -53,7 +69,9 @@ class ExpenseUseCase(
         subcategoryInput: String = "",
         periodId: Long? = null,
         budgetId: Long? = null,
-        budgetCategoryInput: String = ""
+        budgetCategoryInput: String = "",
+        fundingSource: ExpenseFundingSource = ExpenseFundingSource.BUDGET,
+        savingCategoryInput: String = ""
     ): ExpenseResult = withValidatedExpense(
         amountInput = amountInput,
         dateInput = dateInput,
@@ -62,7 +80,9 @@ class ExpenseUseCase(
         subcategoryInput = subcategoryInput,
         periodId = periodId,
         budgetId = budgetId,
-        budgetCategoryInput = budgetCategoryInput
+        budgetCategoryInput = budgetCategoryInput,
+        fundingSource = fundingSource,
+        savingCategoryInput = savingCategoryInput
     ) { expense ->
         repository.insertExpense(expense)
         ExpenseResult.Success
@@ -77,7 +97,9 @@ class ExpenseUseCase(
         subcategoryInput: String = "",
         periodId: Long? = null,
         budgetId: Long? = null,
-        budgetCategoryInput: String = ""
+        budgetCategoryInput: String = "",
+        fundingSource: ExpenseFundingSource = ExpenseFundingSource.BUDGET,
+        savingCategoryInput: String = ""
     ): ExpenseResult = withValidatedExpense(
         id = id,
         amountInput = amountInput,
@@ -87,7 +109,9 @@ class ExpenseUseCase(
         subcategoryInput = subcategoryInput,
         periodId = periodId,
         budgetId = budgetId,
-        budgetCategoryInput = budgetCategoryInput
+        budgetCategoryInput = budgetCategoryInput,
+        fundingSource = fundingSource,
+        savingCategoryInput = savingCategoryInput
     ) { expense ->
         if (id <= 0L || repository.getAllExpenses().first().none { it.id == id }) {
             return@withValidatedExpense ExpenseResult.Error("Gasto no encontrado")
@@ -106,8 +130,24 @@ class ExpenseUseCase(
         periodId: Long?,
         budgetId: Long?,
         budgetCategoryInput: String,
+        fundingSource: ExpenseFundingSource,
+        savingCategoryInput: String,
         onValid: suspend (Expense) -> ExpenseResult
     ): ExpenseResult {
+        if (fundingSource == ExpenseFundingSource.SAVINGS) {
+            return withValidatedSavingsExpense(
+                id = id,
+                amountInput = amountInput,
+                dateInput = dateInput,
+                descriptionInput = descriptionInput,
+                categoryInput = categoryInput,
+                subcategoryInput = subcategoryInput,
+                periodId = periodId,
+                savingCategoryInput = savingCategoryInput,
+                onValid = onValid
+            )
+        }
+
         val periodBudgets = if (budgetRepository != null) {
             if (periodId == null || periodId <= 0L) {
                 return ExpenseResult.Error("Período no seleccionado")
@@ -152,9 +192,90 @@ class ExpenseUseCase(
                 subcategory = subcategoryInput.trim(),
                 periodId = periodId ?: 0L,
                 budgetId = matchedBudget?.id ?: (budgetId ?: 0L),
-                budgetCategory = matchedBudget?.category ?: budgetCategoryInput.trim()
+                budgetCategory = matchedBudget?.category ?: budgetCategoryInput.trim(),
+                fundingSource = ExpenseFundingSource.BUDGET,
+                savingCategory = ""
             )
         )
+    }
+
+    private suspend fun withValidatedSavingsExpense(
+        id: Long,
+        amountInput: String,
+        dateInput: String,
+        descriptionInput: String,
+        categoryInput: String,
+        subcategoryInput: String,
+        periodId: Long?,
+        savingCategoryInput: String,
+        onValid: suspend (Expense) -> ExpenseResult
+    ): ExpenseResult {
+        val savingsRepo = savingsRepository
+            ?: return ExpenseResult.Error("Módulo de ahorros no configurado")
+
+        if (budgetRepository != null && (periodId == null || periodId <= 0L)) {
+            return ExpenseResult.Error("Período no seleccionado")
+        }
+
+        val amount = parseAmountInput(amountInput) ?: 0.0
+        if (amount.isNaN() || amount.isInfinite() || amount <= 0.0) {
+            return ExpenseResult.Error("El monto debe ser mayor a cero")
+        }
+
+        val trimmedSavingCategory = savingCategoryInput.trim()
+        if (trimmedSavingCategory.isEmpty()) {
+            return ExpenseResult.Error("Debes seleccionar una categoría de ahorro")
+        }
+
+        val trimmedCategory = categoryInput.trim()
+        if (trimmedCategory.isEmpty()) {
+            return ExpenseResult.Error("Debes seleccionar una categoría")
+        }
+
+        val trimmedDate = dateInput.trim()
+        if (!isValidExpenseDate(trimmedDate)) {
+            return ExpenseResult.Error("Fecha inválida")
+        }
+
+        return expenseMutex.withLock {
+            val allSavings = savingsRepo.getAllSavings().first()
+            val allExpenses = repository.getAllExpenses().first()
+            val matchingSavings = allSavings.filter {
+                it.amount.isFinite() && it.amount > 0.0 &&
+                    it.category.trim().equals(trimmedSavingCategory, ignoreCase = true)
+            }
+            val totalSaved = matchingSavings.map { it.amount }.sumBigDecimal()
+            val totalSpent = allExpenses
+                .filter {
+                    it.fundingSource == ExpenseFundingSource.SAVINGS &&
+                        (id <= 0L || it.id != id) &&
+                        it.amount.isFinite() && it.amount > 0.0 &&
+                        it.savingCategory.trim().equals(trimmedSavingCategory, ignoreCase = true)
+                }
+                .map { it.amount }
+                .sumBigDecimal()
+            val available = totalSaved.subtract(totalSpent).max(BigDecimal.ZERO)
+            if (matchingSavings.isEmpty() || BigDecimal.valueOf(amount) > available) {
+                return@withLock ExpenseResult.Error("Saldo insuficiente en la categoría de ahorro")
+            }
+
+            val canonicalSavingCategory = matchingSavings.first().category.trim()
+            onValid(
+                Expense(
+                    id = id,
+                    amount = amount,
+                    date = trimmedDate,
+                    description = descriptionInput,
+                    category = trimmedCategory,
+                    subcategory = subcategoryInput.trim(),
+                    periodId = periodId ?: 0L,
+                    budgetId = 0L,
+                    budgetCategory = "",
+                    fundingSource = ExpenseFundingSource.SAVINGS,
+                    savingCategory = canonicalSavingCategory
+                )
+            )
+        }
     }
 
     private fun parseAmountInput(rawInput: String): Double? {
@@ -208,7 +329,7 @@ class ExpenseUseCase(
         expenses: List<Expense>,
         categories: List<Category>
     ): PeriodCategorySummary = buildPeriodCategorySummary(
-        entries = expenses,
+        entries = expenses.filter { it.fundingSource != ExpenseFundingSource.SAVINGS },
         categories = categories,
         categorySelector = { it.category },
         amountSelector = { it.amount },
@@ -216,15 +337,16 @@ class ExpenseUseCase(
     )
 
     /**
-     * Groups expenses strictly by expense category (subcategories consolidated).
+     * Groups budget-funded expenses strictly by expense category (subcategories consolidated).
      */
     fun calculateCategoryExpenses(
         expenses: List<Expense>,
         categories: List<Category>
     ): List<CategoryExpenseItem> {
-        if (expenses.isEmpty()) return emptyList()
-        val totalSpent = expenses.sumOf { it.amount }
-        return expenses.groupBy { it.category.trim().lowercase() }
+        val budgetExpenses = expenses.filter { it.fundingSource != ExpenseFundingSource.SAVINGS }
+        if (budgetExpenses.isEmpty()) return emptyList()
+        val totalSpent = budgetExpenses.sumOf { it.amount }
+        return budgetExpenses.groupBy { it.category.trim().lowercase() }
             .map { (_, catExpenses) ->
                 val rawName = catExpenses.first().category.trim()
                 val category = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }

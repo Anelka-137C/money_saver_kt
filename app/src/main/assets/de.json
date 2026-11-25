@@ -31,8 +31,14 @@
       "amount_label": "Betrag",
       "amount_placeholder": "0.00",
       "date_label": "Datum & Uhrzeit",
+      "funding_source_label": "Finanzierungsquelle",
+      "source_budget": "Budget",
+      "source_savings": "Ersparnisse",
       "budget_label": "Quellbudget",
       "budget_placeholder": "Budget auswählen",
+      "saving_source_label": "Quell-Sparkategorie",
+      "saving_source_placeholder": "Sparkategorie auswählen",
+      "no_savings_available": "Keine Ersparnisse verfügbar",
       "category_label": "Kategorie",
       "category_placeholder": "Kategorie auswählen",
       "description_label": "Notiz (optional)",
@@ -41,6 +47,9 @@
     },
     "breakdown": {
       "title": "Ausgabenaufschlüsselung"
+    },
+    "item": {
+      "savings_badge_prefix": "Ersparnis"
     },
     "history": {
       "title": "Ausgabenhistorie",
@@ -52,8 +61,14 @@
       "amount_label": "Betrag",
       "amount_placeholder": "0.00",
       "date_label": "Datum & Uhrzeit",
+      "funding_source_label": "Finanzierungsquelle",
+      "source_budget": "Budget",
+      "source_savings": "Ersparnisse",
       "budget_label": "Quellbudget",
       "budget_placeholder": "Budget auswählen",
+      "saving_source_label": "Quell-Sparkategorie",
+      "saving_source_placeholder": "Sparkategorie auswählen",
+      "no_savings_available": "Keine Ersparnisse verfügbar",
       "category_label": "Kategorie",
       "category_placeholder": "Kategorie auswählen",
       "description_label": "Beschreibung (optional)",
@@ -266,6 +281,12 @@
       "empty_message": "Keine Ersparnisse in diesem Zeitraum",
       "available_banner_title": "Du hast %s verfügbar",
       "available_banner_subtitle": "%s deines Einkommens ist noch zum Sparen verfügbar."
+    },
+    "net_overview": {
+      "title": "Netto-Sparguthaben",
+      "total_available": "Gesamt verfügbar kumuliert",
+      "center_label": "Verfügbar",
+      "empty_message": "Kein verfügbares Sparguthaben"
     },
     "add_dialog": {
       "title": "Ersparnis zurücklegen",

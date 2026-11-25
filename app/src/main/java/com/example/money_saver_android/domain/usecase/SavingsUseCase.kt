@@ -3,9 +3,11 @@ package com.example.money_saver_android.domain.usecase
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.BudgetRepository
+import com.example.money_saver_android.data.repository.ExpenseRepository
 import com.example.money_saver_android.data.repository.IncomeRepository
 import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
+import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
@@ -27,8 +29,15 @@ class SavingsUseCase(
     private val savingsRepository: SavingsRepository,
     private val incomeRepository: IncomeRepository,
     private val budgetRepository: BudgetRepository? = null,
+    private val expenseRepository: ExpenseRepository? = null,
     private val savingMutex: Mutex = FinancialAllocationLock.mutex
 ) {
+
+    fun getAllSavings(): Flow<List<Saving>> =
+        savingsRepository.getAllSavings()
+
+    fun getAllExpenses(): Flow<List<Expense>> =
+        expenseRepository?.getAllExpenses() ?: emptyFlow()
 
     fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>> =
         savingsRepository.getSavingsByPeriod(periodId)
@@ -50,6 +59,17 @@ class SavingsUseCase(
         categories = categories,
         categorySelector = { it.category },
         amountSelector = { it.amount },
+        defaultColorHex = "#3B82F6"
+    )
+
+    fun calculateNetSavingsSummary(
+        allSavings: List<Saving>,
+        allExpenses: List<Expense>,
+        categories: List<Category>
+    ): PeriodCategorySummary = buildSavingsNetSummary(
+        savings = allSavings,
+        expenses = allExpenses,
+        categories = categories,
         defaultColorHex = "#3B82F6"
     )
 

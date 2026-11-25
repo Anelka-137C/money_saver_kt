@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -41,6 +43,7 @@ data class SavingsUiState(
     val totalBudgeted: Double = 0.0,
     val totalSaved: Double = 0.0,
     val savingsSummary: PeriodCategorySummary = PeriodCategorySummary(),
+    val netSavingsSummary: PeriodCategorySummary = PeriodCategorySummary(),
     val availableIncome: Double = 0.0,
     val savingAmountInput: String = "",
     val savingIncomeIdInput: Long? = null,
@@ -96,6 +99,17 @@ class SavingsViewModel(
                         savingsSummary = savingsUseCase.calculateSavingsCategorySummary(current.savings, list)
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            combine(
+                savingsUseCase.getAllSavings().catch { emit(emptyList()) },
+                savingsUseCase.getAllExpenses().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
+                savingsUseCase.getCategories().catch { emit(emptyList()) }.onStart { emit(emptyList()) }
+            ) { allSavings, allExpenses, categories ->
+                savingsUseCase.calculateNetSavingsSummary(allSavings, allExpenses, categories)
+            }.collect { netSummary ->
+                _uiState.update { current -> current.copy(netSavingsSummary = netSummary) }
             }
         }
     }

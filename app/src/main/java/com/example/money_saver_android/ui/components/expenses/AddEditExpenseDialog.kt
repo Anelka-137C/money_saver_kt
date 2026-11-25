@@ -53,6 +53,8 @@ import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.model.Budget
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
+import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.incomes.CurrencyFormatVisualTransformation
 import com.example.money_saver_android.ui.components.incomes.DateTimePickerField
@@ -81,6 +83,11 @@ fun AddEditExpenseDialog(
     budgets: List<Budget>,
     errorMessage: String?,
     currency: Currency = defaultCurrencies.first(),
+    fundingSource: ExpenseFundingSource = ExpenseFundingSource.BUDGET,
+    savingCategory: String = "",
+    savingsBalances: List<SavingsCategoryBalance> = emptyList(),
+    onFundingSourceSelected: (ExpenseFundingSource) -> Unit = {},
+    onSavingCategorySelected: (String) -> Unit = {},
     onAmountChange: (String) -> Unit,
     onDateChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
@@ -91,6 +98,7 @@ fun AddEditExpenseDialog(
     modifier: Modifier = Modifier
 ) {
     var budgetMenuExpanded by remember { mutableStateOf(false) }
+    var savingMenuExpanded by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onCloseClick,
@@ -179,33 +187,127 @@ fun AddEditExpenseDialog(
                     }
                 }
 
-                // Selector 1: Source Budget
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    ExpenseSelectorField(
-                        label = t("expenses.add_card.budget_label"),
-                        displayValue = formatCategoryLabel(budgetCategory, budgetSubcategory),
-                        placeholder = t("expenses.add_card.budget_placeholder"),
-                        testTag = "selector_expense_budget",
-                        onClick = { budgetMenuExpanded = true }
+                // Funding Source selector (Budget vs Savings)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = t("expenses.add_card.funding_source_label"),
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    DropdownMenu(
-                        expanded = budgetMenuExpanded,
-                        onDismissRequest = { budgetMenuExpanded = false },
-                        modifier = Modifier.background(CardBackground)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(FieldBackground)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        budgets.forEach { budget ->
-                            val label = formatCategoryLabel(budget.category, budget.subcategory).orEmpty()
-                            val amountFormatted = CurrencyFormatter.format(budget.amount, currency)
-                            DropdownMenuItem(
-                                text = {
-                                    Text("$label • $amountFormatted", color = TextPrimary, fontSize = 14.sp)
-                                },
-                                onClick = {
-                                    onBudgetSelected(budget)
-                                    budgetMenuExpanded = false
-                                },
-                                modifier = Modifier.testTag("budget_option_${budget.id}")
-                            )
+                        FundingSourceChip(
+                            label = t("expenses.add_card.source_budget"),
+                            selected = fundingSource == ExpenseFundingSource.BUDGET,
+                            accentColor = GreenAccent,
+                            testTag = "source_option_budget",
+                            onClick = { onFundingSourceSelected(ExpenseFundingSource.BUDGET) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FundingSourceChip(
+                            label = t("expenses.add_card.source_savings"),
+                            selected = fundingSource == ExpenseFundingSource.SAVINGS,
+                            accentColor = Color(0xFF3B82F6),
+                            testTag = "source_option_savings",
+                            onClick = { onFundingSourceSelected(ExpenseFundingSource.SAVINGS) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Selector 1: Source Budget or Source Savings Category
+                if (fundingSource == ExpenseFundingSource.BUDGET) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        ExpenseSelectorField(
+                            label = t("expenses.add_card.budget_label"),
+                            displayValue = formatCategoryLabel(budgetCategory, budgetSubcategory),
+                            placeholder = t("expenses.add_card.budget_placeholder"),
+                            testTag = "selector_expense_budget",
+                            onClick = { budgetMenuExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = budgetMenuExpanded,
+                            onDismissRequest = { budgetMenuExpanded = false },
+                            modifier = Modifier.background(CardBackground)
+                        ) {
+                            budgets.forEach { budget ->
+                                val label = formatCategoryLabel(budget.category, budget.subcategory).orEmpty()
+                                val amountFormatted = CurrencyFormatter.format(budget.amount, currency)
+                                DropdownMenuItem(
+                                    text = {
+                                        Text("$label • $amountFormatted", color = TextPrimary, fontSize = 14.sp)
+                                    },
+                                    onClick = {
+                                        onBudgetSelected(budget)
+                                        budgetMenuExpanded = false
+                                    },
+                                    modifier = Modifier.testTag("budget_option_${budget.id}")
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val selectedBalance = savingsBalances.find {
+                        it.categoryName.equals(savingCategory, ignoreCase = true)
+                    }
+                    val savingDisplayValue = if (savingCategory.isNotBlank()) {
+                        selectedBalance?.let {
+                            "${it.categoryName} • ${CurrencyFormatter.format(it.netBalance, currency)}"
+                        } ?: savingCategory
+                    } else null
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        ExpenseSelectorField(
+                            label = t("expenses.add_card.saving_source_label"),
+                            displayValue = savingDisplayValue,
+                            placeholder = t("expenses.add_card.saving_source_placeholder"),
+                            testTag = "selector_expense_saving_category",
+                            onClick = { savingMenuExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = savingMenuExpanded,
+                            onDismissRequest = { savingMenuExpanded = false },
+                            modifier = Modifier.background(CardBackground)
+                        ) {
+                            if (savingsBalances.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = t("expenses.add_card.no_savings_available"),
+                                            color = TextSecondary,
+                                            fontSize = 14.sp
+                                        )
+                                    },
+                                    enabled = false,
+                                    onClick = {}
+                                )
+                            } else {
+                                savingsBalances.forEach { balance ->
+                                    val formattedBalance = CurrencyFormatter.format(balance.netBalance, currency)
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "${balance.categoryName} • $formattedBalance",
+                                                color = TextPrimary,
+                                                fontSize = 14.sp
+                                            )
+                                        },
+                                        onClick = {
+                                            onSavingCategorySelected(balance.categoryName)
+                                            savingMenuExpanded = false
+                                        },
+                                        modifier = Modifier.testTag("saving_source_option_${balance.categoryName}")
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -275,6 +377,38 @@ fun AddEditExpenseDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FundingSourceChip(
+    label: String,
+    selected: Boolean,
+    accentColor: Color,
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) accentColor.copy(alpha = 0.2f) else Color.Transparent)
+            .border(
+                width = 1.dp,
+                color = if (selected) accentColor else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .clickable(onClick = onClick)
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) accentColor else TextSecondary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 

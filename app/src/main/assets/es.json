@@ -31,8 +31,14 @@
       "amount_label": "Monto",
       "amount_placeholder": "0.00",
       "date_label": "Fecha y hora",
+      "funding_source_label": "Fuente de fondos",
+      "source_budget": "Presupuesto",
+      "source_savings": "Ahorros",
       "budget_label": "Presupuesto origen",
       "budget_placeholder": "Seleccionar presupuesto",
+      "saving_source_label": "Categoría de ahorro origen",
+      "saving_source_placeholder": "Seleccionar categoría de ahorro",
+      "no_savings_available": "No hay ahorros disponibles",
       "category_label": "Categoría",
       "category_placeholder": "Seleccionar categoría",
       "description_label": "Nota (opcional)",
@@ -41,6 +47,9 @@
     },
     "breakdown": {
       "title": "Desglose de gastos"
+    },
+    "item": {
+      "savings_badge_prefix": "Ahorro"
     },
     "history": {
       "title": "Historial de gastos",
@@ -52,8 +61,14 @@
       "amount_label": "Monto",
       "amount_placeholder": "0.00",
       "date_label": "Fecha y hora",
+      "funding_source_label": "Fuente de fondos",
+      "source_budget": "Presupuesto",
+      "source_savings": "Ahorros",
       "budget_label": "Presupuesto origen",
       "budget_placeholder": "Seleccionar presupuesto",
+      "saving_source_label": "Categoría de ahorro origen",
+      "saving_source_placeholder": "Seleccionar categoría de ahorro",
+      "no_savings_available": "No hay ahorros disponibles",
       "category_label": "Categoría",
       "category_placeholder": "Seleccionar categoría",
       "description_label": "Descripción (opcional)",
@@ -266,6 +281,12 @@
       "empty_message": "Sin ahorros registrados en este período",
       "available_banner_title": "Tienes %s disponible",
       "available_banner_subtitle": "%s de tus ingresos sigue disponible para apartar."
+    },
+    "net_overview": {
+      "title": "Saldo neto en ahorros",
+      "total_available": "Total disponible acumulado",
+      "center_label": "Disponible",
+      "empty_message": "Sin saldo disponible en ahorros"
     },
     "add_dialog": {
       "title": "Apartar Ahorro",

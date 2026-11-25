@@ -144,7 +144,9 @@ fun ExpensesTabContent(
             currency = currency
         )
 
-        if (!state.hasActiveBudget) {
+        val canRegisterExpense = state.hasActiveBudget || state.hasAvailableSavings
+
+        if (!canRegisterExpense) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -183,7 +185,7 @@ fun ExpensesTabContent(
                 viewModel.clearErrorMessage()
                 showAddDialog = true
             },
-            enabled = state.hasActiveBudget,
+            enabled = canRegisterExpense,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
@@ -198,13 +200,13 @@ fun ExpensesTabContent(
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = null,
-                tint = if (state.hasActiveBudget) Color.Black else TextSecondary,
+                tint = if (canRegisterExpense) Color.Black else TextSecondary,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = t("expenses.add_card.title"),
-                color = if (state.hasActiveBudget) Color.Black else TextSecondary,
+                color = if (canRegisterExpense) Color.Black else TextSecondary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -271,6 +273,11 @@ fun ExpensesTabContent(
             budgets = state.budgets,
             errorMessage = state.errorMessage,
             currency = currency,
+            fundingSource = state.fundingSourceInput,
+            savingCategory = state.savingCategoryInput,
+            savingsBalances = state.savingsBalances,
+            onFundingSourceSelected = viewModel::onFundingSourceSelected,
+            onSavingCategorySelected = viewModel::onSavingCategorySelected,
             onAmountChange = viewModel::onAmountChange,
             onDateChange = viewModel::onDateChange,
             onDescriptionChange = viewModel::onDescriptionChange,
@@ -304,6 +311,11 @@ fun ExpensesTabContent(
                 budgets = state.budgets,
                 errorMessage = editState.errorMessage,
                 currency = currency,
+                fundingSource = editState.fundingSource,
+                savingCategory = editState.savingCategory,
+                savingsBalances = state.savingsBalances,
+                onFundingSourceSelected = viewModel::onEditFundingSourceSelected,
+                onSavingCategorySelected = viewModel::onEditSavingCategorySelected,
                 onAmountChange = viewModel::onEditAmountChange,
                 onDateChange = viewModel::onEditDateChange,
                 onDescriptionChange = viewModel::onEditDescriptionChange,

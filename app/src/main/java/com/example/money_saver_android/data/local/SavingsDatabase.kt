@@ -31,6 +31,9 @@ data class SavingEntity(
 
 @Dao
 interface SavingDao {
+    @Query("SELECT * FROM savings ORDER BY id ASC")
+    fun getAllSavings(): Flow<List<SavingEntity>>
+
     @Query("SELECT * FROM savings WHERE periodId = :periodId ORDER BY id ASC")
     fun getSavingsByPeriod(periodId: Long): Flow<List<SavingEntity>>
 

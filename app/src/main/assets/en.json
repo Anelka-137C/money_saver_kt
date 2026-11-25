@@ -31,8 +31,14 @@
       "amount_label": "Amount",
       "amount_placeholder": "0.00",
       "date_label": "Date & Time",
+      "funding_source_label": "Funding source",
+      "source_budget": "Budget",
+      "source_savings": "Savings",
       "budget_label": "Source budget",
       "budget_placeholder": "Select budget",
+      "saving_source_label": "Source savings category",
+      "saving_source_placeholder": "Select savings category",
+      "no_savings_available": "No savings available",
       "category_label": "Category",
       "category_placeholder": "Select category",
       "description_label": "Note (optional)",
@@ -41,6 +47,9 @@
     },
     "breakdown": {
       "title": "Expense breakdown"
+    },
+    "item": {
+      "savings_badge_prefix": "Savings"
     },
     "history": {
       "title": "Expense history",
@@ -52,8 +61,14 @@
       "amount_label": "Amount",
       "amount_placeholder": "0.00",
       "date_label": "Date & Time",
+      "funding_source_label": "Funding source",
+      "source_budget": "Budget",
+      "source_savings": "Savings",
       "budget_label": "Source budget",
       "budget_placeholder": "Select budget",
+      "saving_source_label": "Source savings category",
+      "saving_source_placeholder": "Select savings category",
+      "no_savings_available": "No savings available",
       "category_label": "Category",
       "category_placeholder": "Select category",
       "description_label": "Description (optional)",
@@ -266,6 +281,12 @@
       "empty_message": "No savings in this period",
       "available_banner_title": "You have %s available",
       "available_banner_subtitle": "%s of your income is still available to set aside."
+    },
+    "net_overview": {
+      "title": "Net Savings Balance",
+      "total_available": "Total accumulated available",
+      "center_label": "Available",
+      "empty_message": "No available savings balance"
     },
     "add_dialog": {
       "title": "Set Aside Saving",

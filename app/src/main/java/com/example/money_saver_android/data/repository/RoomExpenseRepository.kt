@@ -3,6 +3,7 @@ package com.example.money_saver_android.data.repository
 import com.example.money_saver_android.data.local.ExpenseDao
 import com.example.money_saver_android.data.local.ExpenseEntity
 import com.example.money_saver_android.domain.model.Expense
+import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -36,7 +37,9 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
         subcategory = subcategory.orEmpty(),
         periodId = periodId ?: 0L,
         budgetId = budgetId ?: 0L,
-        budgetCategory = budgetCategory.orEmpty()
+        budgetCategory = budgetCategory.orEmpty(),
+        fundingSource = ExpenseFundingSource.fromStorage(fundingSource),
+        savingCategory = savingCategory.orEmpty()
     )
 
     private fun Expense.toEntity(): ExpenseEntity = ExpenseEntity(
@@ -48,6 +51,8 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
         subcategory = subcategory.takeIf { it.isNotBlank() },
         periodId = periodId.takeIf { it > 0L },
         budgetId = budgetId.takeIf { it > 0L },
-        budgetCategory = budgetCategory.takeIf { it.isNotBlank() }
+        budgetCategory = budgetCategory.takeIf { it.isNotBlank() },
+        fundingSource = fundingSource.name,
+        savingCategory = savingCategory.takeIf { it.isNotBlank() }
     )
 }
