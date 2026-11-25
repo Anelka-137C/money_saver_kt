@@ -450,7 +450,7 @@ class IncomeUseCase(
         return budgets.groupBy { it.category.trim().lowercase() }
             .map { (_, catBudgets) ->
                 val rawName = catBudgets.first().category.trim()
-                val category = categories.find { it.name.equals(rawName, ignoreCase = true) }
+                val category = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
                 val totalBudget = catBudgets.sumOf { it.amount }
                 val spent = expenses.filter { expense ->
                     expense.matchesPeriod(periodStartDate, periodEndDate, periodId) &&
@@ -465,9 +465,9 @@ class IncomeUseCase(
                 }
                 val progress = if (ratio.isFinite()) ratio.toFloat().coerceIn(0f, 1f) else 0f
                 CategoryBudgetItem(
-                    categoryName = category?.name ?: rawName,
+                    categoryName = category?.name?.trim()?.ifEmpty { rawName } ?: rawName,
                     icon = category?.icon?.ifBlank { "📋" } ?: "📋",
-                    colorHex = category?.color?.ifBlank { "#10B981" } ?: "#10B981",
+                    colorHex = category?.color?.trim()?.ifEmpty { "#10B981" } ?: "#10B981",
                     budgetAmount = totalBudget,
                     spentAmount = spent,
                     remainingAmount = remaining,

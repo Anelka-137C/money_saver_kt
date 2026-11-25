@@ -63,4 +63,26 @@ class CategorySummaryTest {
         assertEquals("#EF4444", summary.items[0].colorHex)
         assertEquals(100, summary.items[0].percentage)
     }
+
+    @Test
+    fun `matches catalog categories with leading or trailing whitespace and returns trimmed name and color`() {
+        val messyCatalog = listOf(
+            Category(" Employment ", "💼", " #1CC88A ", emptyList())
+        )
+        val entries = listOf(
+            Income(1, 500.0, "2026-05-01 09:00", "employment", "Salary", "", 1L)
+        )
+
+        val summary = buildPeriodCategorySummary(
+            entries = entries,
+            categories = messyCatalog,
+            categorySelector = { it.category },
+            amountSelector = { it.amount },
+            defaultColorHex = "#4E73DF"
+        )
+
+        assertEquals(1, summary.items.size)
+        assertEquals("Employment", summary.items[0].categoryName)
+        assertEquals("#1CC88A", summary.items[0].colorHex)
+    }
 }

@@ -11,6 +11,7 @@ import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
+import com.example.money_saver_android.domain.usecase.calculateValidPeriodTotal
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -89,10 +90,11 @@ class ExpenseViewModel(
             expensesJob = viewModelScope.launch {
                 expenseUseCase.getExpenses().collect { list ->
                     _uiState.update { current ->
+                        val summary = expenseUseCase.calculateExpenseCategorySummary(list, current.categories)
                         current.copy(
                             expenses = list,
-                            totalSpent = list.sumOf { e -> e.amount },
-                            expenseSummary = expenseUseCase.calculateExpenseCategorySummary(list, current.categories)
+                            totalSpent = summary.totalAmount,
+                            expenseSummary = summary
                         )
                     }
                 }
@@ -148,10 +150,11 @@ class ExpenseViewModel(
                     .catch { emit(emptyList()) }
                     .collect { list ->
                         _uiState.update { current ->
+                            val summary = expenseUseCase.calculateExpenseCategorySummary(list, current.categories)
                             current.copy(
                                 expenses = list,
-                                totalSpent = list.sumOf { e -> e.amount },
-                                expenseSummary = expenseUseCase.calculateExpenseCategorySummary(list, current.categories)
+                                totalSpent = summary.totalAmount,
+                                expenseSummary = summary
                             )
                         }
                     }
@@ -160,11 +163,16 @@ class ExpenseViewModel(
                 expenseUseCase.getBudgetsByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { budgetList ->
+                        val totalBudgeted = calculateValidPeriodTotal(
+                            entries = budgetList,
+                            categorySelector = { it.category },
+                            amountSelector = { it.amount }
+                        )
                         _uiState.update {
                             it.copy(
                                 budgets = budgetList,
                                 hasActiveBudget = budgetList.isNotEmpty(),
-                                totalBudgeted = budgetList.sumOf { b -> b.amount }
+                                totalBudgeted = totalBudgeted
                             )
                         }
                     }

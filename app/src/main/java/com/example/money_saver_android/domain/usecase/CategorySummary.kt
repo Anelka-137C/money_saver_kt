@@ -19,6 +19,21 @@ data class PeriodCategorySummary(
         get() = items.isEmpty() || totalAmount <= 0.0
 }
 
+fun <T> calculateValidPeriodTotal(
+    entries: List<T>,
+    categorySelector: (T) -> String,
+    amountSelector: (T) -> Double
+): Double {
+    val validEntries = entries.filter { entry ->
+        val amount = amountSelector(entry)
+        amount.isFinite() && amount > 0.0 && categorySelector(entry).trim().isNotEmpty()
+    }
+    if (validEntries.isEmpty()) return 0.0
+
+    val total = validEntries.map(amountSelector).sumBigDecimal().toDouble()
+    return if (total.isFinite() && total > 0.0) total else 0.0
+}
+
 fun <T> buildPeriodCategorySummary(
     entries: List<T>,
     categories: List<Category>,
@@ -39,12 +54,14 @@ fun <T> buildPeriodCategorySummary(
         .groupBy { categorySelector(it).trim().lowercase() }
         .map { (_, group) ->
             val rawName = categorySelector(group.first()).trim()
-            val matchedCategory = categories.find { it.name.equals(rawName, ignoreCase = true) }
+            val matchedCategory = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
+            val resolvedName = matchedCategory?.name?.trim()?.ifEmpty { rawName } ?: rawName
+            val resolvedColor = matchedCategory?.color?.trim()?.ifEmpty { defaultColorHex } ?: defaultColorHex
             val amount = group.map(amountSelector).sumBigDecimal().toDouble()
             val ratio = (amount / total).coerceIn(0.0, 1.0)
             CategorySummaryItem(
-                categoryName = matchedCategory?.name ?: rawName,
-                colorHex = matchedCategory?.color?.ifBlank { defaultColorHex } ?: defaultColorHex,
+                categoryName = resolvedName,
+                colorHex = resolvedColor,
                 amount = amount,
                 proportion = ratio.toFloat(),
                 percentage = (ratio * 100.0).roundToInt()

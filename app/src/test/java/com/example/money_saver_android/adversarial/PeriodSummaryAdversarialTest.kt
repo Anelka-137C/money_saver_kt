@@ -113,7 +113,6 @@ class PeriodSummaryAdversarialTest {
     ) : IncomeRepository {
         val incomesFlow = MutableStateFlow<List<Income>>(emptyList())
         val categoriesFlow = MutableStateFlow<List<Category>>(emptyList())
-        val budgetCategoriesFlow = MutableStateFlow<List<Category>>(emptyList())
         private var nextId = 1L
 
         override fun getIncomesByPeriod(periodId: Long): Flow<List<Income>> =
@@ -140,7 +139,6 @@ class PeriodSummaryAdversarialTest {
         }
 
         override fun getAllCategories(): Flow<List<Category>> = categoriesFlow
-        override fun getAllBudgetCategories(): Flow<List<Category>> = budgetCategoriesFlow
 
         override suspend fun insertCategory(category: Category) {
             categoriesFlow.value = categoriesFlow.value + category
@@ -176,7 +174,6 @@ class PeriodSummaryAdversarialTest {
             }
 
         override suspend fun preloadDefaultCategoriesIfNeeded() = Unit
-        override suspend fun preloadDefaultBudgetCategoriesIfNeeded() = Unit
     }
 
     private class AdversarialBudgetRepo : BudgetRepository {
@@ -354,11 +351,11 @@ class PeriodSummaryAdversarialTest {
     fun property_based_invariants_across_randomized_inputs() {
         val random = Random(42)
         val sampleCategories = listOf(
-            Category("Food", "🍔", "#EF4444"),
-            Category("Housing", "🏠", "#3B82F6"),
-            Category("Transport", "🚗", "#10B981"),
-            Category("Entertainment", "🎮", "#F59E0B"),
-            Category("Health", "💊", "#8B5CF6")
+            Category("Food", "🍔", "#EF4444", emptyList()),
+            Category("Housing", "🏠", "#3B82F6", emptyList()),
+            Category("Transport", "🚗", "#10B981", emptyList()),
+            Category("Entertainment", "🎮", "#F59E0B", emptyList()),
+            Category("Health", "💊", "#8B5CF6", emptyList())
         )
 
         repeat(500) { iteration ->
@@ -589,8 +586,8 @@ class PeriodSummaryAdversarialTest {
     @Test
     fun test_catalog_fallback_color_when_color_is_blank_or_missing() {
         val categories = listOf(
-            Category("Food", "🍔", ""), // Blank color
-            Category("Housing", "🏠", "   ") // Whitespace color
+            Category("Food", "🍔", "", emptyList()), // Blank color
+            Category("Housing", "🏠", "   ", emptyList()) // Whitespace color
         )
         val entries = listOf(
             Expense(1, 100.0, "2026-05-01", "", "Food", periodId = 1L),
@@ -614,17 +611,14 @@ class PeriodSummaryAdversarialTest {
     }
 
     /**
-     * VULNERABILITY / ADVERSARIAL BUG EXPOSURE:
-     * When categories in the catalog have leading/trailing whitespace (e.g. " Employment "),
-     * buildPeriodCategorySummary matches with `it.name.equals(rawName, ignoreCase = true)`.
-     * Because `rawName` is trimmed ("Employment") but `it.name` is NOT trimmed (" Employment "),
-     * the lookup fails, resulting in a null matchedCategory and falling back to defaultColorHex!
+     * Verifies that catalog categories with leading/trailing whitespace (e.g. " Employment ")
+     * still match trimmed entry categories, resolve their configured color, and expose a trimmed name.
      */
     @Test
     fun test_untrimmed_category_name_in_catalog_lookup_behavior() {
         val catalogWithWhitespace = listOf(
-            Category(" Employment ", "💼", "#1CC88A"),
-            Category("Transport", "🚗", "#3B82F6")
+            Category(" Employment ", "💼", " #1CC88A ", emptyList()),
+            Category("Transport", "🚗", "#3B82F6", emptyList())
         )
         val entries = listOf(
             Income(1, 500.0, "2026-05-01", "Employment", "", "", 1L),
@@ -642,16 +636,9 @@ class PeriodSummaryAdversarialTest {
         val transportItem = summary.items.first { it.categoryName == "Transport" }
         assertEquals("#3B82F6", transportItem.colorHex)
 
-        val employmentItem = summary.items.first { it.categoryName.trim() == "Employment" }
-        // EXPOSURE: If it.name in catalog was not trimmed, matchedCategory was null,
-        // so colorHex fell back to #4E73DF instead of #1CC88A.
-        // We assert the actual observed behavior:
-        assertNotEquals(
-            "Untrimmed catalog name ' Employment ' fails exact match and falls back to default",
-            "#1CC88A",
-            employmentItem.colorHex
-        )
-        assertEquals("#4E73DF", employmentItem.colorHex)
+        val employmentItem = summary.items.first { it.categoryName == "Employment" }
+        assertEquals("Employment", employmentItem.categoryName)
+        assertEquals("#1CC88A", employmentItem.colorHex)
     }
 
     // =========================================================================
@@ -664,7 +651,7 @@ class PeriodSummaryAdversarialTest {
         val expenseUseCase = ExpenseUseCase(expenseRepo)
         val categories = listOf(
             Category("Food", "🍔", "#FF5733", listOf(Subcategory("Groceries"), Subcategory("Restaurants"), Subcategory("Snacks"))),
-            Category("Travel", "✈️", "#33FF57")
+            Category("Travel", "✈️", "#33FF57", emptyList())
         )
 
         val expenses = listOf(
@@ -697,8 +684,8 @@ class PeriodSummaryAdversarialTest {
         val incomeRepo = AdversarialIncomeRepo()
         val incomeUseCase = IncomeUseCase(incomeRepo)
         val categories = listOf(
-            Category("Salary", "💼", "#10B981"),
-            Category("Investments", "📈", "#3B82F6")
+            Category("Salary", "💼", "#10B981", emptyList()),
+            Category("Investments", "📈", "#3B82F6", emptyList())
         )
 
         val incomes = listOf(
@@ -727,9 +714,10 @@ class PeriodSummaryAdversarialTest {
     @Test
     fun test_savings_usecase_consolidates_savings_across_different_income_sources() {
         val savingsRepo = AdversarialSavingsRepo()
-        val savingsUseCase = SavingsUseCase(savingsRepo)
+        val incomeRepo = AdversarialIncomeRepo()
+        val savingsUseCase = SavingsUseCase(savingsRepo, incomeRepo)
         val categories = listOf(
-            Category("Emergency Fund", "🛡️", "#3B82F6")
+            Category("Emergency Fund", "🛡️", "#3B82F6", emptyList())
         )
 
         val savings = listOf(
@@ -758,8 +746,8 @@ class PeriodSummaryAdversarialTest {
         try {
             val expenseRepo = AdversarialExpenseRepo()
             val categoryRepo = AdversarialCategoryRepo()
-            categoryRepo.insertCategory(Category("Food", "🍔", "#EF4444"))
-            categoryRepo.insertCategory(Category("Leisure", "🎉", "#F59E0B"))
+            categoryRepo.insertCategory(Category("Food", "🍔", "#EF4444", emptyList()))
+            categoryRepo.insertCategory(Category("Leisure", "🎉", "#F59E0B", emptyList()))
 
             // Period 101 has $300 in expenses
             expenseRepo.insertExpense(Expense(1, 100.0, "2026-05-01", "", "Food", periodId = 101L))
@@ -776,7 +764,7 @@ class PeriodSummaryAdversarialTest {
             advanceUntilIdle()
 
             // 1. Select Period 101
-            viewModel.setFinancialPeriod(101L)
+            viewModel.onPeriodSelected(101L)
             advanceUntilIdle()
 
             var state = viewModel.uiState.value
@@ -787,7 +775,7 @@ class PeriodSummaryAdversarialTest {
             assertEquals(300.0, state.expenseSummary.items[0].amount, 0.001)
 
             // 2. Switch to Period 102 -> Period 101 data must vanish completely
-            viewModel.setFinancialPeriod(102L)
+            viewModel.onPeriodSelected(102L)
             advanceUntilIdle()
 
             state = viewModel.uiState.value
@@ -798,7 +786,7 @@ class PeriodSummaryAdversarialTest {
             assertEquals(50.0, state.expenseSummary.items[0].amount, 0.001)
 
             // 3. Switch to empty Period 103 -> Must show 0.0 and empty items immediately
-            viewModel.setFinancialPeriod(103L)
+            viewModel.onPeriodSelected(103L)
             advanceUntilIdle()
 
             state = viewModel.uiState.value
@@ -808,7 +796,7 @@ class PeriodSummaryAdversarialTest {
             assertTrue(state.expenseSummary.items.isEmpty())
 
             // 4. Set period to null -> Immediate reset
-            viewModel.setFinancialPeriod(null)
+            viewModel.onPeriodSelected(null)
             advanceUntilIdle()
 
             state = viewModel.uiState.value
@@ -863,7 +851,8 @@ class PeriodSummaryAdversarialTest {
 
         try {
             val savingsRepo = AdversarialSavingsRepo()
-            val savingsUseCase = SavingsUseCase(savingsRepo)
+            val incomeRepo = AdversarialIncomeRepo()
+            val savingsUseCase = SavingsUseCase(savingsRepo, incomeRepo)
             val viewModel = SavingsViewModel(savingsUseCase)
             advanceUntilIdle()
 
@@ -888,6 +877,70 @@ class PeriodSummaryAdversarialTest {
             assertTrue(state.savingsSummary.isEmpty)
             assertEquals(0.0, state.savingsSummary.totalAmount, 0.0)
             assertTrue(state.savingsSummary.items.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun test_viewmodel_totals_remain_consistent_with_summaries_when_corrupted_or_blank_category_records_exist() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+
+        try {
+            val periodId = 1L
+            val expenseRepo = AdversarialExpenseRepo()
+            val incomeRepo = AdversarialIncomeRepo()
+            val budgetRepo = AdversarialBudgetRepo()
+            val savingsRepo = AdversarialSavingsRepo()
+            val categoryRepo = AdversarialCategoryRepo()
+
+            // Seed valid + corrupted/blank-category records directly in repositories (simulating migration/import)
+            expenseRepo.insertExpense(Expense(1L, 120.0, "2026-05-01", "Valid", "Food", periodId = periodId))
+            expenseRepo.insertExpense(Expense(2L, 999.0, "2026-05-02", "Blank cat", "   ", periodId = periodId))
+            expenseRepo.insertExpense(Expense(3L, -50.0, "2026-05-03", "Negative", "Food", periodId = periodId))
+            expenseRepo.insertExpense(Expense(4L, Double.NaN, "2026-05-04", "NaN", "Food", periodId = periodId))
+
+            incomeRepo.insertIncome(Income(1L, 1000.0, "2026-05-01", "Salary", "", "", periodId))
+            incomeRepo.insertIncome(Income(2L, 500.0, "2026-05-02", "  ", "", "", periodId))
+            incomeRepo.insertIncome(Income(3L, Double.POSITIVE_INFINITY, "2026-05-03", "Salary", "", "", periodId))
+
+            budgetRepo.insertBudget(Budget(1L, 300.0, "Food", "", periodId))
+            budgetRepo.insertBudget(Budget(2L, 400.0, "", "", periodId))
+            budgetRepo.insertBudget(Budget(3L, -100.0, "Food", "", periodId))
+
+            savingsRepo.insertSaving(Saving(1L, 200.0, "Emergency", "", periodId))
+            savingsRepo.insertSaving(Saving(2L, 150.0, "   ", "", periodId))
+            savingsRepo.insertSaving(Saving(3L, 0.0, "Emergency", "", periodId))
+
+            val expenseVm = ExpenseViewModel(ExpenseUseCase(expenseRepo, budgetRepo), CategoryUseCase(categoryRepo))
+            val incomeVm = IncomeViewModel(IncomeUseCase(incomeRepo, budgetRepo, savingsRepository = savingsRepo))
+            val savingsVm = SavingsViewModel(SavingsUseCase(savingsRepo, incomeRepo, budgetRepo))
+
+            expenseVm.onPeriodSelected(periodId)
+            incomeVm.onPeriodSelected(periodId)
+            savingsVm.onPeriodSelected(periodId)
+            advanceUntilIdle()
+
+            // ExpenseViewModel consistency
+            assertEquals(120.0, expenseVm.uiState.value.expenseSummary.totalAmount, 0.001)
+            assertEquals(expenseVm.uiState.value.expenseSummary.totalAmount, expenseVm.uiState.value.totalSpent, 0.001)
+            assertEquals(300.0, expenseVm.uiState.value.totalBudgeted, 0.001)
+
+            // IncomeViewModel consistency
+            assertEquals(1000.0, incomeVm.uiState.value.incomeSummary.totalAmount, 0.001)
+            assertEquals(incomeVm.uiState.value.incomeSummary.totalAmount, incomeVm.uiState.value.totalIncome, 0.001)
+            assertEquals(300.0, incomeVm.uiState.value.budgetSummary.totalAmount, 0.001)
+            assertEquals(incomeVm.uiState.value.budgetSummary.totalAmount, incomeVm.uiState.value.totalBudgeted, 0.001)
+            assertEquals(200.0, incomeVm.uiState.value.totalSaved, 0.001)
+            assertEquals(500.0, incomeVm.uiState.value.availableIncome, 0.001)
+
+            // SavingsViewModel consistency
+            assertEquals(200.0, savingsVm.uiState.value.savingsSummary.totalAmount, 0.001)
+            assertEquals(savingsVm.uiState.value.savingsSummary.totalAmount, savingsVm.uiState.value.totalSaved, 0.001)
+            assertEquals(1000.0, savingsVm.uiState.value.totalIncome, 0.001)
+            assertEquals(300.0, savingsVm.uiState.value.totalBudgeted, 0.001)
+            assertEquals(500.0, savingsVm.uiState.value.availableIncome, 0.001)
         } finally {
             Dispatchers.resetMain()
         }

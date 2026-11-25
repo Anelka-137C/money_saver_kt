@@ -227,7 +227,7 @@ class ExpenseUseCase(
         return expenses.groupBy { it.category.trim().lowercase() }
             .map { (_, catExpenses) ->
                 val rawName = catExpenses.first().category.trim()
-                val category = categories.find { it.name.equals(rawName, ignoreCase = true) }
+                val category = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
                 val spent = catExpenses.sumOf { it.amount }
                 val ratio = when {
                     totalSpent.isInfinite() -> if (spent.isInfinite()) 1.0 else 0.0
@@ -236,9 +236,9 @@ class ExpenseUseCase(
                 }
                 val progress = if (ratio.isFinite()) ratio.toFloat().coerceIn(0f, 1f) else 0f
                 CategoryExpenseItem(
-                    categoryName = category?.name ?: rawName,
+                    categoryName = category?.name?.trim()?.ifEmpty { rawName } ?: rawName,
                     icon = category?.icon?.ifBlank { "💸" } ?: "💸",
-                    colorHex = category?.color?.ifBlank { "#EF4444" } ?: "#EF4444",
+                    colorHex = category?.color?.trim()?.ifEmpty { "#EF4444" } ?: "#EF4444",
                     spentAmount = spent,
                     progress = progress,
                     percent = (progress * 100).toInt()

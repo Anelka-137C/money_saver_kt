@@ -1,27 +1,25 @@
-# Story #11: Consultar histórico filtrado por período financiero
+/# Story #12: Registrar gasto con fondos de ahorros y saldo neto
 
 ## Story
-Como usuario, quiero consultar el histórico de ingresos, presupuesto, gastos y ahorros filtrado por período financiero con un resumen visual por categorías al inicio de cada vista, para revisar claramente cómo se distribuye mi dinero en cada ciclo.
+Como usuario, quiero registrar un gasto especificando que los fondos provienen de mis ahorros con saldo disponible visible y consultar mi saldo neto por categoría en ahorros con el diseño de resumen, para cubrir salidas extraordinarias sin afectar mi presupuesto corriente y monitorear mis fondos remanentes.
 
 ## Acceptance criteria
-- [ ] Given un período financiero con movimientos registrados en ingresos, presupuesto, gastos o ahorros, when el usuario accede a cualquiera de esas cuatro vistas, then visualiza como primer elemento superior la tarjeta de resumen del período con el total acumulado, una gráfica circular cuyas porciones muestran las proporciones agrupadas únicamente por categorías principales (consolidando sus subcategorías) usando el color asignado a cada categoría, y la leyenda de cada categoría con su color correspondiente, monto y porcentaje, sin indicadores comparativos contra otros períodos.
-- [ ] Given registros distribuidos en distintos períodos financieros, when el usuario selecciona otro período en el selector de período, then la tarjeta de resumen y el listado histórico de ingresos, presupuesto, gastos y ahorros se actualizan para mostrar exclusivamente la información perteneciente al período elegido.
-- [ ] Given un período financiero seleccionado que no tiene registros en alguno de los cuatro rubros, when el usuario consulta esa vista, then la tarjeta de resumen muestra el total en cero, la gráfica circular en estado vacío y sin porcentajes ni cifras simuladas.
+- [ ] Given categorías de ahorro con saldo acumulado a través de los períodos financieros, when el usuario despliega el selector de fuente de fondos para registrar un gasto desde ahorros, then visualiza cada categoría con su saldo acumulado total disponible (ahorros históricos menos gastos previos) y, al guardarlo, el gasto queda registrado sin descontar ni incrementar el porcentaje consumido del presupuesto corriente del período.
+- [ ] Given una categoría de ahorro seleccionada como fuente de fondos, when el usuario intenta registrar un gasto cuyo monto supera el saldo acumulado total disponible en esa categoría, then el sistema bloquea el registro mostrando un mensaje de error por saldo insuficiente en la categoría de ahorro.
+- [ ] Given gastos financiados con ahorros registrados en el sistema, when el usuario consulta las vistas de gastos y ahorros, then en gastos identifica cada salida extraordinaria con su etiqueta distintiva de ahorro de origen (excluida del consumo de presupuesto), y en la vista de ahorros visualiza una tarjeta de saldo neto acumulado fiel al diseño de referencia (total general destacado, gráfica circular proporcional y leyenda de categorías con color, monto neto y porcentaje).
 
 ## Plan
-- Lógica de negocio para agrupar los registros del período seleccionado exclusivamente por categoría principal (consolidando subcategorías), asociar el color propio de cada categoría y calcular totales, montos y porcentajes en los cuatro rubros.
-- Gestión de estado para exponer el resumen real por categoría principal (incluyendo su color) de ingresos, presupuesto, gastos y ahorros sincronizado con el período financiero seleccionado.
-- Componente atómico reutilizable de resumen (ubicado en la subcarpeta `atom` dentro de los componentes de interfaz) con total destacado, gráfica circular proporcional pintada con el color de cada categoría y leyenda por categoría fiel al diseño de referencia, sin insignia comparativa y con estado vacío.
-- Integración del componente de resumen como primer elemento superior en las cuatro vistas (ingresos, presupuesto, gastos y ahorros), eliminando los datos fijos o simulados actuales.
-- Textos localizados en los idiomas soportados para encabezados, etiquetas y estado vacío del resumen en cada vista.
+- Almacenamiento en capa de datos de la fuente de fondos (presupuesto corriente o ahorros) y la categoría de ahorro de origen asociada a cada gasto.
+- Lógica de cálculo acumulativo global y validaciones para determinar el saldo neto por categoría de ahorro (aportes históricos menos gastos previos), verificando disponibilidad sin exigir presupuesto corriente activo.
+- Selector de fuente de fondos en el diálogo de gastos que liste las categorías de ahorro mostrando explícitamente su saldo acumulado disponible.
+- Identificación visual de gastos financiados con ahorros en el listado de gastos, manteniéndolos excluidos del total consumido del presupuesto corriente del período.
+- Componente atómico en la vista de ahorros que replique fielmente el diseño de referencia (total, gráfica circular proporcional y leyenda detallada) adaptado a los atributos de saldo neto acumulado por categoría.
 
 ## Out of scope
-- Comparativas, tendencias o variaciones porcentuales entre períodos financieros distintos.
-- Desglose de la gráfica circular por subcategorías (se consolidan dentro de su categoría principal).
-- Una quinta pantalla independiente que apile las cuatro tarjetas a la vez.
-- Eliminar o rediseñar las tarjetas secundarias de asignación/distribución existentes debajo del resumen.
-- Bloquear la edición o eliminación de registros en períodos pasados.
-- Gráficos adicionales distintos a la gráfica circular de resumen.
+- Traspasos o transferencias directas de dinero entre categorías de ahorro sin mediar un gasto.
+- Permitir saldo neto negativo o sobregiro en las categorías de ahorro.
+- Modificación retroactiva de los registros históricos de aportes a ahorros o de ingresos.
+- Pantalla independiente o módulo de auditoría de movimientos de ahorro fuera de las vistas actuales de gastos y ahorros.
 
 ## Suggestions (your call)
-- Definir si el centro de la gráfica circular muestra el total del período con `100%` en los cuatro rubros (y `0%` cuando esté vacío) para mantener consistencia visual con el diseño de referencia sin introducir datos ficticios.
+- Atributos del componente atómico de resumen: reutilizar o especializar la estructura atómica de la tarjeta de resumen para saldo neto mapeando sus etiquetas (ej. título "Saldo neto en ahorros", subtítulo "Total disponible acumulado", centro de gráfica con porcentaje o etiqueta correspondiente) para mantener total consistencia visual con `design/resumen.png`.

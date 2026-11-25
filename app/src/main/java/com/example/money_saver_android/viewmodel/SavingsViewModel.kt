@@ -8,6 +8,7 @@ import com.example.money_saver_android.domain.model.Saving
 import com.example.money_saver_android.domain.usecase.PeriodCategorySummary
 import com.example.money_saver_android.domain.usecase.SavingsResult
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
+import com.example.money_saver_android.domain.usecase.calculateValidPeriodTotal
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -139,7 +140,11 @@ class SavingsViewModel(
                 savingsUseCase.getIncomesByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { incomes ->
-                        val totalIncome = incomes.sumOf { it.amount }
+                        val totalIncome = calculateValidPeriodTotal(
+                            entries = incomes,
+                            categorySelector = { it.category },
+                            amountSelector = { it.amount }
+                        )
                         _uiState.update { current ->
                             val available = savingsUseCase.calculateAvailableIncome(
                                 totalIncome, current.totalBudgeted, current.totalSaved
@@ -162,7 +167,11 @@ class SavingsViewModel(
                 savingsUseCase.getBudgetsByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { budgets ->
-                        val totalBudgeted = budgets.sumOf { it.amount }
+                        val totalBudgeted = calculateValidPeriodTotal(
+                            entries = budgets,
+                            categorySelector = { it.category },
+                            amountSelector = { it.amount }
+                        )
                         _uiState.update { current ->
                             val available = savingsUseCase.calculateAvailableIncome(
                                 current.totalIncome, totalBudgeted, current.totalSaved
@@ -175,15 +184,16 @@ class SavingsViewModel(
                 savingsUseCase.getSavingsByPeriod(periodId)
                     .catch { emit(emptyList()) }
                     .collect { savingList ->
-                        val totalSaved = savingsUseCase.calculateTotalSaved(savingList)
                         _uiState.update { current ->
+                            val summary = savingsUseCase.calculateSavingsCategorySummary(savingList, current.savingCategories)
+                            val totalSaved = summary.totalAmount
                             val available = savingsUseCase.calculateAvailableIncome(
                                 current.totalIncome, current.totalBudgeted, totalSaved
                             )
                             current.copy(
                                 savings = savingList,
                                 totalSaved = totalSaved,
-                                savingsSummary = savingsUseCase.calculateSavingsCategorySummary(savingList, current.savingCategories),
+                                savingsSummary = summary,
                                 availableIncome = available
                             )
                         }
