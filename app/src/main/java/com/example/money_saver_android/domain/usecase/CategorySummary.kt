@@ -28,7 +28,7 @@ data class PeriodCategorySummary(
     val items: List<CategorySummaryItem> = emptyList()
 ) {
     val isEmpty: Boolean
-        get() = items.isEmpty() || totalAmount <= 0.0
+        get() = items.isEmpty() || !totalAmount.isFinite() || totalAmount <= 0.0
 }
 
 fun <T> calculateValidPeriodTotal(

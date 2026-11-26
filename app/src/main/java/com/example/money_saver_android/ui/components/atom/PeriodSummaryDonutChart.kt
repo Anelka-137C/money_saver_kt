@@ -50,24 +50,28 @@ internal fun calculateAnimatedDonutSegments(
     summary: PeriodCategorySummary,
     progress: Float
 ): List<DonutArcSegment> {
-    if (summary.isEmpty || !progress.isFinite()) return emptyList()
+    if (summary.isEmpty || !summary.totalAmount.isFinite() || !progress.isFinite()) return emptyList()
     val clampedProgress = progress.coerceIn(0f, 1f)
     if (clampedProgress <= 0f) return emptyList()
 
-    val segments = mutableListOf<DonutArcSegment>()
-    var startAngle = -90f
-    var accumulatedSweep = 0f
+    val validItems = summary.items.filter { it.proportion.isFinite() && it.proportion > 0f }
+    if (validItems.isEmpty()) return emptyList()
 
-    summary.items.forEachIndexed { index, item ->
-        val remainingCircle = (360f - accumulatedSweep).coerceAtLeast(0f)
-        val fullSweep = if (index == summary.items.lastIndex) {
+    val segments = mutableListOf<DonutArcSegment>()
+    // Accumulate in Double and derive startAngle from accumulatedSweep to avoid Float drift across many slices.
+    var accumulatedSweep = 0.0
+    val progressRatio = clampedProgress.toDouble()
+
+    validItems.forEachIndexed { index, item ->
+        val remainingCircle = (360.0 - accumulatedSweep).coerceAtLeast(0.0)
+        val fullSweep = if (index == validItems.lastIndex) {
             remainingCircle
         } else {
-            val safeProportion = if (item.proportion.isFinite()) item.proportion else 0f
-            (safeProportion * 360f).coerceIn(0f, remainingCircle)
+            (item.proportion.toDouble() * 360.0).coerceIn(0.0, remainingCircle)
         }
-        if (fullSweep > 0f) {
-            val animatedSweep = fullSweep * clampedProgress
+        if (fullSweep > 0.0) {
+            val startAngle = (-90.0 + accumulatedSweep).toFloat()
+            val animatedSweep = (fullSweep * progressRatio).toFloat()
             if (animatedSweep > 0f) {
                 segments.add(
                     DonutArcSegment(
@@ -77,7 +81,6 @@ internal fun calculateAnimatedDonutSegments(
                     )
                 )
             }
-            startAngle += fullSweep
             accumulatedSweep += fullSweep
         }
     }
@@ -119,6 +122,7 @@ internal fun PeriodSummaryDonutChart(
         Canvas(modifier = Modifier.size(126.dp)) {
             val strokeWidth = 16.dp.toPx()
             val diameter = size.minDimension - strokeWidth
+            if (!diameter.isFinite() || diameter <= 0f) return@Canvas
             val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
             val arcSize = Size(diameter, diameter)
             val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
