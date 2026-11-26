@@ -186,10 +186,14 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
         composeTestRule.onNodeWithText("Vista de Contabilidad").assertDoesNotExist()
 
-        // Attempting to click Settings tab keeps lock on Period
+        // Attempting to click Settings tab is allowed even when no active period exists (to allow Drive backup restore)
         composeTestRule.onNodeWithTag("tab_settings").performClick()
-        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+
+        // Returning to Contabilidad still keeps lock on Period
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertDoesNotExist()
     }
 
     @Test
@@ -327,8 +331,36 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
         composeTestRule.onNodeWithText("Vista de Contabilidad").assertDoesNotExist()
 
+        // Settings tab remains accessible even when period is expired so user can restore backups
         composeTestRule.onNodeWithTag("tab_settings").performClick()
-        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_requestedTab_settings_navigates_directly_to_settings_and_allows_switching_back() {
+        val activePeriod = FinancialPeriod(id = 1L, startDate = "2026-11-01", endDate = "2026-11-30")
+        val periodViewModel = PeriodViewModel(
+            PeriodUseCase(FakeFinancialPeriodRepository(initialPeriod = activePeriod), currentDateProvider = { "2026-11-07" })
+        )
+        var consumed = false
+
+        composeTestRule.setContent {
+            MainContainer(
+                settingsViewModel = settingsViewModel,
+                periodViewModel = periodViewModel,
+                i18nManager = i18nManager,
+                requestedTab = AppTab.SETTINGS,
+                onRequestedTabConsumed = { consumed = true },
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
+                }
+            )
+        }
+
+        composeTestRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+        org.junit.Assert.assertTrue(consumed)
+
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
     }
 }

@@ -87,6 +87,20 @@ interface ExpenseDao {
 
     @Query("UPDATE expenses SET savingCategory = :newCategoryName WHERE LOWER(TRIM(COALESCE(savingCategory, ''))) = LOWER(TRIM(:oldCategoryName))")
     suspend fun reassignSavingCategory(oldCategoryName: String, newCategoryName: String)
+
+    @Query("DELETE FROM expenses")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<ExpenseEntity>)
+
+    @Transaction
+    suspend fun replaceAll(entities: List<ExpenseEntity>) {
+        deleteAll()
+        if (entities.isNotEmpty()) {
+            insertAll(entities)
+        }
+    }
 }
 
 @Dao
@@ -155,6 +169,27 @@ interface CategoryDao {
             reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
             reassignExpensesCategory(oldCategoryName = oldName, newCategoryName = newName)
             deleteCategoryByName(oldName)
+        }
+    }
+
+    @Query("DELETE FROM expenses_subcategories")
+    suspend fun deleteAllSubcategories()
+
+    @Query("DELETE FROM expenses_categories")
+    suspend fun deleteAllCategories()
+
+    @Transaction
+    suspend fun replaceAllCategories(
+        categories: List<CategoryEntity>,
+        subcategories: List<SubcategoryEntity>
+    ) {
+        deleteAllSubcategories()
+        deleteAllCategories()
+        if (categories.isNotEmpty()) {
+            insertCategories(categories)
+        }
+        if (subcategories.isNotEmpty()) {
+            insertSubcategories(subcategories)
         }
     }
 }

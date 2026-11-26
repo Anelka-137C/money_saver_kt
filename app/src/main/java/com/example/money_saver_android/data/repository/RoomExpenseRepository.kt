@@ -36,6 +36,10 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
         dao.reassignSavingCategory(oldCategoryName = oldName, newCategoryName = newName)
     }
 
+    override suspend fun replaceAllExpenses(expenses: List<Expense>) {
+        dao.replaceAll(expenses.map { it.toEntity() })
+    }
+
     private fun ExpenseEntity.toDomain(): Expense = Expense(
         id = id,
         amount = amount,

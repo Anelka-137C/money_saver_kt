@@ -14,4 +14,5 @@ interface CategoryRepository {
     suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {}
     suspend fun countExpensesForCategory(categoryName: String): Int = 0
     suspend fun countExpensesForSubcategory(categoryName: String, subcategoryName: String): Int = 0
+    suspend fun replaceAllCategories(categories: List<Category>) {}
 }

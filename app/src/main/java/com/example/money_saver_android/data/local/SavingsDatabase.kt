@@ -54,6 +54,20 @@ interface SavingDao {
 
     @Query("SELECT COUNT(*) FROM savings WHERE category = :categoryName COLLATE NOCASE AND subcategory = :subcategoryName COLLATE NOCASE")
     suspend fun countSavingsForSubcategory(categoryName: String, subcategoryName: String): Int
+
+    @Query("DELETE FROM savings")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<SavingEntity>)
+
+    @Transaction
+    suspend fun replaceAll(entities: List<SavingEntity>) {
+        deleteAll()
+        if (entities.isNotEmpty()) {
+            insertAll(entities)
+        }
+    }
 }
 
 @Entity(tableName = "saving_category")
@@ -135,6 +149,27 @@ interface SavingCategoryDao {
             reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
             reassignSavingsCategory(oldCategoryName = oldName, newCategoryName = newName)
             deleteCategoryByExactName(oldName)
+        }
+    }
+
+    @Query("DELETE FROM saving_subcategory")
+    suspend fun deleteAllSubcategories()
+
+    @Query("DELETE FROM saving_category")
+    suspend fun deleteAllCategories()
+
+    @Transaction
+    suspend fun replaceAllCategories(
+        categories: List<SavingCategoryEntity>,
+        subcategories: List<SavingSubcategoryEntity>
+    ) {
+        deleteAllSubcategories()
+        deleteAllCategories()
+        if (categories.isNotEmpty()) {
+            insertCategories(categories)
+        }
+        if (subcategories.isNotEmpty()) {
+            insertSubcategories(subcategories)
         }
     }
 }

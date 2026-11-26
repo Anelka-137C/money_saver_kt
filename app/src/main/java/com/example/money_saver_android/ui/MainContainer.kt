@@ -16,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +47,11 @@ fun MainContainer(
     i18nManager: I18nManager,
     modifier: Modifier = Modifier,
     periodViewModel: PeriodViewModel? = null,
+    requestedTab: AppTab? = null,
+    onRequestedTabConsumed: () -> Unit = {},
+    onCreateBackupClick: () -> Unit = {},
+    onRestoreBackupClick: () -> Unit = {},
+    onRestoreConfirmed: () -> Unit = {},
     incomesContent: (@Composable () -> Unit)? = null
 ) {
     // Observe language changes to re-render texts in real-time
@@ -64,10 +70,23 @@ fun MainContainer(
     val isPeriodLocked = periodState?.let { !it.isPeriodConfigured } ?: false
 
     var currentTab by rememberSaveable {
-        mutableStateOf(if (isPeriodLocked) AppTab.PERIOD else AppTab.INCOMES)
+        mutableStateOf(
+            when {
+                requestedTab == AppTab.SETTINGS -> AppTab.SETTINGS
+                isPeriodLocked -> AppTab.PERIOD
+                else -> requestedTab ?: AppTab.INCOMES
+            }
+        )
     }
 
-    val activeTab = if (isPeriodLocked) AppTab.PERIOD else currentTab
+    LaunchedEffect(requestedTab, isPeriodLocked) {
+        if (requestedTab != null && (!isPeriodLocked || requestedTab != AppTab.INCOMES)) {
+            currentTab = requestedTab
+            onRequestedTabConsumed()
+        }
+    }
+
+    val activeTab = if (isPeriodLocked && currentTab == AppTab.INCOMES) AppTab.PERIOD else currentTab
 
     CompositionLocalProvider(LocalI18nManager provides i18nManager) {
         Scaffold(
@@ -99,11 +118,7 @@ fun MainContainer(
                     NavigationBarItem(
                         modifier = Modifier.testTag("tab_settings"),
                         selected = activeTab == AppTab.SETTINGS,
-                        onClick = {
-                            if (!isPeriodLocked) {
-                                currentTab = AppTab.SETTINGS
-                            }
-                        },
+                        onClick = { currentTab = AppTab.SETTINGS },
                         icon = { Icon(Icons.Default.Settings, contentDescription = i18nManager.t("navigation.tab_settings")) },
                         label = { Text(i18nManager.t("navigation.tab_settings")) },
                         colors = NavigationBarItemDefaults.colors(
@@ -140,7 +155,10 @@ fun MainContainer(
                     AppTab.INCOMES -> incomesContent?.invoke()
                     AppTab.SETTINGS -> SettingsView(
                         settingsViewModel = settingsViewModel,
-                        i18nManager = i18nManager
+                        i18nManager = i18nManager,
+                        onCreateBackupClick = onCreateBackupClick,
+                        onRestoreBackupClick = onRestoreBackupClick,
+                        onRestoreConfirmed = onRestoreConfirmed
                     )
                     AppTab.PERIOD -> {
                         periodViewModel?.let {

@@ -29,6 +29,8 @@ interface BudgetRepository {
     suspend fun countBudgetsForCategory(categoryName: String): Int
     suspend fun countBudgetsForSubcategory(categoryName: String, subcategoryName: String): Int
     suspend fun preloadDefaultCategoriesIfNeeded()
+    suspend fun replaceAllBudgets(budgets: List<Budget>) {}
+    suspend fun replaceAllCategories(categories: List<Category>) {}
 }
 
 class RoomBudgetRepository(
@@ -56,6 +58,23 @@ class RoomBudgetRepository(
 
     override suspend fun deleteBudget(id: Long) {
         budgetDao.deleteById(id)
+    }
+
+    override suspend fun replaceAllBudgets(budgets: List<Budget>) {
+        budgetDao.replaceAll(budgets.map { it.toEntity() })
+    }
+
+    override suspend fun replaceAllCategories(categories: List<Category>) {
+        val dao = categoryDao ?: return
+        val catEntities = categories.map {
+            BudgetCategoryEntity(name = it.name, icon = it.icon, color = it.color)
+        }
+        val subEntities = categories.flatMap { cat ->
+            cat.subcategories.map { sub ->
+                BudgetSubcategoryEntity(categoryName = cat.name, name = sub.name)
+            }
+        }
+        dao.replaceAllCategories(catEntities, subEntities)
     }
 
     override fun getAllCategories(): Flow<List<Category>> {

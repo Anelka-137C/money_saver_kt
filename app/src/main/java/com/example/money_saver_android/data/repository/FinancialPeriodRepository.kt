@@ -9,4 +9,5 @@ interface FinancialPeriodRepository {
     fun getLatestPeriod(): Flow<FinancialPeriod?>
     fun getAllPeriods(): Flow<List<FinancialPeriod>>
     suspend fun deletePeriod(id: Long)
+    suspend fun replaceAllPeriods(periods: List<FinancialPeriod>) {}
 }

@@ -1,12 +1,20 @@
 package com.example.money_saver_android
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.room.Room
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.local.AppDatabase
@@ -20,14 +28,19 @@ import com.example.money_saver_android.data.repository.RoomExpenseRepository
 import com.example.money_saver_android.data.repository.RoomFinancialPeriodRepository
 import com.example.money_saver_android.data.repository.RoomIncomeRepository
 import com.example.money_saver_android.data.repository.RoomSavingsRepository
+import com.example.money_saver_android.data.repository.SharedPrefsBackupPreferenceRepository
 import com.example.money_saver_android.data.repository.SharedPrefsCurrencyRepository
 import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
+import com.example.money_saver_android.domain.usecase.BackupUseCase
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
 import com.example.money_saver_android.domain.usecase.PeriodUseCase
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import com.example.money_saver_android.i18n.I18nManager
+import com.example.money_saver_android.notifications.AndroidBackupReminderScheduler
+import com.example.money_saver_android.notifications.BackupReminderReceiver
+import com.example.money_saver_android.ui.AppTab
 import com.example.money_saver_android.ui.IncomesView
 import com.example.money_saver_android.ui.MainContainer
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
@@ -36,6 +49,8 @@ import com.example.money_saver_android.viewmodel.IncomeViewModel
 import com.example.money_saver_android.viewmodel.PeriodViewModel
 import com.example.money_saver_android.viewmodel.SavingsViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -81,12 +96,38 @@ class MainActivity : ComponentActivity() {
         SharedPrefsCurrencyRepository(prefs)
     }
 
+    private val backupPreferenceRepository by lazy {
+        val prefs = applicationContext.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+        SharedPrefsBackupPreferenceRepository(prefs)
+    }
+
+    private val backupReminderScheduler by lazy {
+        AndroidBackupReminderScheduler(applicationContext)
+    }
+
+    private val backupUseCase by lazy {
+        BackupUseCase(
+            periodRepository = periodRepository,
+            incomeRepository = incomeRepository,
+            budgetRepository = budgetRepository,
+            expenseRepository = repository,
+            expenseCategoryRepository = categoryRepository,
+            savingsRepository = savingsRepository,
+            languagePreferenceRepository = languageRepository,
+            currencyPreferenceRepository = currencyPreferenceRepository,
+            backupPreferenceRepository = backupPreferenceRepository
+        )
+    }
+
     private val settingsViewModel by lazy {
         SettingsViewModel(
             languageRepository = languageRepository,
             i18nManager = i18nManager,
             currencyRepository = currencyRepository,
-            currencyPreferenceRepository = currencyPreferenceRepository
+            currencyPreferenceRepository = currencyPreferenceRepository,
+            backupUseCase = backupUseCase,
+            backupPreferenceRepository = backupPreferenceRepository,
+            backupReminderScheduler = backupReminderScheduler
         )
     }
 
@@ -173,6 +214,67 @@ class MainActivity : ComponentActivity() {
         IncomeViewModel(incomeUseCase)
     }
 
+    private var requestedTab by mutableStateOf<AppTab?>(null)
+
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Permission result handled silently; reminder still evaluates on app launch */ }
+
+    private val createBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) {
+            settingsViewModel.onBackupCancelled()
+            return@registerForActivityResult
+        }
+        settingsViewModel.performBackup { jsonPayload ->
+            withContext(Dispatchers.IO) {
+                contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { writer ->
+                    writer.write(jsonPayload)
+                } ?: error("Unable to open backup destination")
+            }
+        }
+        requestNotificationPermissionIfNeeded()
+    }
+
+    private val openBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) {
+            settingsViewModel.onRestorePickerCancelled()
+            return@registerForActivityResult
+        }
+        settingsViewModel.prepareRestore {
+            withContext(Dispatchers.IO) {
+                contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+                    reader.readText()
+                } ?: error("Unable to read backup file")
+            }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun resolveTabFromIntent(intent: Intent?): AppTab? {
+        return when (intent?.getStringExtra(BackupReminderReceiver.EXTRA_OPEN_TAB)) {
+            BackupReminderReceiver.TAB_SETTINGS -> AppTab.SETTINGS
+            else -> null
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        resolveTabFromIntent(intent)?.let { requestedTab = it }
+    }
+
     override fun onResume() {
         super.onResume()
         periodViewModel.checkActivePeriod()
@@ -180,6 +282,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedTab = resolveTabFromIntent(intent)
         enableEdgeToEdge()
         setContent {
             Money_saver_androidTheme {
@@ -191,11 +294,25 @@ class MainActivity : ComponentActivity() {
                 val currentSelectedPeriodId = incomeState.selectedPeriodId
                     ?.takeIf { id -> periodState.allPeriods.any { it.id == id } }
                     ?: periodState.activePeriod?.id
+                    ?: periodState.allPeriods.firstOrNull()?.id
 
                 MainContainer(
                     settingsViewModel = settingsViewModel,
                     periodViewModel = periodViewModel,
                     i18nManager = i18nManager,
+                    requestedTab = requestedTab,
+                    onRequestedTabConsumed = { requestedTab = null },
+                    onCreateBackupClick = {
+                        settingsViewModel.clearBackupStatus()
+                        createBackupLauncher.launch(BackupUseCase.BACKUP_FILE_NAME)
+                    },
+                    onRestoreBackupClick = {
+                        settingsViewModel.clearRestoreStatus()
+                        openBackupLauncher.launch(arrayOf("application/json", "application/octet-stream", "*/*"))
+                    },
+                    onRestoreConfirmed = {
+                        periodViewModel.checkActivePeriod()
+                    },
                     incomesContent = {
                         IncomesView(
                             incomeViewModel = incomeViewModel,

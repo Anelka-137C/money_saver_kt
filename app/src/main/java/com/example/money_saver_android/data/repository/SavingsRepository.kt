@@ -30,6 +30,8 @@ interface SavingsRepository {
     suspend fun deleteCategory(categoryName: String)
     suspend fun deleteSubcategory(categoryName: String, subcategoryName: String)
     suspend fun preloadDefaultCategoriesIfNeeded()
+    suspend fun replaceAllSavings(savings: List<Saving>) {}
+    suspend fun replaceAllCategories(categories: List<Category>) {}
 }
 
 class RoomSavingsRepository(
@@ -63,6 +65,23 @@ class RoomSavingsRepository(
 
     override suspend fun deleteSaving(id: Long) {
         savingDao.deleteById(id)
+    }
+
+    override suspend fun replaceAllSavings(savings: List<Saving>) {
+        savingDao.replaceAll(savings.map { it.toEntity() })
+    }
+
+    override suspend fun replaceAllCategories(categories: List<Category>) {
+        val dao = categoryDao ?: return
+        val catEntities = categories.map {
+            SavingCategoryEntity(name = it.name, icon = it.icon, color = it.color)
+        }
+        val subEntities = categories.flatMap { cat ->
+            cat.subcategories.map { sub ->
+                SavingSubcategoryEntity(categoryName = cat.name, name = sub.name)
+            }
+        }
+        dao.replaceAllCategories(catEntities, subEntities)
     }
 
     override suspend fun countSavingsForCategory(categoryName: String): Int {

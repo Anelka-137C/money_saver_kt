@@ -47,6 +47,20 @@ interface BudgetDao {
 
     @Query("SELECT COUNT(*) FROM budgets WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName)) AND LOWER(TRIM(subcategory)) = LOWER(TRIM(:subcategoryName))")
     suspend fun countBudgetsForSubcategory(categoryName: String, subcategoryName: String): Int
+
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<BudgetEntity>)
+
+    @Transaction
+    suspend fun replaceAll(entities: List<BudgetEntity>) {
+        deleteAll()
+        if (entities.isNotEmpty()) {
+            insertAll(entities)
+        }
+    }
 }
 
 @Entity(tableName = "budget_category")
@@ -128,6 +142,27 @@ interface BudgetCategoryDao {
             reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
             reassignBudgetsCategory(oldCategoryName = oldName, newCategoryName = newName)
             deleteCategoryByName(oldName)
+        }
+    }
+
+    @Query("DELETE FROM budget_subcategory")
+    suspend fun deleteAllSubcategories()
+
+    @Query("DELETE FROM budget_category")
+    suspend fun deleteAllCategories()
+
+    @Transaction
+    suspend fun replaceAllCategories(
+        categories: List<BudgetCategoryEntity>,
+        subcategories: List<BudgetSubcategoryEntity>
+    ) {
+        deleteAllSubcategories()
+        deleteAllCategories()
+        if (categories.isNotEmpty()) {
+            insertCategories(categories)
+        }
+        if (subcategories.isNotEmpty()) {
+            insertSubcategories(subcategories)
         }
     }
 }

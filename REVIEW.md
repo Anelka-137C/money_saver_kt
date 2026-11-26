@@ -1,149 +1,178 @@
-# 🛡️ Revisión Adversarial y Suite de Pruebas: Gastos Financiados con Ahorros y Saldo Neto Acumulado
+# Adversarial Code Review Report — Google Drive Backup, Restore & Reminder Notifications
 
-## 1. Objetivo y Alcance
-Diseñar y documentar pruebas automatizadas adversariales y basadas en propiedades (*Property-Based Testing*) orientadas a desafiar los límites de la lógica implementada para el registro de **gastos con cargo a categorías de ahorro acumulado** y el **resumen visual de saldo neto en ahorros**, sin alterar el código productivo.
-
-### Archivos inspeccionados vía Git (`git status` / `git diff`)
-- **Dominio y Modelos:**
-  - `app/src/main/java/com/example/money_saver_android/domain/model/Expense.kt` (`ExpenseFundingSource`)
-  - `app/src/main/java/com/example/money_saver_android/domain/usecase/CategorySummary.kt` (`SavingsCategoryBalance`, `calculateSavingsNetBalances`, `buildSavingsNetSummary`)
-  - `app/src/main/java/com/example/money_saver_android/domain/usecase/ExpenseUseCase.kt` (`withValidatedSavingsExpense`, exclusión de gastos `SAVINGS` del resumen y desglose de presupuesto)
-  - `app/src/main/java/com/example/money_saver_android/domain/usecase/IncomeUseCase.kt` (`matchesBudgetGroup`)
-  - `app/src/main/java/com/example/money_saver_android/domain/usecase/SavingsUseCase.kt` (`calculateNetSavingsSummary`, acceso global a ahorros y gastos)
-- **Persistencia (Room / SQLite):**
-  - `app/src/main/java/com/example/money_saver_android/data/local/ExpenseDatabase.kt` (`ExpenseEntity`, `AppDatabase` v6)
-  - `app/src/main/java/com/example/money_saver_android/data/local/SavingsDatabase.kt` (`SavingDao.getAllSavings`)
-  - `app/src/main/java/com/example/money_saver_android/data/repository/RoomExpenseRepository.kt`
-  - `app/src/main/java/com/example/money_saver_android/data/repository/SavingsRepository.kt`
-- **Gestión de Estado (ViewModels) e Integración:**
-  - `app/src/main/java/com/example/money_saver_android/viewmodel/ExpenseViewModel.kt`
-  - `app/src/main/java/com/example/money_saver_android/viewmodel/SavingsViewModel.kt`
-  - `app/src/main/java/com/example/money_saver_android/MainActivity.kt`
-- **Interfaz de Usuario (Jetpack Compose) e Internacionalización:**
-  - `app/src/main/java/com/example/money_saver_android/ui/ExpensesView.kt`
-  - `app/src/main/java/com/example/money_saver_android/ui/SavingsView.kt`
-  - `app/src/main/java/com/example/money_saver_android/ui/components/expenses/AddEditExpenseDialog.kt`
-  - `app/src/main/java/com/example/money_saver_android/ui/components/expenses/ExpenseCardItem.kt`
-  - `app/src/main/assets/{de,en,es,pt}.json`
+**Fecha:** 2026-11-26  
+**Alcance (detectado vía `git status` / `git diff`):** Respaldo en Google Drive (`money_saver_backup`), restauración completa desde JSON y recordatorios periódicos cada 7 días / 8 horas diurnas.  
+**Suite generada:** `app/src/test/java/com/example/money_saver_android/adversarial/BackupAndRestoreAdversarialTest.kt`  
+**Código productivo modificado:** Ninguno (solo lectura y generación de pruebas).
 
 ---
 
-## 2. Hallazgos y Vulnerabilidades Detectadas (Adversarial Review)
+## Resumen Ejecutivo
 
-### 🔴 Bug 1: Sobregiro / Saldo Neto Negativo al Eliminar, Reducir o Cambiar de Categoría un Ahorro ya Consumido en Gastos
-- **Severidad:** Crítica (Inconsistencia Financiera / Violación de Invariante de No-Sobregiro)
-- **Ubicación:** `SavingsUseCase.kt` (líneas 160–251: `updateSaving` y `deleteSaving`)
-- **Causa Raíz:** Aunque `MainActivity.kt` ahora inyecta `expenseRepository` en `SavingsUseCase`, ni `deleteSaving(id)` ni `updateSaving(...)` consultan `expenseRepository.getAllExpenses()` para verificar si existen gastos con `fundingSource == ExpenseFundingSource.SAVINGS` respaldados por esa categoría de ahorro.
-- **Entradas reproducibles:**
-  - Aporte histórico de `$500` en `"Emergencias"` (Período 1) + gasto financiado con ahorros de `$400` en `"Emergencias"` (Período 2), seguido de:
-    1. `savingsUseCase.deleteSaving(savingId)`
-    2. `savingsUseCase.updateSaving(..., amountInput = "200", categoryInput = "Emergencias")`
-    3. `savingsUseCase.updateSaving(..., amountInput = "500", categoryInput = "Viajes")`
-- **Resultado obtenido vs esperado:**
-  - **Obtenido:** Las tres operaciones retornan `SavingsResult.Success`, dejando `$400` gastados contra `$0` o `$200` ahorrados (sobregiro real de `-$400` o `-$200`, enmascarado por `.max(BigDecimal.ZERO)` o por la desaparición de `"Emergencias"` cuando `validSavings` queda vacío).
-  - **Esperado:** Retornar `SavingsResult.Error` impidiendo eliminar, reducir por debajo del acumulado gastado o mover de categoría fondos que ya respaldan gastos registrados.
-- **Tests que exponen el fallo:**
-  - `test_adversarial_delete_saving_backed_by_savings_expense_must_be_blocked`
-  - `test_adversarial_update_saving_reducing_below_spent_or_changing_category_must_be_blocked`
+Se identificaron **16 defectos / vulnerabilidades de borde** clasificados por severidad:
+- **Críticos (2):** Corrupción *split-brain* ante fallo parcial de restauración multi-BD; sobreescritura de moneda con literal `"null"` por `org.json.JSONObject.optString`.
+- **Altos (6):** Montos negativos/cero aceptados al restaurar; overflow de `Long` en cálculo de recordatorios; falta de exclusión mutua Backup/Restore en `SettingsViewModel`; corrupción de estado activo con `clear*`/`cancel*`; excepción no capturada del scheduler dejando la UI bloqueada en `IN_PROGRESS`; crash `ClassCastException` ante tipo corrupto en `SharedPreferences`.
+- **Medios (6):** Moneda no soportada aceptada en restore; campos requeridos en blanco y fechas invertidas aceptados; duplicación de registros ante períodos duplicados en export; deriva de 8 horas en reprogramación nocturna tras 7 días; falta de validación de `Intent.action` en `BackupReminderReceiver`; duplicación de subcategorías en Room `replaceAllCategories`.
+- **Bajos (2):** Timestamps `<= 0L` aceptados por `BackupReminderScheduleCalculator`; renderizado de fecha epoch `1970-01-01` en `BackupSectionCard` para `lastBackupTimestamp <= 0L`.
 
 ---
 
-### 🔴 Bug 2: Descuento Doble del Propio Gasto al Editar en `AddEditExpenseDialog` (`excludeExpenseId` nunca invocado)
-- **Severidad:** Alta (Estado Inconsistente en Edición / Bloqueo Visual Engañoso)
-- **Ubicación:** `CategorySummary.kt` (línea 91), `ExpenseViewModel.kt` (líneas 128–134) y `ExpensesView.kt` (líneas 301–316)
-- **Causa Raíz:** `calculateSavingsNetBalances` declara el parámetro `excludeExpenseId: Long? = null` para excluir el gasto en edición al calcular el disponible, pero `ExpenseViewModel` calcula `savingsBalances` únicamente con `excludeExpenseId = null` y `ExpensesTabContent` pasa esa misma lista al diálogo de edición (`isEditing = true`).
-- **Entradas reproducibles:** Ahorro de `$500` en `"Viajes"`, gasto registrado de `$350` financiado con `"Viajes"`, y apertura de edición (`startEditing(expense)`).
-- **Resultado obtenido vs esperado:**
-  - **Obtenido:** El selector muestra `"Viajes • $ 150.00"` (descontando los `$350` del propio gasto editado; si se hubiese gastado el 100%, muestra `"$ 0.00"`).
-  - **Esperado:** Mostrar `"Viajes • $ 500.00"`, correspondiente al saldo real disponible para editar dicho gasto.
-- **Test que expone el fallo:**
-  - `test_adversarial_ui_edit_expense_dialog_shows_undiscounted_available_balance_for_edited_expense`
+## Defectos Expuestos por la Suite Adversarial
+
+### Críticos
+
+#### 1. Restauración no atómica entre 4 bases de datos Room (Pérdida parcial / Split-Brain)
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupUseCase.kt` (`L221-L248`)
+- **Entrada adversarial:** Fallo de escritura (ej. `SQLiteFullException`) en `expenseRepository.replaceAllExpenses` durante `restoreBackup`.
+- **Comportamiento actual:** `ConfigDatabase` (períodos), `AppDatabase` (categorías e ingresos) y `BudgetDatabase` (presupuestos) ya fueron borrados y reemplazados, mientras que gastos, ahorros y preferencias conservan los datos antiguos, dejando referencias huérfanas (`periodId`, `budgetId`, `incomeId`).
+- **Comportamiento esperado:** Realizar snapshot previo / rollback ante fallo parcial para preservar consistencia total.
+- **Test:** `adversarial_restoreBackup_midFlightFailure_mustRollbackAlreadyReplacedRepositories`
+
+#### 2. `org.json.JSONObject.optString` convierte `null` JSON en el literal `"null"`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupUseCase.kt` (`L107-L186`, `L238-L240`, `L265-L266`)
+- **Entrada adversarial:** Respaldo JSON con `"currency": null`, `"language": null`, `"subcategory": null`, `"description": null`, `"icon": null`, `"color": null`.
+- **Comportamiento actual:** En Android `org.json`, `optString("currency", "")` retorna `"null"` (4 caracteres). Como `"null".isNotBlank()` es `true`, `restoreBackup` guarda `"null"` como moneda del usuario y propaga `"null"` en campos opcionales.
+- **Comportamiento esperado:** Verificar `isNull(key)` antes de leer `optString`, tratando valores `JSONObject.NULL` como cadenas vacías o valores por defecto y conservando la moneda actual.
+- **Test:** `adversarial_parseBackupJson_explicitJsonNullFields_mustNotBecomeLiteralNullString`
 
 ---
 
-### 🔴 Bug 3: Categorías de Ahorro Agotadas (`$ 0.00`) Aparecen Seleccionables y Ocultan `"No hay ahorros disponibles"`
-- **Severidad:** Alta (UX / Validación en Selector de Fuente de Fondos)
-- **Ubicación:** `AddEditExpenseDialog.kt` (líneas 280–310) y `CategorySummary.kt` (líneas 108–126)
-- **Causa Raíz:** `calculateSavingsNetBalances` devuelve todas las categorías con aportes históricos aunque su `netBalance` sea `0.0`. En `AddEditExpenseDialog`, `if (savingsBalances.isEmpty())` solo se cumple cuando jamás existió ningún ahorro en toda la historia de la aplicación.
-- **Entradas reproducibles:** Categoría `"Emergencias"` con `$200` ahorrados en Período 1 y `$200` gastados (`netBalance == 0.0`), presupuesto activo en Período 2, abrir diálogo de nuevo gasto, elegir fuente **Ahorros** y abrir `selector_expense_saving_category`.
-- **Resultado obtenido vs esperado:**
-  - **Obtenido:** El mensaje `"No hay ahorros disponibles"` no se muestra; aparece `"Emergencias • $ 0.00"` habilitado y seleccionable, provocando fallo garantizado al guardar.
-  - **Esperado:** Filtrar categorías agotadas (`netBalance <= 0.0`) al crear gastos nuevos y mostrar `"No hay ahorros disponibles"` cuando todas las categorías estén en cero.
-- **Test que expone el fallo:**
-  - `test_adversarial_ui_add_dialog_depleted_savings_shows_empty_message_and_dynamic_button_state`
+### Altos
+
+#### 3. Montos negativos y cero aceptados en `parseBackupJson`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupUseCase.kt` (`L123-L174`)
+- **Entrada adversarial:** `amount = -500.0`, `0.0`, `-0.01` en ingresos, presupuestos, gastos o ahorros.
+- **Comportamiento actual:** Solo se valida `amount.isFinite()`, devolviendo `RestoreParseResult.Valid` y corrompiendo balances contables tras restaurar.
+- **Comportamiento esperado:** Exigir `amount.isFinite() && amount > 0.0` (o rechazar como `RestoreParseResult.Invalid`).
+- **Test:** `adversarial_parseBackupJson_rejectsNegativeAndZeroFinancialAmounts`
+
+#### 4. Overflow aritmético de `Long` en `BackupReminderScheduleCalculator`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupReminderScheduleCalculator.kt` (`L32`, `L41`, `L45`)
+- **Entrada adversarial:** `lastBackupTimestamp = Long.MAX_VALUE - 1000L` (en `shouldNotifyNow`) o `nowMillis = Long.MAX_VALUE - 1000L` (en `nextReminderTimeMillis`).
+- **Comportamiento actual:** `lastBackupTimestamp + SEVEN_DAYS_MILLIS` desborda a un `Long` negativo, haciendo que `shouldNotifyNow` retorne `true` pese a estar en el futuro; `nowMillis + REMINDER_INTERVAL_MILLIS` programa una alarma en el pasado.
+- **Comportamiento esperado:** Evitar overflow mediante comparaciones por sustracción segura o saturación.
+- **Test:** `adversarial_scheduleCalculator_nearLongMaxValue_mustNotOverflow`
+
+#### 5. Falta de exclusión mutua entre Backup y Restore en `SettingsViewModel`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/viewmodel/SettingsViewModel.kt` (`L114-L157`, `L201-L208`)
+- **Entrada adversarial:** Invocar `prepareRestore` mientras `backupStatus == BackupStatus.IN_PROGRESS`, o `performBackup` mientras `restoreStatus == RestoreStatus.READING` / `RESTORING`.
+- **Comportamiento actual:** Cada método solo valida su propio estado, permitiendo que Backup y Restore corran en paralelo dentro del mismo `SettingsUiState`.
+- **Comportamiento esperado:** Bloquear cualquier inicio de backup o restore si la otra operación está activa.
+- **Test:** `adversarial_settingsViewModel_backupAndRestoreMustBeMutuallyExclusive`
+
+#### 6. `clear*` / `cancel*` corrompen operaciones en curso en `SettingsViewModel`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/viewmodel/SettingsViewModel.kt` (`L140-L195`)
+- **Entrada adversarial:** Llamar `clearBackupStatus()` / `onBackupCancelled()` durante `BackupStatus.IN_PROGRESS`, o `cancelPendingRestore()` durante `RestoreStatus.READING`.
+- **Comportamiento actual:** Sobrescribe `IN_PROGRESS` a `IDLE`/`CANCELLED` mientras la corrutina sigue escribiendo (rehabilitando botones y permitiendo doble ejecución); una lectura cancelada sigue poblando `pendingRestoreSnapshot` cuando finaliza, reabriendo el diálogo de confirmación.
+- **Comportamiento esperado:** Ignorar resets/cancelaciones no válidos sobre estados activos y descartar resultados obsoletos si la lectura fue cancelada.
+- **Test:** `adversarial_settingsViewModel_cancelOrClearWhileBusy_mustNotCorruptActiveOperation`
+
+#### 7. Excepción en `BackupReminderScheduler` bloquea la UI permanentemente en `IN_PROGRESS`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/viewmodel/SettingsViewModel.kt` (`L124-L131`)
+- **Entrada adversarial:** `backupReminderScheduler.scheduleNextReminder(...)` lanza `SecurityException` o `RuntimeException` tras un `BackupResult.Success`.
+- **Comportamiento actual:** Al ejecutarse sin `try/catch` antes de `_uiState.update`, la corrutina falla de forma no controlada y `backupStatus` queda permanentemente en `IN_PROGRESS` (botones deshabilitados indefinidamente).
+- **Comportamiento esperado:** Encapsular la programación del recordatorio en `runCatching` / `try-catch` (sin cancelar `CancellationException`) y completar la transición a `BackupStatus.SUCCESS`.
+- **Test:** `adversarial_settingsViewModel_schedulerThrowsOnBackupSuccess_mustNotLeaveUiStuckInProgress`
+
+#### 8. Borrado silencioso con `<= 0L` y `ClassCastException` en `SharedPrefsBackupPreferenceRepository`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/data/repository/BackupPreferenceRepository.kt` (`L21-L29`)
+- **Entrada adversarial:** `saveLastBackupTimestamp(0L)` tras un valor válido; entrada corrupta tipo `String` en `SharedPreferences` bajo la clave `"last_backup_timestamp"`.
+- **Comportamiento actual:** Guardar `0L` borra silenciosamente un timestamp válido previo; leer una entrada corrupta lanza `ClassCastException` no controlada.
+- **Comportamiento esperado:** Ignorar/rechazar guardados con `timestampMillis <= 0L` y manejar `ClassCastException` devolviendo `null`.
+- **Test:** `adversarial_backupPreferenceRepository_boundaryValuesAndCorruptedTypeHandling`
 
 ---
 
-### 🟡 Bug 4: Ausencia de Guarda de Concurrencia / Idempotencia en `ExpenseViewModel.confirmEdit()`
-- **Severidad:** Media (Concurrencia en ViewModel / Doble Escritura)
-- **Ubicación:** `ExpenseViewModel.kt` (líneas 377–413)
-- **Causa Raíz:** Mientras `saveExpense()` verifica `if (isSavingExpense) return` y `SavingsViewModel.confirmEditSaving()` verifica `if (isSaving) return`, `ExpenseViewModel.confirmEdit()` carece de bandera de operación en vuelo.
-- **Entradas reproducibles:** Doble toque rápido en el botón Guardar durante la edición de un gasto (`confirmEdit()` invocado dos veces antes de completar la corrutina).
-- **Resultado obtenido vs esperado:**
-  - **Obtenido:** Se ejecutan 2 actualizaciones concurrentes (`updateCallCount == 2`).
-  - **Esperado:** Ejecutar `updateExpense` una única vez (`updateCallCount == 1`).
-- **Test que expone el fallo:**
-  - `test_adversarial_viewmodel_double_confirmEdit_must_be_idempotent`
+### Medios
+
+#### 9. Código de moneda no validado al restaurar
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupUseCase.kt` (`L238-L240`) y `SettingsViewModel.kt` (`L221`)
+- **Entrada adversarial:** `currency = "FAKE_COIN_999"`.
+- **Comportamiento actual:** Se persiste y se asigna a `selectedCurrency` cualquier cadena no vacía aunque no pertenezca a las divisas soportadas.
+- **Comportamiento esperado:** Validar el código contra las monedas soportadas y conservar la moneda actual si no es válida.
+- **Test:** `adversarial_restoreBackup_unsupportedCurrencyCode_mustNotOverwriteValidPreference`
+
+#### 10. Campos obligatorios en blanco y fechas de período invertidas aceptados en `parseBackupJson`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupUseCase.kt` (`L113-L186`)
+- **Entrada adversarial:** `category = "   "` en gastos/ingresos/presupuestos/ahorros; período con `startDate = "2026-12-31"` y `endDate = "2026-01-01"`.
+- **Comportamiento actual:** Se aceptan como `RestoreParseResult.Valid`.
+- **Comportamiento esperado:** Rechazar campos obligatorios vacíos/en blanco y rangos `startDate > endDate` como `RestoreParseResult.Invalid`.
+- **Test:** `adversarial_parseBackupJson_rejectsSchemaTamperingAndBlankRequiredFields`
+
+#### 11. Duplicación de ingresos y presupuestos en `buildBackupJson` ante IDs de período repetidos
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupUseCase.kt` (`L274-L279`)
+- **Entrada adversarial:** `periodRepository.getAllPeriods()` retorna dos entradas con el mismo `id = 1L`.
+- **Comportamiento actual:** `periods.flatMap { ... }` duplica todos los ingresos y presupuestos de ese período en el JSON exportado.
+- **Comportamiento esperado:** Deduplicar los IDs de período (`.distinctBy { it.id }`) antes de consultar ingresos/presupuestos.
+- **Test:** `adversarial_buildBackupJson_duplicatePeriodIds_mustNotDuplicateIncomesOrBudgets`
+
+#### 12. Deriva de 8 horas al reprogramar en horario nocturno tras superar 7 días
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupReminderScheduleCalculator.kt` (`L41-L47`)
+- **Entrada adversarial:** Último backup a las `02:00 UTC`; reinicio (`ACTION_BOOT_COMPLETED`) 7 días después a las `07:55 UTC` (noche, 5 min antes de abrir la ventana diurna).
+- **Comportamiento actual:** Al cumplirse `nowMillis >= sevenDaysAfter`, suma `8 horas` (`15:55 UTC`) en lugar de ajustar al inicio diurno (`08:00 UTC`).
+- **Comportamiento esperado:** Si es horario nocturno y el recordatorio está vencido (`!isDaytime(nowMillis)`), programar al próximo inicio diurno (`08:00`).
+- **Test:** `adversarial_scheduleCalculator_nighttimeRescheduleAfterSevenDays_targets0800InsteadOfDelaying8Hours`
+
+#### 13. `BackupReminderReceiver` no valida que `intent?.action == ACTION_BACKUP_REMINDER`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/notifications/BackupReminderReceiver.kt` (`L37-L40`)
+- **Entrada adversarial:** `onReceive(context, null)` o `Intent("com.example.UNRELATED_SPOOFED_ACTION")`.
+- **Comportamiento actual:** Solo excluye `Intent.ACTION_BOOT_COMPLETED`, por lo que cualquier acción desconocida o `null` publica la notificación.
+- **Comportamiento esperado:** Mostrar notificación únicamente cuando `intent?.action == AndroidBackupReminderScheduler.ACTION_BACKUP_REMINDER`.
+- **Test:** `adversarial_reminderReceiver_nullOrUnexpectedIntentAction_mustNotPostNotification`
+
+#### 14. Subcategorías duplicadas al reemplazar categorías repetidas en Room
+- **Ubicación:** `RoomCategoryRepository.kt` (`L105-L115`), `IncomeRepository.kt` (`L65-L75`), `BudgetRepository.kt` (`L67-L78`), `SavingsRepository.kt` (`L74-L85`)
+- **Entrada adversarial:** Lista con categorías repetidas (`"Comida"` dos veces) y/o subcategorías repetidas (`"Super"`).
+- **Comportamiento actual:** `insertCategories` reemplaza la PK `"Comida"`, pero `subEntities` inserta todas las filas de subcategorías duplicadas (porque `SubcategoryEntity` usa PK autogenerada sin unicidad `(categoryName, name)`).
+- **Comportamiento esperado:** Deduplicar categorías por nombre y subcategorías por par `(categoryName, name)` antes de insertar.
+- **Test:** `adversarial_roomReplaceAll_emptyWipe_sqlInjection_andDuplicateCategoryDeduplication`
 
 ---
 
-### 🟡 Bug 5: Estado Residual en `fundingSourceInput` al Agotarse los Ahorros o al Cambiar de Período sin `budgetRepository`
-- **Severidad:** Media (Máquina de Estados en `ExpenseViewModel`)
-- **Ubicación:** `ExpenseViewModel.kt` (líneas 135–147 y 156–222)
-- **Causa Raíz:**
-  1. En el `combine` de `init`, si `hasActiveBudget == true` y el usuario tenía seleccionado `SAVINGS` (`"Emergencias"`), cuando los ahorros pasan a `$0.00` (`hasAvailableSavings = false`), `fundingSourceInput` no revierte a `BUDGET` ni limpia `savingCategoryInput`.
-  2. En `onPeriodSelected(periodId)`, `fundingSourceInput` se reinicia incondicionalmente a `BUDGET`; cuando `budgetRepository == null`, `getBudgetsByPeriod` retorna `emptyFlow()` (no emite elementos), dejando `fundingSourceInput` en `BUDGET` pese a que `hasActiveBudget == false` y `hasAvailableSavings == true`.
-- **Test que expone el fallo:**
-  - `test_adversarial_viewmodel_funding_source_recovers_when_savings_deplete_or_period_switches_without_budget_repo`
+### Bajos
+
+#### 15. `BackupReminderScheduleCalculator` acepta `lastBackupTimestamp <= 0L`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/domain/usecase/BackupReminderScheduleCalculator.kt` (`L26-L48`)
+- **Entrada adversarial:** `lastBackupTimestamp` en `{0L, -1L, Long.MIN_VALUE}`.
+- **Comportamiento actual:** Evalúa como respaldo de 1970 o anterior, retornando `shouldNotifyNow = true` y programando alarma.
+- **Comportamiento esperado:** Tratar `lastBackupTimestamp == null || lastBackupTimestamp <= 0L` como sin respaldo (`false` / `null`).
+- **Test:** `adversarial_scheduleCalculator_nonPositiveLastBackupTimestamp_treatedAsUnbackedUp`
+
+#### 16. `BackupSectionCard` muestra fecha epoch `1970-01-01` para `lastBackupTimestamp <= 0L`
+- **Ubicación:** `app/src/main/java/com/example/money_saver_android/ui/components/settings/BackupSectionCard.kt` (`L67-L71`)
+- **Entrada adversarial:** `lastBackupTimestamp = 0L` o negativo.
+- **Comportamiento actual:** Formatea `Date(0L)` (`1970-01-01` / `1969-12-31`), a diferencia de `RestoreBackupConfirmationDialog` que valida `> 0L`.
+- **Comportamiento esperado:** Validar `it > 0L` y mostrar `neverBackedUpText` en caso contrario.
+- **Test:** `adversarial_backupSectionCard_zeroOrNegativeTimestamp_displaysNeverBackedUpInsteadOf1970`
 
 ---
 
-### 🟡 Bug 6: Contaminación por `NaN` y Discrepancia de Redondeo en `ExpenseUseCase.calculateCategoryExpenses`
-- **Severidad:** Media (Sanitización Numérica y Consistencia Visual entre Tarjetas)
-- **Ubicación:** `ExpenseUseCase.kt` (líneas 342–370)
-- **Causa Raíz:** A diferencia de `calculateExpenseCategorySummary` (que usa `buildPeriodCategorySummary` con filtro `isFinite() && > 0.0`, `sumBigDecimal()` y `.roundToInt()`), `calculateCategoryExpenses` suma directamente `budgetExpenses.sumOf { it.amount }` y trunca el porcentaje con `(progress * 100).toInt()`.
-- **Entradas reproducibles:** `$200` en `"Comida"`, `$100` en `"Transporte"`, `$900` en ahorro (`SAVINGS`) y un registro corrupto `Double.NaN` (`BUDGET`).
-- **Resultado obtenido vs esperado:**
-  - **Obtenido:** `totalSpent` se vuelve `NaN` colapsando todas las categorías válidas a `0%` (y aún sin `NaN`, trunca `200/300` a `66%` mientras la tarjeta superior muestra `67%`).
-  - **Esperado:** Ignorar entradas no finitas o inválidas y mantener consistencia de porcentaje (`67%`) con `PeriodSummaryCard`.
-- **Test que expone el fallo:**
-  - `test_adversarial_corrupted_nan_budget_expense_and_percentage_consistency_in_calculateCategoryExpenses`
+## Cobertura de Property-Based Testing e Invariantes Verificadas
+
+1. **`pbt_nextReminderTimeMillis_alwaysDaytime_strictlyAfterNow_andAtLeastSevenDaysAfterBackup`** (500 iteraciones en 9 zonas horarias incluyendo `UTC+05:30`, `UTC+05:45`, `UTC+14:00` y zonas DST):
+   - Invariante 1: El resultado siempre cae en ventana diurna `[08:00, 22:00)`.
+   - Invariante 2: El resultado es siempre `>= lastBackupTimestamp + 7 días`.
+   - Invariante 3: El resultado es siempre estrictamente mayor que `nowMillis`.
+2. **`pbt_shouldNotifyNow_matchesSevenDayThresholdAndDaytimeWindow`** (500 iteraciones): equivalencia exacta con el umbral de 7 días y horario diurno.
+3. **`pbt_buildAndParseBackupJson_roundTripPreservesAllRecordsAndAdversarialStrings`** (80 iteraciones): fidelidad ida y vuelta con emojis compuestos, texto RTL árabe/hebreo, comillas escapadas, saltos de línea y payloads tipo SQL injection.
+4. **`pbt_exportBackup_neverMutatesLastBackupTimestampOnWriteFailure`** (50 iteraciones): invariante de preservación de `lastBackupTimestamp` ante cualquier excepción de escritura.
+5. **Concurrencia, Android y Compose:**
+   - Transiciones DST primavera/otoño (`America/New_York`).
+   - Propagación de `CancellationException` sin tragarla en `exportBackup` y `restoreBackup`.
+   - Serialización estricta bajo `allocationMutex` entre export y restore concurrentes.
+   - Manejo seguro de `Double.NaN` durante exportación.
+   - Doble confirmación rápida de restore (`confirmRestore`) idempotente.
+   - `ACTION_BOOT_COMPLETED`, falta de permiso `POST_NOTIFICATIONS` en API 34 e idempotencia de `AndroidBackupReminderScheduler`.
+   - Bloqueo mutuo de botones en `BackupSectionCard`, plantillas `String.format` corruptas en `RestoreBackupConfirmationDialog` y navegación por deep-link `requestedTab` en `MainContainer` con período bloqueado.
 
 ---
 
-## 3. Suite de Pruebas Implementada
-
-Archivo creado:
-- `app/src/test/java/com/example/money_saver_android/adversarial/SavingsFundedExpensesAdversarialTest.kt`
-
-| Test Case | Categoría | Propiedad / Escenario Evaluado |
-| :--- | :--- | :--- |
-| `property_based_invariants_savings_net_balances_and_net_summary_500_iterations` | Property-Based Testing | **500 iteraciones aleatorias**: no-negatividad, finitud, conservación exacta `BigDecimal`, exclusión de saldos `0.0` en la dona, suma de proporciones `~1.0`, orden determinista y consolidación case/whitespace. |
-| `property_based_invariant_budget_and_period_expense_isolation_from_savings_expenses` | Property-Based Testing | **300 escenarios multi-período**: invariabilidad total de presupuestos y resúmenes de gastos del período ante gastos `SAVINGS` con categorías colisionantes. |
-| `property_based_stateful_ledger_invariant_random_save_and_update_operations_never_overdraw` | Stateful Property Test | **200 pasos aleatorios** de depósitos, gastos, ediciones y borrados en `ExpenseUseCase`: `spent <= saved` en cada paso. |
-| `test_adversarial_delete_saving_backed_by_savings_expense_must_be_blocked` | Integridad Cruzada | **Expone Bug #1a**: bloqueo de borrado de ahorro respaldando gastos existentes. |
-| `test_adversarial_update_saving_reducing_below_spent_or_changing_category_must_be_blocked` | Integridad Cruzada | **Expone Bug #1b/#1c**: bloqueo de reducción por debajo de lo gastado o cambio de categoría en `updateSaving`. |
-| `test_adversarial_ieee754_cent_drift_and_localized_decimal_formats_on_savings_expenses` | Precisión Numérica | Deriva IEEE-754 (`0.10 + 0.20`), consumo del último centavo exacto y formatos `"1.234,56"` / `"1,234.56"`. |
-| `test_adversarial_malformed_inputs_calendar_boundaries_overflow_and_missing_dependencies` | Valores Frontera | `savingsRepository = null`, `periodId` inválido, montos corruptos (`NaN`, `Infinity`, `-0.0`), fechas imposibles (`2026-02-29`, `24:00`) y `Double.MAX_VALUE` overflow. |
-| `test_adversarial_update_expense_switching_funding_source_bidirectional_state_and_balance_integrity` | Dominio / Transiciones | Edición bidireccional `BUDGET -> SAVINGS -> BUDGET`, limpieza de metadatos y restauración exacta de saldos. |
-| `test_adversarial_corrupted_nan_budget_expense_and_percentage_consistency_in_calculateCategoryExpenses` | Sanitización / Dominio | **Expone Bug #6**: resistencia a `NaN` y consistencia de redondeo entre tarjetas. |
-| `test_adversarial_concurrent_20_coroutines_spending_shared_savings_never_overdraws` | Concurrencia (`Mutex`) | 20 corrutinas paralelas con `yield()` compitiendo por `$500`: exactamente 5 éxitos y 15 rechazos sin sobregiro. |
-| `test_adversarial_viewmodel_double_confirmEdit_must_be_idempotent` | Concurrencia ViewModel | **Expone Bug #4**: idempotencia ante doble clic en `confirmEdit()`. |
-| `test_adversarial_viewmodel_funding_source_recovers_when_savings_deplete_or_period_switches_without_budget_repo` | Ciclo de Vida ViewModel | **Expone Bug #5**: recuperación automática de `fundingSourceInput` al agotarse ahorros o cambiar de período. |
-| `test_adversarial_room_persistence_legacy_nulls_corrupt_funding_source_and_extreme_unicode_roundtrip` | Persistencia Room | `AppDatabase` v6 + `SavingsDatabase` v2 con `fundingSource = null`, enums corruptos, espacios/casing mixto y Unicode/RTL/Emoji/SQL de +300 caracteres. |
-| `test_adversarial_ui_edit_expense_dialog_shows_undiscounted_available_balance_for_edited_expense` | UI Compose | **Expone Bug #2**: saldo editable sin doble descuento en `AddEditExpenseDialog(isEditing = true)`. |
-| `test_adversarial_ui_add_dialog_depleted_savings_shows_empty_message_and_dynamic_button_state` | UI Compose | **Expone Bug #3**: habilitación/deshabilitación reactiva de `btn_open_add_expense` y mensaje vacío cuando las categorías quedan en `$0.00`. |
-| `test_adversarial_ui_expense_card_blank_saving_category_renders_clean_prefix_badge` | UI Compose | Fallback limpio `"Ahorro"` sin dos puntos colgantes en `ExpenseCardItem` cuando `savingCategory` está en blanco. |
-| `test_adversarial_ui_savings_tab_preserves_cumulative_net_card_when_switching_to_empty_period` | UI Compose / Períodos | Al cambiar al Período 99 vacío, `card_savings_overview` muestra `$ 0.00` mientras `card_savings_net_overview` conserva `$ 450.00` acumulados. |
-
----
-
-## 4. Instrucciones de Ejecución Local y CI/CD
+## Instrucciones de Ejecución Local / CI
 
 ```bash
-# Ejecutar únicamente la nueva suite adversarial de gastos financiados con ahorros:
-./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.SavingsFundedExpensesAdversarialTest"
+# Ejecutar solo la suite adversarial de Backup & Restore
+./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.BackupAndRestoreAdversarialTest"
 
-# Ejecutar todas las suites adversariales del proyecto:
-./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.*"
+# Ejecutar toda la suite unitaria del proyecto
+./gradlew testDebugUnitTest
 ```

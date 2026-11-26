@@ -27,6 +27,8 @@ interface IncomeRepository {
     suspend fun deleteSubcategory(categoryName: String, subcategoryName: String)
     suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int
     suspend fun preloadDefaultCategoriesIfNeeded()
+    suspend fun replaceAllIncomes(incomes: List<Income>) {}
+    suspend fun replaceAllCategories(categories: List<Category>) {}
 }
 
 class RoomIncomeRepository(
@@ -54,6 +56,22 @@ class RoomIncomeRepository(
 
     override suspend fun deleteIncome(id: Long) {
         incomeDao.deleteById(id)
+    }
+
+    override suspend fun replaceAllIncomes(incomes: List<Income>) {
+        incomeDao.replaceAll(incomes.map { it.toEntity() })
+    }
+
+    override suspend fun replaceAllCategories(categories: List<Category>) {
+        val catEntities = categories.map {
+            IncomeCategoryEntity(name = it.name, icon = it.icon, color = it.color)
+        }
+        val subEntities = categories.flatMap { cat ->
+            cat.subcategories.map { sub ->
+                IncomeSubcategoryEntity(categoryName = cat.name, name = sub.name)
+            }
+        }
+        categoryDao.replaceAllCategories(catEntities, subEntities)
     }
 
     override fun getAllCategories(): Flow<List<Category>> {

@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "currencies")
@@ -56,6 +57,20 @@ interface FinancialPeriodDao {
 
     @Query("DELETE FROM financial_periods WHERE id = :id")
     suspend fun deletePeriod(id: Long)
+
+    @Query("DELETE FROM financial_periods")
+    suspend fun deleteAllPeriods()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPeriods(periods: List<FinancialPeriodEntity>)
+
+    @Transaction
+    suspend fun replaceAllPeriods(periods: List<FinancialPeriodEntity>) {
+        deleteAllPeriods()
+        if (periods.isNotEmpty()) {
+            insertPeriods(periods)
+        }
+    }
 }
 
 @Database(

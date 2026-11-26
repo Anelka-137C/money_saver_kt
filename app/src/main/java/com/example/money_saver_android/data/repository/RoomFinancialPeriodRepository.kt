@@ -55,4 +55,12 @@ class RoomFinancialPeriodRepository(
     override suspend fun deletePeriod(id: Long) {
         dao.deletePeriod(id)
     }
+
+    override suspend fun replaceAllPeriods(periods: List<FinancialPeriod>) {
+        dao.replaceAllPeriods(
+            periods.map {
+                FinancialPeriodEntity(id = it.id, startDate = it.startDate, endDate = it.endDate)
+            }
+        )
+    }
 }

@@ -101,4 +101,16 @@ class RoomCategoryRepository(
     override suspend fun countExpensesForSubcategory(categoryName: String, subcategoryName: String): Int {
         return dao.countExpensesForSubcategory(categoryName, subcategoryName)
     }
+
+    override suspend fun replaceAllCategories(categories: List<Category>) {
+        val catEntities = categories.map {
+            CategoryEntity(name = it.name, icon = it.icon, color = it.color)
+        }
+        val subEntities = categories.flatMap { cat ->
+            cat.subcategories.map { sub ->
+                SubcategoryEntity(categoryName = cat.name, name = sub.name)
+            }
+        }
+        dao.replaceAllCategories(catEntities, subEntities)
+    }
 }

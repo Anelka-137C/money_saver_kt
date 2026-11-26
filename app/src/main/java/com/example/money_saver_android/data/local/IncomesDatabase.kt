@@ -83,6 +83,20 @@ interface IncomeDao {
 
     @Query("SELECT COUNT(*) FROM incomes WHERE LOWER(TRIM(category)) = LOWER(TRIM(:categoryName)) AND LOWER(TRIM(subcategory)) = LOWER(TRIM(:subcategoryName))")
     suspend fun countIncomesForSubcategory(categoryName: String, subcategoryName: String): Int
+
+    @Query("DELETE FROM incomes")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<IncomeEntity>)
+
+    @Transaction
+    suspend fun replaceAll(entities: List<IncomeEntity>) {
+        deleteAll()
+        if (entities.isNotEmpty()) {
+            insertAll(entities)
+        }
+    }
 }
 
 @Dao
@@ -130,6 +144,27 @@ interface IncomeCategoryDao {
             reassignSubcategories(oldCategoryName = oldName, newCategoryName = newName)
             reassignIncomesCategory(oldCategoryName = oldName, newCategoryName = newName)
             deleteCategoryByName(oldName)
+        }
+    }
+
+    @Query("DELETE FROM incomes_subcategory")
+    suspend fun deleteAllSubcategories()
+
+    @Query("DELETE FROM incomes_category")
+    suspend fun deleteAllCategories()
+
+    @Transaction
+    suspend fun replaceAllCategories(
+        categories: List<IncomeCategoryEntity>,
+        subcategories: List<IncomeSubcategoryEntity>
+    ) {
+        deleteAllSubcategories()
+        deleteAllCategories()
+        if (categories.isNotEmpty()) {
+            insertCategories(categories)
+        }
+        if (subcategories.isNotEmpty()) {
+            insertSubcategories(subcategories)
         }
     }
 }
