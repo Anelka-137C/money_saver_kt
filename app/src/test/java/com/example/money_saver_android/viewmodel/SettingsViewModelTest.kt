@@ -4,6 +4,7 @@ import com.example.money_saver_android.FakeCategoryRepoForVm
 import com.example.money_saver_android.FakeExpenseRepository
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
+import com.example.money_saver_android.data.repository.AppLockPreferenceRepository
 import com.example.money_saver_android.data.repository.BackupPreferenceRepository
 import com.example.money_saver_android.data.repository.CurrencyPreferenceRepository
 import com.example.money_saver_android.data.repository.CurrencyRepository
@@ -14,6 +15,8 @@ import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.usecase.BackupUseCase
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.notifications.BackupReminderScheduler
+import com.example.money_saver_android.security.DeviceAuthCapability
+import com.example.money_saver_android.security.DeviceAuthCapabilityProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -268,5 +271,52 @@ class SettingsViewModelTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    @Test
+    fun test_settings_viewmodel_loads_and_toggles_app_lock_preference_with_capability() {
+        val fakeAppLockRepo = object : AppLockPreferenceRepository {
+            var enabled = true
+            override fun isAppLockEnabled(): Boolean = enabled
+            override fun setAppLockEnabled(enabled: Boolean) {
+                this.enabled = enabled
+            }
+        }
+        var currentCapability = DeviceAuthCapability.BIOMETRIC_AND_PIN
+        val fakeCapabilityProvider = object : DeviceAuthCapabilityProvider {
+            override fun getCapability(): DeviceAuthCapability = currentCapability
+        }
+
+        val viewModel = SettingsViewModel(
+            languageRepository = FakeLanguagePreferenceRepository(),
+            i18nManager = I18nManager(),
+            appLockPreferenceRepository = fakeAppLockRepo,
+            deviceAuthCapabilityProvider = fakeCapabilityProvider
+        )
+
+        assertEquals(true, viewModel.uiState.value.isAppLockEnabled)
+        assertEquals(DeviceAuthCapability.BIOMETRIC_AND_PIN, viewModel.uiState.value.deviceAuthCapability)
+
+        viewModel.onAppLockToggled(false)
+        assertEquals(false, viewModel.uiState.value.isAppLockEnabled)
+        assertEquals(false, fakeAppLockRepo.enabled)
+
+        currentCapability = DeviceAuthCapability.PIN_ONLY
+        viewModel.refreshDeviceAuthCapability()
+        assertEquals(DeviceAuthCapability.PIN_ONLY, viewModel.uiState.value.deviceAuthCapability)
+
+        viewModel.onAppLockToggled(true)
+        assertEquals(true, viewModel.uiState.value.isAppLockEnabled)
+        assertEquals(true, fakeAppLockRepo.enabled)
+
+        // When no lock is configured, cannot enable protection
+        viewModel.onAppLockToggled(false)
+        currentCapability = DeviceAuthCapability.NONE
+        viewModel.refreshDeviceAuthCapability()
+        assertEquals(DeviceAuthCapability.NONE, viewModel.uiState.value.deviceAuthCapability)
+
+        viewModel.onAppLockToggled(true)
+        assertEquals(false, viewModel.uiState.value.isAppLockEnabled)
+        assertEquals(false, fakeAppLockRepo.enabled)
     }
 }

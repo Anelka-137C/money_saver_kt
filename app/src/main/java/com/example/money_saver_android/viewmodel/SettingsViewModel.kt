@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
+import com.example.money_saver_android.data.repository.AppLockPreferenceRepository
 import com.example.money_saver_android.data.repository.BackupPreferenceRepository
 import com.example.money_saver_android.data.repository.CurrencyPreferenceRepository
 import com.example.money_saver_android.data.repository.CurrencyRepository
@@ -16,6 +17,8 @@ import com.example.money_saver_android.domain.usecase.RestoreParseResult
 import com.example.money_saver_android.domain.usecase.RestoreResult
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.notifications.BackupReminderScheduler
+import com.example.money_saver_android.security.DeviceAuthCapability
+import com.example.money_saver_android.security.DeviceAuthCapabilityProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +61,9 @@ data class SettingsUiState(
     val lastBackupTimestamp: Long? = null,
     val backupStatus: BackupStatus = BackupStatus.IDLE,
     val restoreStatus: RestoreStatus = RestoreStatus.IDLE,
-    val pendingRestoreSnapshot: BackupSnapshot? = null
+    val pendingRestoreSnapshot: BackupSnapshot? = null,
+    val isAppLockEnabled: Boolean = false,
+    val deviceAuthCapability: DeviceAuthCapability = DeviceAuthCapability.NONE
 )
 
 class SettingsViewModel(
@@ -68,7 +73,9 @@ class SettingsViewModel(
     private val currencyPreferenceRepository: CurrencyPreferenceRepository? = null,
     private val backupUseCase: BackupUseCase? = null,
     private val backupPreferenceRepository: BackupPreferenceRepository? = null,
-    private val backupReminderScheduler: BackupReminderScheduler? = null
+    private val backupReminderScheduler: BackupReminderScheduler? = null,
+    private val appLockPreferenceRepository: AppLockPreferenceRepository? = null,
+    private val deviceAuthCapabilityProvider: DeviceAuthCapabilityProvider? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -81,11 +88,15 @@ class SettingsViewModel(
         val initialCurrency = currencyPreferenceRepository?.getCurrency() ?: "COP"
         val initialLastBackup = backupUseCase?.getLastBackupTimestamp()
             ?: backupPreferenceRepository?.getLastBackupTimestamp()
+        val initialAppLockEnabled = appLockPreferenceRepository?.isAppLockEnabled() ?: false
+        val initialCapability = deviceAuthCapabilityProvider?.getCapability() ?: DeviceAuthCapability.NONE
         _uiState.update {
             it.copy(
                 selectedLanguage = initialLanguage,
                 selectedCurrency = initialCurrency,
-                lastBackupTimestamp = initialLastBackup
+                lastBackupTimestamp = initialLastBackup,
+                isAppLockEnabled = initialAppLockEnabled,
+                deviceAuthCapability = initialCapability
             )
         }
         if (initialLastBackup != null) {
@@ -111,6 +122,19 @@ class SettingsViewModel(
     fun onCurrencySelected(currencyCode: String) {
         currencyPreferenceRepository?.saveCurrency(currencyCode)
         _uiState.update { it.copy(selectedCurrency = currencyCode) }
+    }
+
+    fun onAppLockToggled(enabled: Boolean) {
+        if (enabled && _uiState.value.deviceAuthCapability == DeviceAuthCapability.NONE) {
+            return
+        }
+        appLockPreferenceRepository?.setAppLockEnabled(enabled)
+        _uiState.update { it.copy(isAppLockEnabled = enabled) }
+    }
+
+    fun refreshDeviceAuthCapability() {
+        val capability = deviceAuthCapabilityProvider?.getCapability() ?: DeviceAuthCapability.NONE
+        _uiState.update { it.copy(deviceAuthCapability = capability) }
     }
 
     private fun isBackupOrRestoreBusy(): Boolean {

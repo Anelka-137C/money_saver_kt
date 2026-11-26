@@ -18,6 +18,7 @@ import com.example.money_saver_android.ui.components.settings.BackupSectionCard
 import com.example.money_saver_android.ui.components.settings.CurrencySectionCard
 import com.example.money_saver_android.ui.components.settings.LanguageSectionCard
 import com.example.money_saver_android.ui.components.settings.RestoreBackupConfirmationDialog
+import com.example.money_saver_android.ui.components.settings.SecuritySectionCard
 import com.example.money_saver_android.ui.components.settings.SettingsHeader
 import com.example.money_saver_android.ui.theme.DarkBackground
 import com.example.money_saver_android.viewmodel.SettingsViewModel
@@ -60,6 +61,33 @@ fun SettingsView(
             availableCurrencies = state.availableCurrencies,
             selectedCurrency = state.selectedCurrency,
             onCurrencySelected = settingsViewModel::onCurrencySelected
+        )
+
+        SecuritySectionCard(
+            title = i18nManager.tOrFallback("settings.security_section.title", "Seguridad"),
+            description = i18nManager.tOrFallback(
+                "settings.security_section.description",
+                "Protege el acceso a tus datos financieros al abrir o retomar la aplicación."
+            ),
+            toggleLabel = i18nManager.tOrFallback(
+                "settings.security_section.toggle_label",
+                "Protección de acceso"
+            ),
+            capabilityBiometricAndPinText = i18nManager.tOrFallback(
+                "settings.security_section.capability_biometric_and_pin",
+                "Disponible con huella y PIN del dispositivo"
+            ),
+            capabilityPinOnlyText = i18nManager.tOrFallback(
+                "settings.security_section.capability_pin_only",
+                "Disponible solo con el PIN del dispositivo"
+            ),
+            capabilityNoneText = i18nManager.tOrFallback(
+                "settings.security_section.capability_none",
+                "Configura un PIN, patrón o huella en el sistema para activar esta protección"
+            ),
+            isAppLockEnabled = state.isAppLockEnabled,
+            deviceAuthCapability = state.deviceAuthCapability,
+            onAppLockToggled = settingsViewModel::onAppLockToggled
         )
 
         BackupSectionCard(

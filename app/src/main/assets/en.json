@@ -114,6 +114,14 @@
       "title": "Preferred Currency",
       "description": "Select the currency to display amounts"
     },
+    "security_section": {
+      "title": "Security",
+      "description": "Protect access to your financial data when opening or returning to the app.",
+      "toggle_label": "Access protection",
+      "capability_biometric_and_pin": "Available with fingerprint and device PIN",
+      "capability_pin_only": "Available with device PIN only",
+      "capability_none": "Set up a PIN, pattern, or fingerprint in system settings to enable this protection"
+    },
     "backup_section": {
       "title": "Google Drive Backup",
       "description": "Save a copy of your financial data (money_saver_backup) in the Google Drive folder you choose.",
@@ -145,6 +153,14 @@
       "de": "Deutsch",
       "pt": "Português (Brasil)"
     }
+  },
+  "app_lock": {
+    "prompt_title": "Unlock Money Saver",
+    "prompt_subtitle": "Use your fingerprint or device PIN to continue",
+    "screen_title": "App locked",
+    "screen_subtitle": "Your financial data is protected",
+    "auth_error": "Could not verify your identity. Please try again.",
+    "retry_button": "Retry unlock"
   },
   "period": {
     "title": "Financial Period",

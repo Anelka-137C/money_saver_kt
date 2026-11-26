@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.room.Room
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.local.AppDatabase
@@ -28,6 +28,7 @@ import com.example.money_saver_android.data.repository.RoomExpenseRepository
 import com.example.money_saver_android.data.repository.RoomFinancialPeriodRepository
 import com.example.money_saver_android.data.repository.RoomIncomeRepository
 import com.example.money_saver_android.data.repository.RoomSavingsRepository
+import com.example.money_saver_android.data.repository.SharedPrefsAppLockPreferenceRepository
 import com.example.money_saver_android.data.repository.SharedPrefsBackupPreferenceRepository
 import com.example.money_saver_android.data.repository.SharedPrefsCurrencyRepository
 import com.example.money_saver_android.data.repository.SharedPrefsLanguageRepository
@@ -40,9 +41,13 @@ import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.notifications.AndroidBackupReminderScheduler
 import com.example.money_saver_android.notifications.BackupReminderReceiver
+import com.example.money_saver_android.security.AndroidDeviceAuthCapabilityChecker
+import com.example.money_saver_android.security.AppLockController
+import com.example.money_saver_android.security.NativeBiometricAuthenticator
 import com.example.money_saver_android.ui.AppTab
 import com.example.money_saver_android.ui.IncomesView
 import com.example.money_saver_android.ui.MainContainer
+import com.example.money_saver_android.ui.components.security.AppLockGate
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.IncomeViewModel
@@ -52,7 +57,14 @@ import com.example.money_saver_android.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    companion object {
+        private const val KEY_APP_LOCKED = "app_lock_is_locked"
+        private const val KEY_APP_LOCK_ERROR = "app_lock_show_error"
+        private const val KEY_PROCESS_TOKEN = "app_lock_process_token"
+        private val PROCESS_TOKEN: String = java.util.UUID.randomUUID().toString()
+    }
 
     private val i18nManager by lazy {
         I18nManager().apply {
@@ -101,6 +113,33 @@ class MainActivity : ComponentActivity() {
         SharedPrefsBackupPreferenceRepository(prefs)
     }
 
+    private val appLockPreferenceRepository by lazy {
+        val prefs = applicationContext.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+        SharedPrefsAppLockPreferenceRepository(prefs)
+    }
+
+    private val deviceAuthCapabilityChecker by lazy {
+        AndroidDeviceAuthCapabilityChecker(applicationContext)
+    }
+
+    private val nativeBiometricAuthenticator by lazy {
+        NativeBiometricAuthenticator(
+            activity = this,
+            titleProvider = { i18nManager.t("app_lock.prompt_title") },
+            subtitleProvider = { i18nManager.t("app_lock.prompt_subtitle") }
+        )
+    }
+
+    private val appLockController by lazy {
+        AppLockController(
+            appLockPreferenceRepository = appLockPreferenceRepository,
+            deviceAuthCapabilityProvider = deviceAuthCapabilityChecker,
+            launchDeviceAuth = nativeBiometricAuthenticator::authenticate
+        )
+    }
+
+    private var hasCompletedInitialStart = false
+
     private val backupReminderScheduler by lazy {
         AndroidBackupReminderScheduler(applicationContext)
     }
@@ -127,7 +166,9 @@ class MainActivity : ComponentActivity() {
             currencyPreferenceRepository = currencyPreferenceRepository,
             backupUseCase = backupUseCase,
             backupPreferenceRepository = backupPreferenceRepository,
-            backupReminderScheduler = backupReminderScheduler
+            backupReminderScheduler = backupReminderScheduler,
+            appLockPreferenceRepository = appLockPreferenceRepository,
+            deviceAuthCapabilityProvider = deviceAuthCapabilityChecker
         )
     }
 
@@ -218,11 +259,14 @@ class MainActivity : ComponentActivity() {
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* Permission result handled silently; reminder still evaluates on app launch */ }
+    ) {
+        appLockController.clearBackgroundLockSuppression()
+    }
 
     private val createBackupLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
+        appLockController.clearBackgroundLockSuppression()
         if (uri == null) {
             settingsViewModel.onBackupCancelled()
             return@registerForActivityResult
@@ -240,6 +284,7 @@ class MainActivity : ComponentActivity() {
     private val openBackupLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
+        appLockController.clearBackgroundLockSuppression()
         if (uri == null) {
             settingsViewModel.onRestorePickerCancelled()
             return@registerForActivityResult
@@ -258,6 +303,7 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
+            appLockController.suppressNextBackgroundLock()
             requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -275,17 +321,56 @@ class MainActivity : ComponentActivity() {
         resolveTabFromIntent(intent)?.let { requestedTab = it }
     }
 
+    override fun onStart() {
+        super.onStart()
+        val state = appLockController.uiState.value
+        if (hasCompletedInitialStart || (state.isLocked && !state.isAuthenticating && !state.showAuthError)) {
+            appLockController.onAppForegrounded()
+        }
+        hasCompletedInitialStart = true
+    }
+
     override fun onResume() {
         super.onResume()
         periodViewModel.checkActivePeriod()
+        settingsViewModel.refreshDeviceAuthCapability()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) {
+            appLockController.onAppBackgrounded()
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val lockState = appLockController.uiState.value
+        val shouldPersistLocked = lockState.isLocked ||
+            (!isChangingConfigurations &&
+                !appLockController.isBackgroundLockSuppressed() &&
+                appLockPreferenceRepository.isAppLockEnabled())
+        outState.putString(KEY_PROCESS_TOKEN, PROCESS_TOKEN)
+        outState.putBoolean(KEY_APP_LOCKED, shouldPersistLocked)
+        outState.putBoolean(KEY_APP_LOCK_ERROR, lockState.showAuthError)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val isSameProcess = savedInstanceState?.getString(KEY_PROCESS_TOKEN) == PROCESS_TOKEN
+        if (savedInstanceState == null || !isSameProcess) {
+            appLockController.onAppLaunch()
+        } else {
+            appLockController.restoreLockedState(
+                wasLocked = savedInstanceState.getBoolean(KEY_APP_LOCKED, false),
+                showAuthError = savedInstanceState.getBoolean(KEY_APP_LOCK_ERROR, false)
+            )
+        }
         requestedTab = resolveTabFromIntent(intent)
         enableEdgeToEdge()
         setContent {
             Money_saver_androidTheme {
+                val lockState by appLockController.uiState.collectAsState()
                 val settingsState by settingsViewModel.uiState.collectAsState()
                 val activeCurrency = settingsState.availableCurrencies.find { it.code == settingsState.selectedCurrency }
                     ?: defaultCurrencies.first()
@@ -296,40 +381,48 @@ class MainActivity : ComponentActivity() {
                     ?: periodState.activePeriod?.id
                     ?: periodState.allPeriods.firstOrNull()?.id
 
-                MainContainer(
-                    settingsViewModel = settingsViewModel,
-                    periodViewModel = periodViewModel,
+                AppLockGate(
+                    lockState = lockState,
                     i18nManager = i18nManager,
-                    requestedTab = requestedTab,
-                    onRequestedTabConsumed = { requestedTab = null },
-                    onCreateBackupClick = {
-                        settingsViewModel.clearBackupStatus()
-                        createBackupLauncher.launch(BackupUseCase.BACKUP_FILE_NAME)
-                    },
-                    onRestoreBackupClick = {
-                        settingsViewModel.clearRestoreStatus()
-                        openBackupLauncher.launch(arrayOf("application/json", "application/octet-stream", "*/*"))
-                    },
-                    onRestoreConfirmed = {
-                        periodViewModel.checkActivePeriod()
-                    },
-                    incomesContent = {
-                        IncomesView(
-                            incomeViewModel = incomeViewModel,
-                            expenseViewModel = viewModel,
-                            savingsViewModel = savingsViewModel,
-                            allPeriods = periodState.allPeriods,
-                            selectedPeriodId = currentSelectedPeriodId,
-                            onPeriodSelected = { periodId ->
-                                incomeViewModel.onPeriodSelected(periodId)
-                                viewModel.onPeriodSelected(periodId)
-                                savingsViewModel.onPeriodSelected(periodId)
-                            },
-                            i18nManager = i18nManager,
-                            currency = activeCurrency
-                        )
-                    }
-                )
+                    onRetry = appLockController::retryAuthentication
+                ) {
+                    MainContainer(
+                        settingsViewModel = settingsViewModel,
+                        periodViewModel = periodViewModel,
+                        i18nManager = i18nManager,
+                        requestedTab = requestedTab,
+                        onRequestedTabConsumed = { requestedTab = null },
+                        onCreateBackupClick = {
+                            settingsViewModel.clearBackupStatus()
+                            appLockController.suppressNextBackgroundLock()
+                            createBackupLauncher.launch(BackupUseCase.BACKUP_FILE_NAME)
+                        },
+                        onRestoreBackupClick = {
+                            settingsViewModel.clearRestoreStatus()
+                            appLockController.suppressNextBackgroundLock()
+                            openBackupLauncher.launch(arrayOf("application/json", "application/octet-stream", "*/*"))
+                        },
+                        onRestoreConfirmed = {
+                            periodViewModel.checkActivePeriod()
+                        },
+                        incomesContent = {
+                            IncomesView(
+                                incomeViewModel = incomeViewModel,
+                                expenseViewModel = viewModel,
+                                savingsViewModel = savingsViewModel,
+                                allPeriods = periodState.allPeriods,
+                                selectedPeriodId = currentSelectedPeriodId,
+                                onPeriodSelected = { periodId ->
+                                    incomeViewModel.onPeriodSelected(periodId)
+                                    viewModel.onPeriodSelected(periodId)
+                                    savingsViewModel.onPeriodSelected(periodId)
+                                },
+                                i18nManager = i18nManager,
+                                currency = activeCurrency
+                            )
+                        }
+                    )
+                }
             }
         }
     }

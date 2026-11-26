@@ -114,6 +114,14 @@
       "title": "Bevorzugte Währung",
       "description": "Wählen Sie die Währung für die Beträge aus"
     },
+    "security_section": {
+      "title": "Sicherheit",
+      "description": "Schütze den Zugriff auf deine Finanzdaten beim Öffnen oder Zurückkehren zur App.",
+      "toggle_label": "Zugriffsschutz",
+      "capability_biometric_and_pin": "Verfügbar mit Fingerabdruck und Geräte-PIN",
+      "capability_pin_only": "Nur mit Geräte-PIN verfügbar",
+      "capability_none": "Richte eine PIN, ein Muster oder einen Fingerabdruck in den Systemeinstellungen ein, um diesen Schutz zu aktivieren"
+    },
     "backup_section": {
       "title": "Google Drive-Sicherung",
       "description": "Speichere eine Kopie deiner Finanzdaten (money_saver_backup) im gewünschten Google Drive-Ordner.",
@@ -145,6 +153,14 @@
       "de": "Deutsch",
       "pt": "Português (Brasil)"
     }
+  },
+  "app_lock": {
+    "prompt_title": "Money Saver entsperren",
+    "prompt_subtitle": "Verwende deinen Fingerabdruck oder die Geräte-PIN",
+    "screen_title": "App gesperrt",
+    "screen_subtitle": "Deine Finanzdaten sind geschützt",
+    "auth_error": "Identität konnte nicht bestätigt werden. Bitte versuche es erneut.",
+    "retry_button": "Entsperren wiederholen"
   },
   "period": {
     "title": "Finanzzeitraum",

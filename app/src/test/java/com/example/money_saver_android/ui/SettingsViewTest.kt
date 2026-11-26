@@ -2,6 +2,10 @@ package com.example.money_saver_android.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,12 +15,15 @@ import androidx.compose.ui.test.performScrollTo
 import com.example.money_saver_android.FakeCategoryRepoForVm
 import com.example.money_saver_android.FakeExpenseRepository
 import com.example.money_saver_android.data.defaultCurrencies
+import com.example.money_saver_android.data.repository.AppLockPreferenceRepository
 import com.example.money_saver_android.data.repository.BackupPreferenceRepository
 import com.example.money_saver_android.domain.FakeBudgetRepository
 import com.example.money_saver_android.domain.FakeSavingsRepository
 import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.usecase.BackupUseCase
 import com.example.money_saver_android.i18n.I18nManager
+import com.example.money_saver_android.security.DeviceAuthCapability
+import com.example.money_saver_android.security.DeviceAuthCapabilityProvider
 import com.example.money_saver_android.viewmodel.FakeCurrencyPreferenceRepository
 import com.example.money_saver_android.viewmodel.FakeCurrencyRepository
 import com.example.money_saver_android.viewmodel.FakeFinancialPeriodRepository
@@ -234,5 +241,67 @@ class SettingsViewTest {
             .assertTextEquals("Datos restaurados correctamente")
         composeTestRule.onNodeWithTag("text_last_backup_status").performScrollTo()
             .assertTextEquals("Sin respaldos")
+    }
+
+    @Test
+    fun test_settings_screen_displays_security_card_capability_message_and_toggles_switch() {
+        val fakeAppLockPrefs = object : AppLockPreferenceRepository {
+            var enabled = false
+            override fun isAppLockEnabled(): Boolean = enabled
+            override fun setAppLockEnabled(enabled: Boolean) { this.enabled = enabled }
+        }
+        var currentCapability = DeviceAuthCapability.BIOMETRIC_AND_PIN
+        val fakeCapabilityProvider = object : DeviceAuthCapabilityProvider {
+            override fun getCapability(): DeviceAuthCapability = currentCapability
+        }
+        val vm = SettingsViewModel(
+            languageRepository = FakeLanguagePreferenceRepository("es"),
+            i18nManager = i18nManager,
+            currencyRepository = FakeCurrencyRepository(defaultCurrencies),
+            currencyPreferenceRepository = fakeCurrPrefRepo,
+            appLockPreferenceRepository = fakeAppLockPrefs,
+            deviceAuthCapabilityProvider = fakeCapabilityProvider
+        )
+
+        composeTestRule.setContent {
+            SettingsView(
+                settingsViewModel = vm,
+                i18nManager = i18nManager
+            )
+        }
+
+        composeTestRule.onNodeWithTag("card_security_section").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_security_capability").performScrollTo()
+            .assertTextEquals("Disponible con huella y PIN del dispositivo")
+        composeTestRule.onNodeWithTag("switch_app_lock").performScrollTo()
+            .assertIsEnabled()
+            .assertIsOff()
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertTrue(fakeAppLockPrefs.enabled)
+        composeTestRule.onNodeWithTag("switch_app_lock").assertIsOn()
+
+        // PIN only capability updates message and still allows toggling
+        currentCapability = DeviceAuthCapability.PIN_ONLY
+        composeTestRule.runOnUiThread { vm.refreshDeviceAuthCapability() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("text_security_capability").performScrollTo()
+            .assertTextEquals("Disponible solo con el PIN del dispositivo")
+        composeTestRule.onNodeWithTag("switch_app_lock").performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(false, fakeAppLockPrefs.enabled)
+        composeTestRule.onNodeWithTag("switch_app_lock").assertIsOff()
+
+        // No device lock disables switch and shows setup warning
+        currentCapability = DeviceAuthCapability.NONE
+        composeTestRule.runOnUiThread { vm.refreshDeviceAuthCapability() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("text_security_capability").performScrollTo()
+            .assertTextEquals("Configura un PIN, patrón o huella en el sistema para activar esta protección")
+        composeTestRule.onNodeWithTag("switch_app_lock").performScrollTo()
+            .assertIsNotEnabled()
     }
 }

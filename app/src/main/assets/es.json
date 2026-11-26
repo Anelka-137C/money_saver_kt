@@ -114,6 +114,14 @@
       "title": "Moneda de preferencia",
       "description": "Selecciona la divisa para ver los importes"
     },
+    "security_section": {
+      "title": "Seguridad",
+      "description": "Protege el acceso a tus datos financieros al abrir o retomar la aplicación.",
+      "toggle_label": "Protección de acceso",
+      "capability_biometric_and_pin": "Disponible con huella y PIN del dispositivo",
+      "capability_pin_only": "Disponible solo con el PIN del dispositivo",
+      "capability_none": "Configura un PIN, patrón o huella en el sistema para activar esta protección"
+    },
     "backup_section": {
       "title": "Respaldo en Google Drive",
       "description": "Guarda una copia de tus datos financieros (money_saver_backup) en la carpeta de Google Drive que elijas.",
@@ -145,6 +153,14 @@
       "de": "Deutsch",
       "pt": "Português (Brasil)"
     }
+  },
+  "app_lock": {
+    "prompt_title": "Desbloquear Money Saver",
+    "prompt_subtitle": "Usa tu huella o el PIN del dispositivo para acceder",
+    "screen_title": "Aplicación bloqueada",
+    "screen_subtitle": "Tus datos financieros están protegidos",
+    "auth_error": "No se pudo verificar tu identidad. Intenta de nuevo.",
+    "retry_button": "Reintentar desbloqueo"
   },
   "period": {
     "title": "Período Financiero",
