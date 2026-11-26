@@ -103,14 +103,15 @@ class RoomCategoryRepository(
     }
 
     override suspend fun replaceAllCategories(categories: List<Category>) {
-        val catEntities = categories.map {
+        val uniqueCategories = categories.associateBy { it.name }.values.toList()
+        val catEntities = uniqueCategories.map {
             CategoryEntity(name = it.name, icon = it.icon, color = it.color)
         }
         val subEntities = categories.flatMap { cat ->
             cat.subcategories.map { sub ->
                 SubcategoryEntity(categoryName = cat.name, name = sub.name)
             }
-        }
+        }.distinctBy { it.categoryName to it.name }
         dao.replaceAllCategories(catEntities, subEntities)
     }
 }

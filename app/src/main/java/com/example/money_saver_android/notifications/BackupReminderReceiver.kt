@@ -29,13 +29,17 @@ class BackupReminderReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
+        val action = intent?.action ?: return
+        val isBoot = action == Intent.ACTION_BOOT_COMPLETED
+        val isReminderAlarm = action == AndroidBackupReminderScheduler.ACTION_BACKUP_REMINDER
+        if (!isBoot && !isReminderAlarm) return
+
         val prefs = context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
         val backupRepo = SharedPrefsBackupPreferenceRepository(prefs)
         val lastBackup = backupRepo.getLastBackupTimestamp() ?: return
         val now = System.currentTimeMillis()
 
-        val isBoot = intent?.action == Intent.ACTION_BOOT_COMPLETED
-        if (!isBoot && BackupReminderScheduleCalculator.shouldNotifyNow(lastBackup, now)) {
+        if (isReminderAlarm && BackupReminderScheduleCalculator.shouldNotifyNow(lastBackup, now)) {
             showReminderNotification(context, prefs)
         }
 

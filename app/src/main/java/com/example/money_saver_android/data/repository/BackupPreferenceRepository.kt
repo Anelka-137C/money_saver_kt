@@ -20,11 +20,16 @@ class SharedPrefsBackupPreferenceRepository(
 
     override fun getLastBackupTimestamp(): Long? {
         if (!sharedPreferences.contains(KEY_LAST_BACKUP_TIMESTAMP)) return null
-        val value = sharedPreferences.getLong(KEY_LAST_BACKUP_TIMESTAMP, -1L)
+        val value = try {
+            sharedPreferences.getLong(KEY_LAST_BACKUP_TIMESTAMP, -1L)
+        } catch (_: ClassCastException) {
+            return null
+        }
         return value.takeIf { it > 0L }
     }
 
     override fun saveLastBackupTimestamp(timestampMillis: Long) {
+        if (timestampMillis <= 0L) return
         sharedPreferences.edit().putLong(KEY_LAST_BACKUP_TIMESTAMP, timestampMillis).apply()
     }
 }

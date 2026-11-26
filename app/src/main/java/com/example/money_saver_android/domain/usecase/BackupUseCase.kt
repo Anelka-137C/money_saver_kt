@@ -2,6 +2,7 @@ package com.example.money_saver_android.domain.usecase
 
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.Subcategory
+import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.repository.BackupPreferenceRepository
 import com.example.money_saver_android.data.repository.BudgetRepository
 import com.example.money_saver_android.data.repository.CategoryRepository
@@ -19,9 +20,11 @@ import com.example.money_saver_android.domain.model.FinancialPeriod
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -77,6 +80,7 @@ class BackupUseCase(
     companion object {
         const val BACKUP_FILE_NAME = "money_saver_backup"
         const val SCHEMA_VERSION = 1
+        private val SUPPORTED_CURRENCIES: Set<String> = defaultCurrencies.map { it.code }.toSet()
     }
 
     fun getLastBackupTimestamp(): Long? = backupPreferenceRepository.getLastBackupTimestamp()
@@ -104,31 +108,33 @@ class BackupUseCase(
             }
             val exportedAtMillis = root.getLong("exportedAtMillis")
             val prefsObj = root.getJSONObject("preferences")
-            val language = prefsObj.optString("language", "")
-            val currency = prefsObj.optString("currency", "")
+            val language = prefsObj.optStringOrEmpty("language", "")
+            val currency = prefsObj.optStringOrEmpty("currency", "")
 
             val periodsArray = root.getJSONArray("periods")
             val periods = (0 until periodsArray.length()).map { idx ->
                 val obj = periodsArray.getJSONObject(idx)
+                val startDate = obj.requireNonBlankString("startDate")
+                val endDate = obj.requireNonBlankString("endDate")
+                require(startDate <= endDate) { "Invalid period date range: $startDate > $endDate" }
                 FinancialPeriod(
                     id = obj.getLong("id"),
-                    startDate = obj.getString("startDate"),
-                    endDate = obj.getString("endDate")
+                    startDate = startDate,
+                    endDate = endDate
                 )
             }
 
             val incomesArray = root.getJSONArray("incomes")
             val incomes = (0 until incomesArray.length()).map { idx ->
                 val obj = incomesArray.getJSONObject(idx)
-                val amount = obj.getDouble("amount")
-                require(amount.isFinite()) { "Invalid income amount" }
+                val amount = obj.requirePositiveAmount("amount")
                 Income(
                     id = obj.getLong("id"),
                     amount = amount,
-                    dateTime = obj.getString("dateTime"),
-                    category = obj.getString("category"),
-                    subcategory = obj.optString("subcategory", ""),
-                    description = obj.optString("description", ""),
+                    dateTime = obj.requireNonBlankString("dateTime"),
+                    category = obj.requireNonBlankString("category"),
+                    subcategory = obj.optStringOrEmpty("subcategory", ""),
+                    description = obj.optStringOrEmpty("description", ""),
                     periodId = obj.getLong("periodId")
                 )
             }
@@ -136,13 +142,12 @@ class BackupUseCase(
             val budgetsArray = root.getJSONArray("budgets")
             val budgets = (0 until budgetsArray.length()).map { idx ->
                 val obj = budgetsArray.getJSONObject(idx)
-                val amount = obj.getDouble("amount")
-                require(amount.isFinite()) { "Invalid budget amount" }
+                val amount = obj.requirePositiveAmount("amount")
                 Budget(
                     id = obj.getLong("id"),
                     amount = amount,
-                    category = obj.getString("category"),
-                    subcategory = obj.optString("subcategory", ""),
+                    category = obj.requireNonBlankString("category"),
+                    subcategory = obj.optStringOrEmpty("subcategory", ""),
                     periodId = obj.getLong("periodId")
                 )
             }
@@ -150,38 +155,36 @@ class BackupUseCase(
             val expensesArray = root.getJSONArray("expenses")
             val expenses = (0 until expensesArray.length()).map { idx ->
                 val obj = expensesArray.getJSONObject(idx)
-                val amount = obj.getDouble("amount")
-                require(amount.isFinite()) { "Invalid expense amount" }
+                val amount = obj.requirePositiveAmount("amount")
                 Expense(
                     id = obj.getLong("id"),
                     amount = amount,
-                    date = obj.getString("date"),
-                    description = obj.optString("description", ""),
-                    category = obj.getString("category"),
-                    subcategory = obj.optString("subcategory", ""),
+                    date = obj.requireNonBlankString("date"),
+                    description = obj.optStringOrEmpty("description", ""),
+                    category = obj.requireNonBlankString("category"),
+                    subcategory = obj.optStringOrEmpty("subcategory", ""),
                     periodId = obj.optLong("periodId", 0L),
                     budgetId = obj.optLong("budgetId", 0L),
-                    budgetCategory = obj.optString("budgetCategory", ""),
-                    fundingSource = ExpenseFundingSource.fromStorage(obj.optString("fundingSource", "BUDGET")),
-                    savingCategory = obj.optString("savingCategory", "")
+                    budgetCategory = obj.optStringOrEmpty("budgetCategory", ""),
+                    fundingSource = ExpenseFundingSource.fromStorage(obj.optStringOrEmpty("fundingSource", "BUDGET")),
+                    savingCategory = obj.optStringOrEmpty("savingCategory", "")
                 )
             }
 
             val savingsArray = root.getJSONArray("savings")
             val savings = (0 until savingsArray.length()).map { idx ->
                 val obj = savingsArray.getJSONObject(idx)
-                val amount = obj.getDouble("amount")
-                require(amount.isFinite()) { "Invalid saving amount" }
+                val amount = obj.requirePositiveAmount("amount")
                 Saving(
                     id = obj.getLong("id"),
                     amount = amount,
-                    category = obj.getString("category"),
-                    subcategory = obj.optString("subcategory", ""),
+                    category = obj.requireNonBlankString("category"),
+                    subcategory = obj.optStringOrEmpty("subcategory", ""),
                     periodId = obj.getLong("periodId"),
                     incomeId = obj.optLong("incomeId", 0L),
-                    incomeCategory = obj.optString("incomeCategory", ""),
-                    dateTime = obj.optString("dateTime", ""),
-                    note = obj.optString("note", "")
+                    incomeCategory = obj.optStringOrEmpty("incomeCategory", ""),
+                    dateTime = obj.optStringOrEmpty("dateTime", ""),
+                    note = obj.optStringOrEmpty("note", "")
                 )
             }
 
@@ -217,26 +220,79 @@ class BackupUseCase(
      * Replaces all local financial data, categories, and language/currency preferences
      * from a validated [BackupSnapshot]. Intentionally does NOT alter `lastBackupTimestamp`,
      * which tracks only the user's latest upload to Google Drive.
+     *
+     * Captures a pre-restore rollback snapshot so that any mid-flight failure across the
+     * separate Room databases restores the prior consistent local state.
      */
     suspend fun restoreBackup(snapshot: BackupSnapshot): RestoreResult {
         return try {
             allocationMutex.withLock {
-                periodRepository.replaceAllPeriods(snapshot.periods)
-                incomeRepository.replaceAllCategories(snapshot.incomeCategories)
-                budgetRepository.replaceAllCategories(snapshot.budgetCategories)
-                expenseCategoryRepository.replaceAllCategories(snapshot.expenseCategories)
-                savingsRepository.replaceAllCategories(snapshot.savingCategories)
-
-                incomeRepository.replaceAllIncomes(snapshot.incomes)
-                budgetRepository.replaceAllBudgets(snapshot.budgets)
-                expenseRepository.replaceAllExpenses(snapshot.expenses)
-                savingsRepository.replaceAllSavings(snapshot.savings)
-
-                if (snapshot.language in SharedPrefsLanguageRepository.SUPPORTED_LANGUAGES) {
-                    languagePreferenceRepository.saveLanguage(snapshot.language)
+                val prevPeriods = periodRepository.getAllPeriods().firstOrNull().orEmpty()
+                val prevPeriodIds = prevPeriods.map { it.id }.distinct()
+                val prevIncomeCats = incomeRepository.getAllCategories().firstOrNull().orEmpty()
+                val prevBudgetCats = budgetRepository.getAllCategories().firstOrNull().orEmpty()
+                val prevExpenseCats = expenseCategoryRepository.getAllCategories().firstOrNull().orEmpty()
+                val prevSavingCats = savingsRepository.getAllCategories().firstOrNull().orEmpty()
+                val prevIncomes = prevPeriodIds.flatMap { periodId ->
+                    incomeRepository.getIncomesByPeriod(periodId).firstOrNull().orEmpty()
+                }.distinctBy { it.id }
+                val prevBudgets = prevPeriodIds.flatMap { periodId ->
+                    budgetRepository.getBudgetsByPeriod(periodId).firstOrNull().orEmpty()
+                }.distinctBy { it.id }
+                val prevExpenses = expenseRepository.getAllExpenses().firstOrNull().orEmpty()
+                val prevAllSavings = savingsRepository.getAllSavings().firstOrNull().orEmpty()
+                val prevSavings = prevAllSavings.ifEmpty {
+                    prevPeriodIds.flatMap { periodId ->
+                        savingsRepository.getSavingsByPeriod(periodId).firstOrNull().orEmpty()
+                    }.distinctBy { it.id }
                 }
-                if (snapshot.currency.isNotBlank()) {
-                    currencyPreferenceRepository.saveCurrency(snapshot.currency)
+                val prevLanguage = languagePreferenceRepository.getLanguage()
+                val prevCurrency = currencyPreferenceRepository.getCurrency()
+
+                val rollbackSteps = mutableListOf<suspend () -> Unit>()
+                try {
+                    rollbackSteps.add { periodRepository.replaceAllPeriods(prevPeriods) }
+                    periodRepository.replaceAllPeriods(snapshot.periods)
+
+                    rollbackSteps.add { incomeRepository.replaceAllCategories(prevIncomeCats) }
+                    incomeRepository.replaceAllCategories(snapshot.incomeCategories)
+
+                    rollbackSteps.add { budgetRepository.replaceAllCategories(prevBudgetCats) }
+                    budgetRepository.replaceAllCategories(snapshot.budgetCategories)
+
+                    rollbackSteps.add { expenseCategoryRepository.replaceAllCategories(prevExpenseCats) }
+                    expenseCategoryRepository.replaceAllCategories(snapshot.expenseCategories)
+
+                    rollbackSteps.add { savingsRepository.replaceAllCategories(prevSavingCats) }
+                    savingsRepository.replaceAllCategories(snapshot.savingCategories)
+
+                    rollbackSteps.add { incomeRepository.replaceAllIncomes(prevIncomes) }
+                    incomeRepository.replaceAllIncomes(snapshot.incomes)
+
+                    rollbackSteps.add { budgetRepository.replaceAllBudgets(prevBudgets) }
+                    budgetRepository.replaceAllBudgets(snapshot.budgets)
+
+                    rollbackSteps.add { expenseRepository.replaceAllExpenses(prevExpenses) }
+                    expenseRepository.replaceAllExpenses(snapshot.expenses)
+
+                    rollbackSteps.add { savingsRepository.replaceAllSavings(prevSavings) }
+                    savingsRepository.replaceAllSavings(snapshot.savings)
+
+                    if (snapshot.language in SharedPrefsLanguageRepository.SUPPORTED_LANGUAGES) {
+                        rollbackSteps.add { languagePreferenceRepository.saveLanguage(prevLanguage) }
+                        languagePreferenceRepository.saveLanguage(snapshot.language)
+                    }
+                    if (snapshot.currency in SUPPORTED_CURRENCIES) {
+                        rollbackSteps.add { currencyPreferenceRepository.saveCurrency(prevCurrency) }
+                        currencyPreferenceRepository.saveCurrency(snapshot.currency)
+                    }
+                } catch (t: Throwable) {
+                    withContext(NonCancellable) {
+                        for (rollback in rollbackSteps.asReversed()) {
+                            runCatching { rollback() }
+                        }
+                    }
+                    throw t
                 }
             }
             RestoreResult.Success(snapshot)
@@ -250,41 +306,63 @@ class BackupUseCase(
     private fun parseCategoriesArray(array: JSONArray): List<Category> {
         return (0 until array.length()).map { idx ->
             val obj = array.getJSONObject(idx)
-            val name = obj.getString("name").trim()
-            require(name.isNotEmpty()) { "Category name cannot be blank" }
-            val subsArray = obj.optJSONArray("subcategories")
+            val name = obj.requireNonBlankString("name").trim()
+            val subsArray = if (obj.isNull("subcategories")) null else obj.optJSONArray("subcategories")
             val subs = if (subsArray != null) {
                 (0 until subsArray.length()).mapNotNull { sIdx ->
-                    subsArray.getString(sIdx).trim().takeIf { it.isNotEmpty() }?.let { Subcategory(it) }
+                    if (subsArray.isNull(sIdx)) {
+                        null
+                    } else {
+                        subsArray.getString(sIdx).trim().takeIf { it.isNotEmpty() }?.let { Subcategory(it) }
+                    }
                 }
             } else {
                 emptyList()
             }
             Category(
                 name = name,
-                icon = obj.optString("icon", "💰").ifBlank { "💰" },
-                color = obj.optString("color", "#4E73DF").ifBlank { "#4E73DF" },
+                icon = obj.optStringOrEmpty("icon", "💰").ifBlank { "💰" },
+                color = obj.optStringOrEmpty("color", "#4E73DF").ifBlank { "#4E73DF" },
                 subcategories = subs
             )
         }
     }
 
+    private fun JSONObject.optStringOrEmpty(key: String, fallback: String = ""): String {
+        if (isNull(key)) return fallback
+        return optString(key, fallback)
+    }
+
+    private fun JSONObject.requireNonBlankString(key: String): String {
+        require(!isNull(key)) { "Missing or null required field: $key" }
+        val value = getString(key)
+        require(value.isNotBlank()) { "Blank required field: $key" }
+        return value
+    }
+
+    private fun JSONObject.requirePositiveAmount(key: String): Double {
+        val amount = getDouble(key)
+        require(amount.isFinite() && amount > 0.0) { "Invalid $key amount: $amount" }
+        return amount
+    }
+
     suspend fun buildBackupJson(exportedAtMillis: Long = nowProvider()): String = allocationMutex.withLock {
         val periods = periodRepository.getAllPeriods().firstOrNull().orEmpty()
-        val incomes = periods.flatMap { period ->
-            incomeRepository.getIncomesByPeriod(period.id).firstOrNull().orEmpty()
-        }
-        val budgets = periods.flatMap { period ->
-            budgetRepository.getBudgetsByPeriod(period.id).firstOrNull().orEmpty()
-        }
+        val uniquePeriodIds = periods.map { it.id }.distinct()
+        val incomes = uniquePeriodIds.flatMap { periodId ->
+            incomeRepository.getIncomesByPeriod(periodId).firstOrNull().orEmpty()
+        }.distinctBy { it.id }
+        val budgets = uniquePeriodIds.flatMap { periodId ->
+            budgetRepository.getBudgetsByPeriod(periodId).firstOrNull().orEmpty()
+        }.distinctBy { it.id }
         val expenses = expenseRepository.getAllExpenses().firstOrNull().orEmpty()
         val allSavings = savingsRepository.getAllSavings().firstOrNull().orEmpty()
         val savings = if (allSavings.isNotEmpty()) {
             allSavings
         } else {
-            periods.flatMap { period ->
-                savingsRepository.getSavingsByPeriod(period.id).firstOrNull().orEmpty()
-            }
+            uniquePeriodIds.flatMap { periodId ->
+                savingsRepository.getSavingsByPeriod(periodId).firstOrNull().orEmpty()
+            }.distinctBy { it.id }
         }
 
         val root = JSONObject().apply {

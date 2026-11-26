@@ -28,8 +28,9 @@ object BackupReminderScheduleCalculator {
         nowMillis: Long,
         timeZone: TimeZone = TimeZone.getDefault()
     ): Boolean {
-        if (lastBackupTimestamp == null) return false
-        return nowMillis >= lastBackupTimestamp + SEVEN_DAYS_MILLIS && isDaytime(nowMillis, timeZone)
+        if (lastBackupTimestamp == null || lastBackupTimestamp <= 0L) return false
+        if (nowMillis < lastBackupTimestamp) return false
+        return (nowMillis - lastBackupTimestamp) >= SEVEN_DAYS_MILLIS && isDaytime(nowMillis, timeZone)
     }
 
     fun nextReminderTimeMillis(
@@ -37,14 +38,20 @@ object BackupReminderScheduleCalculator {
         nowMillis: Long,
         timeZone: TimeZone = TimeZone.getDefault()
     ): Long? {
-        if (lastBackupTimestamp == null) return null
+        if (lastBackupTimestamp == null || lastBackupTimestamp <= 0L) return null
+        if (lastBackupTimestamp > Long.MAX_VALUE - SEVEN_DAYS_MILLIS) return null
         val sevenDaysAfter = lastBackupTimestamp + SEVEN_DAYS_MILLIS
-        val rawCandidate = if (nowMillis < sevenDaysAfter) {
-            sevenDaysAfter
-        } else {
-            nowMillis + REMINDER_INTERVAL_MILLIS
+        val rawCandidate = when {
+            nowMillis < sevenDaysAfter -> sevenDaysAfter
+            !isDaytime(nowMillis, timeZone) -> nowMillis
+            nowMillis <= Long.MAX_VALUE - REMINDER_INTERVAL_MILLIS -> nowMillis + REMINDER_INTERVAL_MILLIS
+            else -> return null
         }
-        return adjustToDaytime(rawCandidate, timeZone)
+        if (rawCandidate > Long.MAX_VALUE - 2L * 24 * 60 * 60 * 1000) return null
+        val adjusted = adjustToDaytime(rawCandidate, timeZone)
+        if (adjusted > nowMillis) return adjusted
+        if (nowMillis > Long.MAX_VALUE - REMINDER_INTERVAL_MILLIS - 2L * 24 * 60 * 60 * 1000) return null
+        return adjustToDaytime(nowMillis + REMINDER_INTERVAL_MILLIS, timeZone)
     }
 
     internal fun adjustToDaytime(

@@ -65,7 +65,7 @@ fun BackupSectionCard(
     modifier: Modifier = Modifier
 ) {
     val formattedTimestamp = remember(lastBackupTimestamp) {
-        lastBackupTimestamp?.let {
+        lastBackupTimestamp?.takeIf { it > 0L }?.let {
             SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(it))
         }
     }

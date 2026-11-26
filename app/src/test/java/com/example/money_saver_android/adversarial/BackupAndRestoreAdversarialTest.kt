@@ -437,9 +437,9 @@ class BackupAndRestoreAdversarialTest {
         override fun saveLanguage(languageCode: String) { lang = languageCode }
     }
 
-    private class AdversarialCurrencyPrefRepo(var currency: String = "COP") : CurrencyPreferenceRepository {
-        override fun getCurrency(): String = currency
-        override fun saveCurrency(currencyCode: String) { currency = currencyCode }
+    private class AdversarialCurrencyPrefRepo(var currentCurrency: String = "COP") : CurrencyPreferenceRepository {
+        override fun getCurrency(): String = currentCurrency
+        override fun saveCurrency(currencyCode: String) { currentCurrency = currencyCode }
     }
 
     private class AdversarialBackupPrefRepo(var timestamp: Long? = null) : BackupPreferenceRepository {
@@ -780,7 +780,7 @@ class BackupAndRestoreAdversarialTest {
         repeat(80) { trial ->
             val harness = BackupHarness()
             harness.langRepo.lang = languages[rng.nextInt(languages.size)]
-            harness.currencyRepo.currency = currencies[rng.nextInt(currencies.size)]
+            harness.currencyRepo.currentCurrency = currencies[rng.nextInt(currencies.size)]
 
             val periodCount = rng.nextInt(1, 4)
             val periods = (1..periodCount).map { idx ->
@@ -872,7 +872,7 @@ class BackupAndRestoreAdversarialTest {
             assertEquals(BackupUseCase.SCHEMA_VERSION, snapshot.schemaVersion)
             assertEquals(exportedAt, snapshot.exportedAtMillis)
             assertEquals(harness.langRepo.lang, snapshot.language)
-            assertEquals(harness.currencyRepo.currency, snapshot.currency)
+            assertEquals(harness.currencyRepo.currentCurrency, snapshot.currency)
             assertEquals(periods, snapshot.periods)
             assertEquals(incomes.sortedBy { it.id }, snapshot.incomes.sortedBy { it.id })
             assertEquals(budgets.sortedBy { it.id }, snapshot.budgets.sortedBy { it.id })

@@ -3,6 +3,7 @@ package com.example.money_saver_android.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.money_saver_android.data.Currency
+import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.repository.BackupPreferenceRepository
 import com.example.money_saver_android.data.repository.CurrencyPreferenceRepository
 import com.example.money_saver_android.data.repository.CurrencyRepository
@@ -72,6 +73,7 @@ class SettingsViewModel(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private var activeRestoreToken: Long = 0L
 
     init {
         val initialLanguage = languageRepository.getLanguage()
@@ -111,8 +113,15 @@ class SettingsViewModel(
         _uiState.update { it.copy(selectedCurrency = currencyCode) }
     }
 
+    private fun isBackupOrRestoreBusy(): Boolean {
+        val state = _uiState.value
+        return state.backupStatus == BackupStatus.IN_PROGRESS ||
+            state.restoreStatus == RestoreStatus.READING ||
+            state.restoreStatus == RestoreStatus.RESTORING
+    }
+
     fun performBackup(writeContent: suspend (String) -> Unit) {
-        if (_uiState.value.backupStatus == BackupStatus.IN_PROGRESS) return
+        if (isBackupOrRestoreBusy()) return
         val useCase = backupUseCase
         if (useCase == null) {
             _uiState.update { it.copy(backupStatus = BackupStatus.ERROR) }
@@ -122,7 +131,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             when (val result = useCase.exportBackup(writeContent)) {
                 is BackupResult.Success -> {
-                    backupReminderScheduler?.scheduleNextReminder(result.timestampMillis)
+                    try {
+                        backupReminderScheduler?.scheduleNextReminder(result.timestampMillis)
+                    } catch (ce: kotlinx.coroutines.CancellationException) {
+                        throw ce
+                    } catch (_: Exception) {
+                        // Do not mask a completed backup or leave UI stuck in IN_PROGRESS if scheduling fails
+                    }
                     _uiState.update {
                         it.copy(
                             lastBackupTimestamp = result.timestampMillis,
@@ -138,22 +153,23 @@ class SettingsViewModel(
     }
 
     fun onBackupCancelled() {
+        if (_uiState.value.backupStatus == BackupStatus.IN_PROGRESS) return
         _uiState.update { it.copy(backupStatus = BackupStatus.CANCELLED) }
     }
 
     fun clearBackupStatus() {
+        if (_uiState.value.backupStatus == BackupStatus.IN_PROGRESS) return
         _uiState.update { it.copy(backupStatus = BackupStatus.IDLE) }
     }
 
     fun prepareRestore(readContent: suspend () -> String) {
-        if (_uiState.value.restoreStatus == RestoreStatus.READING ||
-            _uiState.value.restoreStatus == RestoreStatus.RESTORING
-        ) return
+        if (isBackupOrRestoreBusy()) return
         val useCase = backupUseCase
         if (useCase == null) {
             _uiState.update { it.copy(restoreStatus = RestoreStatus.ERROR) }
             return
         }
+        val token = ++activeRestoreToken
         _uiState.update { it.copy(restoreStatus = RestoreStatus.READING, pendingRestoreSnapshot = null) }
         viewModelScope.launch {
             val rawJson = try {
@@ -161,11 +177,15 @@ class SettingsViewModel(
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
             } catch (_: Exception) {
-                _uiState.update { it.copy(restoreStatus = RestoreStatus.ERROR) }
+                if (token == activeRestoreToken) {
+                    _uiState.update { it.copy(restoreStatus = RestoreStatus.ERROR) }
+                }
                 return@launch
             }
+            if (token != activeRestoreToken) return@launch
             when (val parsed = useCase.parseBackupJson(rawJson)) {
                 is RestoreParseResult.Valid -> {
+                    if (token != activeRestoreToken) return@launch
                     _uiState.update {
                         it.copy(
                             restoreStatus = RestoreStatus.IDLE,
@@ -174,6 +194,7 @@ class SettingsViewModel(
                     }
                 }
                 is RestoreParseResult.Invalid -> {
+                    if (token != activeRestoreToken) return@launch
                     _uiState.update {
                         it.copy(
                             restoreStatus = RestoreStatus.INVALID_FILE,
@@ -186,6 +207,8 @@ class SettingsViewModel(
     }
 
     fun cancelPendingRestore() {
+        if (_uiState.value.restoreStatus == RestoreStatus.RESTORING) return
+        activeRestoreToken++
         _uiState.update {
             it.copy(
                 pendingRestoreSnapshot = null,
@@ -195,10 +218,14 @@ class SettingsViewModel(
     }
 
     fun onRestorePickerCancelled() {
+        if (_uiState.value.restoreStatus == RestoreStatus.READING ||
+            _uiState.value.restoreStatus == RestoreStatus.RESTORING
+        ) return
         _uiState.update { it.copy(restoreStatus = RestoreStatus.CANCELLED) }
     }
 
     fun confirmRestore(onRestored: () -> Unit = {}) {
+        if (isBackupOrRestoreBusy()) return
         val snapshot = _uiState.value.pendingRestoreSnapshot ?: return
         val useCase = backupUseCase
         if (useCase == null) {
@@ -215,10 +242,15 @@ class SettingsViewModel(
                     if (restoredLanguage != null) {
                         i18nManager.setLanguage(restoredLanguage)
                     }
+                    val supportedCurrencies = (
+                        _uiState.value.availableCurrencies.map { it.code } +
+                            defaultCurrencies.map { it.code }
+                        ).toSet()
+                    val restoredCurrency = result.snapshot.currency.takeIf { it in supportedCurrencies }
                     _uiState.update { current ->
                         current.copy(
                             selectedLanguage = restoredLanguage ?: current.selectedLanguage,
-                            selectedCurrency = result.snapshot.currency.ifBlank { current.selectedCurrency },
+                            selectedCurrency = restoredCurrency ?: current.selectedCurrency,
                             restoreStatus = RestoreStatus.SUCCESS
                         )
                     }
@@ -232,6 +264,9 @@ class SettingsViewModel(
     }
 
     fun clearRestoreStatus() {
+        if (_uiState.value.restoreStatus == RestoreStatus.READING ||
+            _uiState.value.restoreStatus == RestoreStatus.RESTORING
+        ) return
         _uiState.update { it.copy(restoreStatus = RestoreStatus.IDLE) }
     }
 }
