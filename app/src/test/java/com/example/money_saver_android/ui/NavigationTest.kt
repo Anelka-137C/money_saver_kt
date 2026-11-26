@@ -4,6 +4,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -362,5 +364,59 @@ class NavigationTest {
 
         composeTestRule.onNodeWithTag("tab_incomes").performClick()
         composeTestRule.onNodeWithText("Vista de Contabilidad").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_floating_bottom_bar_displays_all_tabs_and_reflects_selected_state() {
+        val fakePeriodRepo = FakeFinancialPeriodRepository(initialPeriod = null)
+        val periodUseCase = PeriodUseCase(fakePeriodRepo, currentDateProvider = { "2026-11-07" })
+        val periodViewModel = PeriodViewModel(periodUseCase)
+
+        composeTestRule.setContent {
+            MainContainer(
+                settingsViewModel = settingsViewModel,
+                periodViewModel = periodViewModel,
+                i18nManager = i18nManager,
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
+                }
+            )
+        }
+
+        // Floating bottom bar container and all 3 tabs render; Period starts selected while locked
+        composeTestRule.onNodeWithTag("floating_bottom_nav").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_incomes").assertIsDisplayed().assertIsNotSelected()
+        composeTestRule.onNodeWithTag("tab_settings").assertIsDisplayed().assertIsNotSelected()
+        composeTestRule.onNodeWithTag("tab_period").assertIsDisplayed().assertIsSelected()
+
+        // Locked Contabilidad tab does not become selected on click
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithTag("tab_incomes").assertIsNotSelected()
+        composeTestRule.onNodeWithTag("tab_period").assertIsSelected()
+
+        // Settings remains selectable while period is locked
+        composeTestRule.onNodeWithTag("tab_settings").performClick()
+        composeTestRule.onNodeWithTag("tab_settings").assertIsSelected()
+        composeTestRule.onNodeWithTag("tab_period").assertIsNotSelected()
+
+        // Configure valid period to unlock Contabilidad
+        composeTestRule.onNodeWithTag("tab_period").performClick()
+        composeTestRule.onNodeWithTag("input_start_date").performTextInput("2026-11-01")
+        composeTestRule.onNodeWithTag("input_end_date").performTextInput("2026-11-30")
+        composeTestRule.onNodeWithTag("btn_save_period").performClick()
+
+        // Unlocked: switching tabs updates selected state accurately
+        composeTestRule.onNodeWithTag("tab_incomes").performClick()
+        composeTestRule.onNodeWithTag("tab_incomes").assertIsSelected()
+        composeTestRule.onNodeWithTag("tab_settings").assertIsNotSelected()
+        composeTestRule.onNodeWithTag("tab_period").assertIsNotSelected()
+
+        composeTestRule.onNodeWithTag("tab_settings").performClick()
+        composeTestRule.onNodeWithTag("tab_settings").assertIsSelected()
+        composeTestRule.onNodeWithTag("tab_incomes").assertIsNotSelected()
+
+        composeTestRule.onNodeWithTag("tab_period").performClick()
+        composeTestRule.onNodeWithTag("tab_period").assertIsSelected()
+        composeTestRule.onNodeWithTag("tab_settings").assertIsNotSelected()
     }
 }
