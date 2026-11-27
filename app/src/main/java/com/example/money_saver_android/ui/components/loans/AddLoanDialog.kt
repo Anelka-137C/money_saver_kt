@@ -370,8 +370,8 @@ internal fun filterDecimalInput(raw: String, allowsDecimals: Boolean, maxDecimal
     return buildString {
         var hasDot = false
         var decCount = 0
-        for (char in raw.replace(",", "")) {
-            if (char.isDigit()) {
+        for (char in raw) {
+            if (char in '0'..'9') {
                 if (hasDot) {
                     if (decCount < maxDecimals) {
                         append(char)

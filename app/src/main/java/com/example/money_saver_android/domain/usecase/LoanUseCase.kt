@@ -34,12 +34,13 @@ class LoanUseCase(
     fun getSavingCategories(): Flow<List<Category>> = savingsRepository?.getAllCategories() ?: emptyFlow()
 
     fun calculateTotalReceivable(loans: List<Loan>): Double {
-        val total = loans
+        val totalDecimal = loans
             .filter { it.amountToReceive.isFinite() && it.amountToReceive > 0.0 }
             .map { it.amountToReceive }
             .sumBigDecimal()
-            .toDouble()
-        return if (total.isFinite() && total > 0.0) total else 0.0
+        if (totalDecimal <= BigDecimal.ZERO) return 0.0
+        val total = totalDecimal.toDouble()
+        return if (total.isFinite()) total else Double.MAX_VALUE
     }
 
     suspend fun saveLoan(
@@ -49,7 +50,7 @@ class LoanUseCase(
         noteInput: String = "",
         savingCategoryInput: String = ""
     ): LoanResult {
-        val trimmedPerson = personNameInput.trim()
+        val trimmedPerson = personNameInput.trim { it.isWhitespace() }
         if (trimmedPerson.isEmpty()) {
             return LoanResult.Error("Debes ingresar el nombre de la persona")
         }
@@ -66,14 +67,15 @@ class LoanUseCase(
             return LoanResult.Error("El monto a recibir debe ser mayor o igual al monto prestado")
         }
 
-        val trimmedSavingCategory = savingCategoryInput.trim()
+        val trimmedNote = noteInput.trim { it.isWhitespace() }
+        val trimmedSavingCategory = savingCategoryInput.trim { it.isWhitespace() }
         if (trimmedSavingCategory.isEmpty()) {
             loanRepository.insertLoan(
                 Loan(
                     personName = trimmedPerson,
                     amountLent = amountLent,
                     amountToReceive = amountToReceive,
-                    note = noteInput.trim(),
+                    note = trimmedNote,
                     savingCategory = ""
                 )
             )
@@ -89,7 +91,7 @@ class LoanUseCase(
             val allLoans = loanRepository.getAllLoans().first()
             val matchingSavings = allSavings.filter {
                 it.amount.isFinite() && it.amount > 0.0 &&
-                    it.category.trim().equals(trimmedSavingCategory, ignoreCase = true)
+                    it.category.trim { ch -> ch.isWhitespace() }.equals(trimmedSavingCategory, ignoreCase = true)
             }
             val available = calculateCategoryAvailableSavings(
                 categoryName = trimmedSavingCategory,
@@ -106,8 +108,8 @@ class LoanUseCase(
                     personName = trimmedPerson,
                     amountLent = amountLent,
                     amountToReceive = amountToReceive,
-                    note = noteInput.trim(),
-                    savingCategory = matchingSavings.first().category.trim()
+                    note = trimmedNote,
+                    savingCategory = matchingSavings.first().category.trim { it.isWhitespace() }
                 )
             )
             LoanResult.Success

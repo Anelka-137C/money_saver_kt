@@ -6,6 +6,7 @@ import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.model.Loan
 import com.example.money_saver_android.domain.model.Saving
 import java.math.BigDecimal
+import java.util.Locale
 import kotlin.math.roundToInt
 
 data class SavingsCategoryBalance(
@@ -65,7 +66,7 @@ fun <T> buildPeriodCategorySummary(
     if (!total.isFinite() || total <= 0.0) return PeriodCategorySummary()
 
     val items = validEntries
-        .groupBy { categorySelector(it).trim().lowercase() }
+        .groupBy { categorySelector(it).trim().lowercase(Locale.ROOT) }
         .map { (_, group) ->
             val rawName = categorySelector(group.first()).trim()
             val matchedCategory = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
@@ -160,7 +161,7 @@ fun calculateSavingsNetBalances(
                 it.amount > 0.0 &&
                 it.savingCategory.trim().isNotEmpty()
         }
-        .groupBy { it.savingCategory.trim().lowercase() }
+        .groupBy { it.savingCategory.trim().lowercase(Locale.ROOT) }
         .mapValues { (_, list) -> list.map { it.amount }.sumBigDecimal() }
 
     val loanedByKey = loans
@@ -169,11 +170,11 @@ fun calculateSavingsNetBalances(
                 it.amountLent > 0.0 &&
                 it.savingCategory.trim().isNotEmpty()
         }
-        .groupBy { it.savingCategory.trim().lowercase() }
+        .groupBy { it.savingCategory.trim().lowercase(Locale.ROOT) }
         .mapValues { (_, list) -> list.map { it.amountLent }.sumBigDecimal() }
 
     return validSavings
-        .groupBy { it.category.trim().lowercase() }
+        .groupBy { it.category.trim().lowercase(Locale.ROOT) }
         .map { (key, group) ->
             val rawName = group.first().category.trim()
             val matched = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
@@ -192,7 +193,7 @@ fun calculateSavingsNetBalances(
                 totalLoaned = loanedDec.toDouble().takeIf { it.isFinite() } ?: 0.0
             )
         }
-        .sortedWith(compareByDescending<SavingsCategoryBalance> { it.netBalance }.thenBy { it.categoryName.lowercase() })
+        .sortedWith(compareByDescending<SavingsCategoryBalance> { it.netBalance }.thenBy { it.categoryName.lowercase(Locale.ROOT) })
 }
 
 fun buildSavingsNetSummary(

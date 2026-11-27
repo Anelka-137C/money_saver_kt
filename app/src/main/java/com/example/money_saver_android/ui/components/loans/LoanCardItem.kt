@@ -38,6 +38,7 @@ import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import java.util.Locale
 import kotlin.math.absoluteValue
 
 private val LoanAvatarColors = listOf(
@@ -205,10 +206,21 @@ private fun MetricDivider() {
 }
 
 internal fun buildPersonInitials(personName: String): String {
-    val parts = personName.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val parts = personName.trim { it.isWhitespace() }.split(Regex("\\s+")).filter { it.isNotEmpty() }
     return when {
         parts.isEmpty() -> "?"
-        parts.size == 1 -> parts[0].take(2).uppercase()
-        else -> "${parts[0].first()}${parts[1].first()}".uppercase()
+        parts.size == 1 -> parts[0].takeCodePoints(2).uppercase(Locale.ROOT)
+        else -> "${parts[0].takeCodePoints(1)}${parts[1].takeCodePoints(1)}".uppercase(Locale.ROOT)
     }
+}
+
+private fun String.takeCodePoints(count: Int): String {
+    if (isEmpty() || count <= 0) return ""
+    var offset = 0
+    var taken = 0
+    while (offset < length && taken < count) {
+        offset += Character.charCount(codePointAt(offset))
+        taken++
+    }
+    return substring(0, offset)
 }

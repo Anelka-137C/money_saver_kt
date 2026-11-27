@@ -10,6 +10,7 @@ import com.example.money_saver_android.domain.usecase.LoanResult
 import com.example.money_saver_android.domain.usecase.LoanUseCase
 import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
 import com.example.money_saver_android.domain.usecase.calculateSavingsNetBalances
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,15 +84,7 @@ class LoansViewModel(
                     loans = allLoans
                 )
                 _uiState.update { current ->
-                    val stillAvailable = current.selectedSavingCategory.isNotBlank() &&
-                        balances.any {
-                            it.categoryName.equals(current.selectedSavingCategory, ignoreCase = true) &&
-                                it.netBalance > 0.0
-                        }
-                    current.copy(
-                        savingsBalances = balances,
-                        selectedSavingCategory = if (stillAvailable) current.selectedSavingCategory else ""
-                    )
+                    current.copy(savingsBalances = balances)
                 }
             }
         }
@@ -181,6 +174,15 @@ class LoansViewModel(
                     is LoanResult.Error -> {
                         _uiState.update { it.copy(errorMessage = result.message) }
                     }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        errorMessage = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "No se pudo guardar el préstamo"
+                    )
                 }
             } finally {
                 isSaving = false

@@ -35,8 +35,11 @@ internal fun calculateExactAvailableIncome(
     return if (raw.isNaN()) 0.0 else maxOf(0.0, raw)
 }
 
+private val STRICT_THOUSANDS_COMMA_REGEX = Regex("^[1-9]\\d{0,2}(,\\d{3})+$")
+private val STRICT_DECIMAL_REGEX = Regex("^[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?$")
+
 internal fun parseAmountInput(rawInput: String): Double? {
-    val trimmed = rawInput.trim()
+    val trimmed = rawInput.trim { it.isWhitespace() }
     if (trimmed.isEmpty()) return null
     val normalized = when {
         trimmed.contains(',') && trimmed.contains('.') -> {
@@ -47,7 +50,7 @@ internal fun parseAmountInput(rawInput: String): Double? {
             }
         }
         trimmed.contains(',') -> {
-            if (Regex("^\\d{1,3}(,\\d{3})+$").matches(trimmed)) {
+            if (STRICT_THOUSANDS_COMMA_REGEX.matches(trimmed)) {
                 trimmed.replace(",", "")
             } else if (trimmed.count { it == ',' } == 1) {
                 trimmed.replace(",", ".")
@@ -57,6 +60,7 @@ internal fun parseAmountInput(rawInput: String): Double? {
         }
         else -> trimmed
     }
+    if (!STRICT_DECIMAL_REGEX.matches(normalized)) return null
     return normalized.toDoubleOrNull()
 }
 

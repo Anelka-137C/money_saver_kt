@@ -439,17 +439,23 @@ class SavingsViewModel(
     fun confirmDeleteSaving() {
         val saving = _uiState.value.savingToDelete ?: return
         viewModelScope.launch {
-            when (savingsUseCase.deleteSaving(saving.id)) {
+            when (val result = savingsUseCase.deleteSaving(saving.id)) {
                 is SavingsResult.Success -> {
                     _uiState.update {
                         it.copy(
                             savingToDelete = null,
+                            savingErrorMessage = null,
                             savingToastMessage = MSG_SAVING_DELETED
                         )
                     }
                 }
                 is SavingsResult.Error -> {
-                    _uiState.update { it.copy(savingToDelete = null) }
+                    _uiState.update {
+                        it.copy(
+                            savingToDelete = null,
+                            savingErrorMessage = result.message
+                        )
+                    }
                 }
             }
         }

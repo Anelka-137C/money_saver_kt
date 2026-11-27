@@ -284,31 +284,6 @@ class ExpenseUseCase(
         }
     }
 
-    private fun parseAmountInput(rawInput: String): Double? {
-        val trimmed = rawInput.trim()
-        if (trimmed.isEmpty()) return null
-        val normalized = when {
-            trimmed.contains(',') && trimmed.contains('.') -> {
-                if (trimmed.lastIndexOf(',') > trimmed.lastIndexOf('.')) {
-                    trimmed.replace(".", "").replace(",", ".")
-                } else {
-                    trimmed.replace(",", "")
-                }
-            }
-            trimmed.contains(',') -> {
-                if (Regex("^\\d{1,3}(,\\d{3})+$").matches(trimmed)) {
-                    trimmed.replace(",", "")
-                } else if (trimmed.count { it == ',' } == 1) {
-                    trimmed.replace(",", ".")
-                } else {
-                    return null
-                }
-            }
-            else -> trimmed
-        }
-        return normalized.toDoubleOrNull()
-    }
-
     private fun isValidExpenseDate(dateStr: String): Boolean {
         if (dateStr.isEmpty()) return false
         val pattern = when {
