@@ -5,11 +5,12 @@ import com.example.money_saver_android.data.Subcategory
 import com.example.money_saver_android.data.repository.BudgetRepository
 import com.example.money_saver_android.data.repository.ExpenseRepository
 import com.example.money_saver_android.data.repository.IncomeRepository
+import com.example.money_saver_android.data.repository.LoanRepository
 import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
-import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.model.Income
+import com.example.money_saver_android.domain.model.Loan
 import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -32,6 +33,7 @@ class SavingsUseCase(
     private val incomeRepository: IncomeRepository,
     private val budgetRepository: BudgetRepository? = null,
     private val expenseRepository: ExpenseRepository? = null,
+    private val loanRepository: LoanRepository? = null,
     private val savingMutex: Mutex = FinancialAllocationLock.mutex
 ) {
 
@@ -40,6 +42,9 @@ class SavingsUseCase(
 
     fun getAllExpenses(): Flow<List<Expense>> =
         expenseRepository?.getAllExpenses() ?: emptyFlow()
+
+    fun getAllLoans(): Flow<List<Loan>> =
+        loanRepository?.getAllLoans() ?: emptyFlow()
 
     fun getSavingsByPeriod(periodId: Long): Flow<List<Saving>> =
         savingsRepository.getSavingsByPeriod(periodId)
@@ -67,12 +72,14 @@ class SavingsUseCase(
     fun calculateNetSavingsSummary(
         allSavings: List<Saving>,
         allExpenses: List<Expense>,
-        categories: List<Category>
+        categories: List<Category>,
+        allLoans: List<Loan> = emptyList()
     ): PeriodCategorySummary = buildSavingsNetSummary(
         savings = allSavings,
         expenses = allExpenses,
         categories = categories,
-        defaultColorHex = "#3B82F6"
+        defaultColorHex = "#3B82F6",
+        loans = allLoans
     )
 
     fun calculateAvailableIncome(
@@ -225,14 +232,14 @@ class SavingsUseCase(
                 return@withLock SavingsResult.Error("El monto supera el ingreso disponible")
             }
 
-            if (wouldOverdrawSavingsExpenses(
+            if (wouldOverdrawSavingsAllocations(
                     categoryToCheck = existingSaving.category,
                     savingIdToReplace = id,
                     replacementAmount = amountDecimal,
                     replacementCategory = trimmedCategory
                 )
             ) {
-                return@withLock SavingsResult.Error("El monto o categoría compromete gastos ya financiados con este ahorro")
+                return@withLock SavingsResult.Error("El monto o categoría compromete gastos o préstamos financiados con este ahorro")
             }
 
             val incomeLabel = if (matchedIncome.subcategory.isNotBlank()) {
@@ -259,44 +266,41 @@ class SavingsUseCase(
     }
 
     suspend fun deleteSaving(id: Long): SavingsResult = savingMutex.withLock {
-        val existingSaving = if (expenseRepository != null && id > 0L) {
+        val existingSaving = if ((expenseRepository != null || loanRepository != null) && id > 0L) {
             savingsRepository.getSavingById(id)
         } else {
             null
         }
-        if (existingSaving != null && wouldOverdrawSavingsExpenses(
+        if (existingSaving != null && wouldOverdrawSavingsAllocations(
                 categoryToCheck = existingSaving.category,
                 savingIdToReplace = existingSaving.id,
                 replacementAmount = BigDecimal.ZERO,
                 replacementCategory = null
             )
         ) {
-            return@withLock SavingsResult.Error("No se puede eliminar el ahorro porque respalda gastos registrados")
+            return@withLock SavingsResult.Error("No se puede eliminar el ahorro porque respalda gastos o préstamos registrados")
         }
         savingsRepository.deleteSaving(id)
         SavingsResult.Success
     }
 
-    private suspend fun wouldOverdrawSavingsExpenses(
+    private suspend fun wouldOverdrawSavingsAllocations(
         categoryToCheck: String,
         savingIdToReplace: Long,
         replacementAmount: BigDecimal,
         replacementCategory: String?
     ): Boolean {
-        val expRepo = expenseRepository ?: return false
+        if (expenseRepository == null && loanRepository == null) return false
         val normalizedCheck = categoryToCheck.trim()
         if (normalizedCheck.isEmpty()) return false
-        val allExpenses = expRepo.getAllExpenses().firstOrNull() ?: emptyList()
-        val totalSpent = allExpenses
-            .filter {
-                it.fundingSource == ExpenseFundingSource.SAVINGS &&
-                    it.amount.isFinite() &&
-                    it.amount > 0.0 &&
-                    it.savingCategory.trim().equals(normalizedCheck, ignoreCase = true)
-            }
-            .map { it.amount }
-            .sumBigDecimal()
-        if (totalSpent <= BigDecimal.ZERO) return false
+        val allExpenses = expenseRepository?.getAllExpenses()?.firstOrNull() ?: emptyList()
+        val allLoans = loanRepository?.getAllLoans()?.firstOrNull() ?: emptyList()
+        val totalCommitted = calculateCategorySavingsOutflows(
+            categoryName = normalizedCheck,
+            expenses = allExpenses,
+            loans = allLoans
+        )
+        if (totalCommitted <= BigDecimal.ZERO) return false
 
         val allSavings = savingsRepository.getAllSavings().firstOrNull() ?: emptyList()
         val baseSaved = allSavings
@@ -311,7 +315,7 @@ class SavingsUseCase(
         val replacementMatches = replacementCategory != null &&
             replacementCategory.trim().equals(normalizedCheck, ignoreCase = true)
         val totalSavedAfter = if (replacementMatches) baseSaved.add(replacementAmount) else baseSaved
-        return totalSpent > totalSavedAfter
+        return totalCommitted > totalSavedAfter
     }
 
     private fun isValidSavingDateTime(dateStr: String): Boolean {
@@ -415,6 +419,7 @@ class SavingsUseCase(
         )
         if (targetCategory.name != trimmedNewName) {
             expenseRepository?.reassignSavingCategory(targetCategory.name, trimmedNewName)
+            loanRepository?.reassignSavingCategory(targetCategory.name, trimmedNewName)
         }
         SavingsResult.Success
     }

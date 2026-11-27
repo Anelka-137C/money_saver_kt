@@ -6,6 +6,7 @@ import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.ExpenseFundingSource
+import com.example.money_saver_android.domain.model.Loan
 import com.example.money_saver_android.domain.model.Saving
 import com.example.money_saver_android.domain.usecase.CategoryExpenseItem
 import com.example.money_saver_android.domain.usecase.CategoryResult
@@ -95,7 +96,15 @@ class ExpenseViewModel(
     private var isUpdatingExpense: Boolean = false
     private var latestAllSavings: List<Saving> = emptyList()
     private var latestAllExpenses: List<Expense> = emptyList()
+    private var latestAllLoans: List<Loan> = emptyList()
     private var latestSavingCategories: List<Category> = emptyList()
+
+    private data class SavingsBalanceSnapshot(
+        val savings: List<Saving>,
+        val expenses: List<Expense>,
+        val loans: List<Loan>,
+        val categories: List<Category>
+    )
 
     init {
         if (!expenseUseCase.requiresBudgetConditioning) {
@@ -129,14 +138,21 @@ class ExpenseViewModel(
             combine(
                 expenseUseCase.getAllSavings().catch { emit(emptyList()) },
                 expenseUseCase.getExpenses().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
+                expenseUseCase.getAllLoans().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
                 expenseUseCase.getSavingCategories().catch { emit(emptyList()) }.onStart { emit(emptyList()) }
-            ) { allSavings, allExpenses, savingCategories ->
-                Triple(allSavings, allExpenses, savingCategories)
-            }.collect { (allSavings, allExpenses, savingCategories) ->
+            ) { allSavings, allExpenses, allLoans, savingCategories ->
+                SavingsBalanceSnapshot(allSavings, allExpenses, allLoans, savingCategories)
+            }.collect { (allSavings, allExpenses, allLoans, savingCategories) ->
                 latestAllSavings = allSavings
                 latestAllExpenses = allExpenses
+                latestAllLoans = allLoans
                 latestSavingCategories = savingCategories
-                val balances = calculateSavingsNetBalances(allSavings, allExpenses, savingCategories)
+                val balances = calculateSavingsNetBalances(
+                    savings = allSavings,
+                    expenses = allExpenses,
+                    categories = savingCategories,
+                    loans = allLoans
+                )
                 _uiState.update { current ->
                     val hasAvailable = balances.any { it.netBalance > 0.0 }
                     val nextSource = resolveFundingSource(
@@ -159,7 +175,8 @@ class ExpenseViewModel(
                             savings = allSavings,
                             expenses = allExpenses,
                             categories = savingCategories,
-                            excludeExpenseId = edit.expenseId.takeIf { id -> id > 0L }
+                            excludeExpenseId = edit.expenseId.takeIf { id -> id > 0L },
+                            loans = allLoans
                         )
                     } ?: emptyList()
                     current.copy(
@@ -325,7 +342,8 @@ class ExpenseViewModel(
             savings = latestAllSavings,
             expenses = latestAllExpenses,
             categories = latestSavingCategories,
-            excludeExpenseId = expense.id.takeIf { id -> id > 0L }
+            excludeExpenseId = expense.id.takeIf { id -> id > 0L },
+            loans = latestAllLoans
         )
         _uiState.update {
             it.copy(

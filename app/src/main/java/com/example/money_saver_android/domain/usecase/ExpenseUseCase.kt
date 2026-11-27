@@ -3,10 +3,12 @@ package com.example.money_saver_android.domain.usecase
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.data.repository.BudgetRepository
 import com.example.money_saver_android.data.repository.ExpenseRepository
+import com.example.money_saver_android.data.repository.LoanRepository
 import com.example.money_saver_android.data.repository.SavingsRepository
 import com.example.money_saver_android.domain.model.Budget
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.ExpenseFundingSource
+import com.example.money_saver_android.domain.model.Loan
 import com.example.money_saver_android.domain.model.Saving
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -38,6 +40,7 @@ class ExpenseUseCase(
     private val repository: ExpenseRepository,
     private val budgetRepository: BudgetRepository? = null,
     private val savingsRepository: SavingsRepository? = null,
+    private val loanRepository: LoanRepository? = null,
     private val expenseMutex: Mutex = FinancialAllocationLock.mutex
 ) {
     val requiresBudgetConditioning: Boolean
@@ -61,6 +64,10 @@ class ExpenseUseCase(
 
     fun getSavingCategories(): Flow<List<Category>> {
         return savingsRepository?.getAllCategories() ?: emptyFlow()
+    }
+
+    fun getAllLoans(): Flow<List<Loan>> {
+        return loanRepository?.getAllLoans() ?: emptyFlow()
     }
 
     suspend fun saveExpense(
@@ -242,21 +249,18 @@ class ExpenseUseCase(
         return expenseMutex.withLock {
             val allSavings = savingsRepo.getAllSavings().first()
             val allExpenses = repository.getAllExpenses().first()
+            val allLoans = loanRepository?.getAllLoans()?.first() ?: emptyList()
             val matchingSavings = allSavings.filter {
                 it.amount.isFinite() && it.amount > 0.0 &&
                     it.category.trim().equals(trimmedSavingCategory, ignoreCase = true)
             }
-            val totalSaved = matchingSavings.map { it.amount }.sumBigDecimal()
-            val totalSpent = allExpenses
-                .filter {
-                    it.fundingSource == ExpenseFundingSource.SAVINGS &&
-                        (id <= 0L || it.id != id) &&
-                        it.amount.isFinite() && it.amount > 0.0 &&
-                        it.savingCategory.trim().equals(trimmedSavingCategory, ignoreCase = true)
-                }
-                .map { it.amount }
-                .sumBigDecimal()
-            val available = totalSaved.subtract(totalSpent).max(BigDecimal.ZERO)
+            val available = calculateCategoryAvailableSavings(
+                categoryName = trimmedSavingCategory,
+                savings = allSavings,
+                expenses = allExpenses,
+                loans = allLoans,
+                excludeExpenseId = id.takeIf { it > 0L }
+            )
             if (matchingSavings.isEmpty() || BigDecimal.valueOf(amount) > available) {
                 return@withLock ExpenseResult.Error("Saldo insuficiente en la categoría de ahorro")
             }

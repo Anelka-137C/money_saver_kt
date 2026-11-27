@@ -108,9 +108,15 @@ class SavingsViewModel(
             combine(
                 savingsUseCase.getAllSavings().catch { emit(emptyList()) },
                 savingsUseCase.getAllExpenses().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
+                savingsUseCase.getAllLoans().catch { emit(emptyList()) }.onStart { emit(emptyList()) },
                 savingsUseCase.getCategories().catch { emit(emptyList()) }.onStart { emit(emptyList()) }
-            ) { allSavings, allExpenses, categories ->
-                savingsUseCase.calculateNetSavingsSummary(allSavings, allExpenses, categories)
+            ) { allSavings, allExpenses, allLoans, categories ->
+                savingsUseCase.calculateNetSavingsSummary(
+                    allSavings = allSavings,
+                    allExpenses = allExpenses,
+                    categories = categories,
+                    allLoans = allLoans
+                )
             }.collect { netSummary ->
                 _uiState.update { current -> current.copy(netSavingsSummary = netSummary) }
             }

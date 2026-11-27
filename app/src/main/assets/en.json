@@ -2,6 +2,7 @@
   "navigation": {
     "tab_expenses": "Expenses",
     "tab_incomes": "Accounting",
+    "tab_loans": "Loans",
     "tab_settings": "Settings",
     "tab_period": "Period"
   },
@@ -384,6 +385,47 @@
       "subcategory_created": "Subcategory created successfully",
       "category_deleted": "Category deleted successfully",
       "subcategory_deleted": "Subcategory deleted successfully"
+    }
+  },
+  "loans": {
+    "header": {
+      "title": "Loans"
+    },
+    "summary": {
+      "total_receivable": "Total receivable",
+      "paid": "Paid"
+    },
+    "section": {
+      "pending_title": "Pending debts",
+      "count_singular": "loan",
+      "count_plural": "loans"
+    },
+    "empty": {
+      "message": "You have no registered loans yet"
+    },
+    "actions": {
+      "register_loan": "Register loan"
+    },
+    "card": {
+      "personal_loan": "Personal loan",
+      "amount_lent": "Amount lent",
+      "paid": "Paid",
+      "pending": "Pending"
+    },
+    "add_dialog": {
+      "title": "Register loan",
+      "person_label": "Person",
+      "person_placeholder": "e.g. Mary Smith",
+      "amount_lent_label": "Amount lent",
+      "amount_to_receive_label": "Amount to receive",
+      "saving_source_label": "Source savings category (optional)",
+      "saving_none": "None (personal loan)",
+      "note_label": "Note or concept (optional)",
+      "note_placeholder": "e.g. Trip loan",
+      "save_button": "Save loan"
+    },
+    "messages": {
+      "saved": "Loan registered successfully"
     }
   }
 }

@@ -20,6 +20,7 @@ import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.data.local.AppDatabase
 import com.example.money_saver_android.data.local.BudgetDatabase
 import com.example.money_saver_android.data.local.ConfigDatabase
+import com.example.money_saver_android.data.local.LoansDatabase
 import com.example.money_saver_android.data.local.SavingsDatabase
 import com.example.money_saver_android.data.repository.RoomBudgetRepository
 import com.example.money_saver_android.data.repository.RoomCategoryRepository
@@ -27,6 +28,7 @@ import com.example.money_saver_android.data.repository.RoomCurrencyRepository
 import com.example.money_saver_android.data.repository.RoomExpenseRepository
 import com.example.money_saver_android.data.repository.RoomFinancialPeriodRepository
 import com.example.money_saver_android.data.repository.RoomIncomeRepository
+import com.example.money_saver_android.data.repository.RoomLoanRepository
 import com.example.money_saver_android.data.repository.RoomSavingsRepository
 import com.example.money_saver_android.data.repository.SharedPrefsAppLockPreferenceRepository
 import com.example.money_saver_android.data.repository.SharedPrefsBackupPreferenceRepository
@@ -36,6 +38,7 @@ import com.example.money_saver_android.domain.usecase.BackupUseCase
 import com.example.money_saver_android.domain.usecase.CategoryUseCase
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
 import com.example.money_saver_android.domain.usecase.IncomeUseCase
+import com.example.money_saver_android.domain.usecase.LoanUseCase
 import com.example.money_saver_android.domain.usecase.PeriodUseCase
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
 import com.example.money_saver_android.i18n.I18nManager
@@ -46,11 +49,13 @@ import com.example.money_saver_android.security.AppLockController
 import com.example.money_saver_android.security.NativeBiometricAuthenticator
 import com.example.money_saver_android.ui.AppTab
 import com.example.money_saver_android.ui.IncomesView
+import com.example.money_saver_android.ui.LoansView
 import com.example.money_saver_android.ui.MainContainer
 import com.example.money_saver_android.ui.components.security.AppLockGate
 import com.example.money_saver_android.ui.theme.Money_saver_androidTheme
 import com.example.money_saver_android.viewmodel.ExpenseViewModel
 import com.example.money_saver_android.viewmodel.IncomeViewModel
+import com.example.money_saver_android.viewmodel.LoansViewModel
 import com.example.money_saver_android.viewmodel.PeriodViewModel
 import com.example.money_saver_android.viewmodel.SavingsViewModel
 import com.example.money_saver_android.viewmodel.SettingsViewModel
@@ -191,7 +196,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private val expenseUseCase by lazy {
-        ExpenseUseCase(repository, budgetRepository, savingsRepository)
+        ExpenseUseCase(repository, budgetRepository, savingsRepository, loanRepository)
     }
 
     private val categoryUseCase by lazy {
@@ -235,11 +240,43 @@ class MainActivity : FragmentActivity() {
     }
 
     private val savingsUseCase by lazy {
-        SavingsUseCase(savingsRepository, incomeRepository, budgetRepository, expenseRepository = repository)
+        SavingsUseCase(
+            savingsRepository,
+            incomeRepository,
+            budgetRepository,
+            expenseRepository = repository,
+            loanRepository = loanRepository
+        )
     }
 
     private val savingsViewModel by lazy {
         SavingsViewModel(savingsUseCase)
+    }
+
+    private val loansDatabase by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            LoansDatabase::class.java,
+            "loans.db"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
+    }
+
+    private val loanRepository by lazy {
+        RoomLoanRepository(loansDatabase.loanDao())
+    }
+
+    private val loanUseCase by lazy {
+        LoanUseCase(
+            loanRepository = loanRepository,
+            savingsRepository = savingsRepository,
+            expenseRepository = repository
+        )
+    }
+
+    private val loansViewModel by lazy {
+        LoansViewModel(loanUseCase)
     }
 
     private val incomeUseCase by lazy {
@@ -417,6 +454,13 @@ class MainActivity : FragmentActivity() {
                                     viewModel.onPeriodSelected(periodId)
                                     savingsViewModel.onPeriodSelected(periodId)
                                 },
+                                i18nManager = i18nManager,
+                                currency = activeCurrency
+                            )
+                        },
+                        loansContent = {
+                            LoansView(
+                                loansViewModel = loansViewModel,
                                 i18nManager = i18nManager,
                                 currency = activeCurrency
                             )

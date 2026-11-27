@@ -2,6 +2,7 @@
   "navigation": {
     "tab_expenses": "Despesas",
     "tab_incomes": "Contabilidade",
+    "tab_loans": "Empréstimos",
     "tab_settings": "Configurações",
     "tab_period": "Período"
   },
@@ -384,6 +385,47 @@
       "subcategory_created": "Subcategoria criada com sucesso",
       "category_deleted": "Categoria excluída com sucesso",
       "subcategory_deleted": "Subcategoria excluída com sucesso"
+    }
+  },
+  "loans": {
+    "header": {
+      "title": "Empréstimos"
+    },
+    "summary": {
+      "total_receivable": "Total a receber",
+      "paid": "Pago"
+    },
+    "section": {
+      "pending_title": "Dívidas pendentes",
+      "count_singular": "empréstimo",
+      "count_plural": "empréstimos"
+    },
+    "empty": {
+      "message": "Você ainda não tem empréstimos registrados"
+    },
+    "actions": {
+      "register_loan": "Registrar empréstimo"
+    },
+    "card": {
+      "personal_loan": "Empréstimo pessoal",
+      "amount_lent": "Valor emprestado",
+      "paid": "Pago",
+      "pending": "Pendente"
+    },
+    "add_dialog": {
+      "title": "Registrar empréstimo",
+      "person_label": "Pessoa",
+      "person_placeholder": "Ex. Maria Silva",
+      "amount_lent_label": "Valor emprestado",
+      "amount_to_receive_label": "Valor a receber",
+      "saving_source_label": "Categoria de economia de origem (opcional)",
+      "saving_none": "Nenhuma (empréstimo pessoal)",
+      "note_label": "Nota ou motivo (opcional)",
+      "note_placeholder": "Ex. Empréstimo para viagem",
+      "save_button": "Salvar empréstimo"
+    },
+    "messages": {
+      "saved": "Empréstimo registrado com sucesso"
     }
   }
 }

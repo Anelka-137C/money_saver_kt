@@ -46,6 +46,7 @@ class NavigationTest {
               "navigation": {
                 "tab_expenses": "Gastos",
                 "tab_incomes": "Contabilidad",
+                "tab_loans": "Préstamos",
                 "tab_settings": "Configuración",
                 "tab_period": "Período"
               },
@@ -75,6 +76,7 @@ class NavigationTest {
               "navigation": {
                 "tab_expenses": "Expenses",
                 "tab_incomes": "Accounting",
+                "tab_loans": "Loans",
                 "tab_settings": "Settings",
                 "tab_period": "Period"
               },
@@ -383,9 +385,10 @@ class NavigationTest {
             )
         }
 
-        // Floating bottom bar container and all 3 tabs render; Period starts selected while locked
+        // Floating bottom bar container and all 4 tabs render; Period starts selected while locked
         composeTestRule.onNodeWithTag("floating_bottom_nav").assertIsDisplayed()
         composeTestRule.onNodeWithTag("tab_incomes").assertIsDisplayed().assertIsNotSelected()
+        composeTestRule.onNodeWithTag("tab_loans").assertIsDisplayed().assertIsNotSelected()
         composeTestRule.onNodeWithTag("tab_settings").assertIsDisplayed().assertIsNotSelected()
         composeTestRule.onNodeWithTag("tab_period").assertIsDisplayed().assertIsSelected()
 
@@ -418,5 +421,31 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("tab_period").performClick()
         composeTestRule.onNodeWithTag("tab_period").assertIsSelected()
         composeTestRule.onNodeWithTag("tab_settings").assertIsNotSelected()
+    }
+
+    @Test
+    fun test_loans_tab_is_enabled_even_when_no_active_period() {
+        val fakePeriodRepo = FakeFinancialPeriodRepository(initialPeriod = null)
+        val periodUseCase = PeriodUseCase(fakePeriodRepo, currentDateProvider = { "2026-11-07" })
+        val periodViewModel = PeriodViewModel(periodUseCase)
+
+        composeTestRule.setContent {
+            MainContainer(
+                settingsViewModel = settingsViewModel,
+                periodViewModel = periodViewModel,
+                i18nManager = i18nManager,
+                incomesContent = {
+                    androidx.compose.material3.Text("Vista de Contabilidad")
+                },
+                loansContent = {
+                    androidx.compose.material3.Text("Vista de Préstamos")
+                }
+            )
+        }
+
+        composeTestRule.onNodeWithTag("period_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tab_loans").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("tab_loans").assertIsSelected()
+        composeTestRule.onNodeWithText("Vista de Préstamos").assertIsDisplayed()
     }
 }

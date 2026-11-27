@@ -2,6 +2,7 @@
   "navigation": {
     "tab_expenses": "Gastos",
     "tab_incomes": "Contabilidad",
+    "tab_loans": "Préstamos",
     "tab_settings": "Configuración",
     "tab_period": "Período"
   },
@@ -384,6 +385,47 @@
       "subcategory_created": "Subcategoría creada exitosamente",
       "category_deleted": "Categoría eliminada exitosamente",
       "subcategory_deleted": "Subcategoría eliminada exitosamente"
+    }
+  },
+  "loans": {
+    "header": {
+      "title": "Préstamos"
+    },
+    "summary": {
+      "total_receivable": "Total por cobrar",
+      "paid": "Pagado"
+    },
+    "section": {
+      "pending_title": "Deudas pendientes",
+      "count_singular": "préstamo",
+      "count_plural": "préstamos"
+    },
+    "empty": {
+      "message": "Aún no tienes préstamos registrados"
+    },
+    "actions": {
+      "register_loan": "Registrar préstamo"
+    },
+    "card": {
+      "personal_loan": "Préstamo personal",
+      "amount_lent": "Monto prestado",
+      "paid": "Pagado",
+      "pending": "Pendiente"
+    },
+    "add_dialog": {
+      "title": "Registrar préstamo",
+      "person_label": "Persona",
+      "person_placeholder": "Ej. María Castillo",
+      "amount_lent_label": "Monto prestado",
+      "amount_to_receive_label": "Monto a recibir",
+      "saving_source_label": "Categoría de ahorro origen (opcional)",
+      "saving_none": "Ninguna (préstamo personal)",
+      "note_label": "Nota o concepto (opcional)",
+      "note_placeholder": "Ej. Préstamo para viaje",
+      "save_button": "Guardar préstamo"
+    },
+    "messages": {
+      "saved": "Préstamo registrado exitosamente"
     }
   }
 }

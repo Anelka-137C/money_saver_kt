@@ -1,12 +1,28 @@
-# Reporte de Revisión Adversarial — `PeriodSummaryDonutChart`
+# Reporte de Revisión Adversarial — Módulo de Préstamos (#15) y Saldo Neto de Ahorros
 
 **Fecha:** 2026-11-26  
-**Alcance analizado (vía `git diff`):**
-- [`app/src/main/java/com/example/money_saver_android/ui/components/atom/PeriodSummaryDonutChart.kt`](app/src/main/java/com/example/money_saver_android/ui/components/atom/PeriodSummaryDonutChart.kt)
-- Dependencia directa: [`app/src/main/java/com/example/money_saver_android/domain/usecase/CategorySummary.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/CategorySummary.kt)
+**Alcance analizado (vía `git status` y `git diff`):**
+- [`app/src/main/java/com/example/money_saver_android/domain/model/Loan.kt`](app/src/main/java/com/example/money_saver_android/domain/model/Loan.kt)
+- [`app/src/main/java/com/example/money_saver_android/data/local/LoansDatabase.kt`](app/src/main/java/com/example/money_saver_android/data/local/LoansDatabase.kt)
+- [`app/src/main/java/com/example/money_saver_android/data/repository/LoanRepository.kt`](app/src/main/java/com/example/money_saver_android/data/repository/LoanRepository.kt)
+- [`app/src/main/java/com/example/money_saver_android/domain/usecase/LoanUseCase.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/LoanUseCase.kt)
+- [`app/src/main/java/com/example/money_saver_android/domain/usecase/CategorySummary.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/CategorySummary.kt)
+- [`app/src/main/java/com/example/money_saver_android/domain/usecase/ExpenseUseCase.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/ExpenseUseCase.kt)
+- [`app/src/main/java/com/example/money_saver_android/domain/usecase/SavingsUseCase.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/SavingsUseCase.kt)
+- [`app/src/main/java/com/example/money_saver_android/viewmodel/LoansViewModel.kt`](app/src/main/java/com/example/money_saver_android/viewmodel/LoansViewModel.kt)
+- [`app/src/main/java/com/example/money_saver_android/viewmodel/ExpenseViewModel.kt`](app/src/main/java/com/example/money_saver_android/viewmodel/ExpenseViewModel.kt)
+- [`app/src/main/java/com/example/money_saver_android/viewmodel/SavingsViewModel.kt`](app/src/main/java/com/example/money_saver_android/viewmodel/SavingsViewModel.kt)
+- [`app/src/main/java/com/example/money_saver_android/ui/LoansView.kt`](app/src/main/java/com/example/money_saver_android/ui/LoansView.kt)
+- [`app/src/main/java/com/example/money_saver_android/ui/components/loans/AddLoanDialog.kt`](app/src/main/java/com/example/money_saver_android/ui/components/loans/AddLoanDialog.kt)
+- [`app/src/main/java/com/example/money_saver_android/ui/components/loans/LoanCardItem.kt`](app/src/main/java/com/example/money_saver_android/ui/components/loans/LoanCardItem.kt)
+- [`app/src/main/java/com/example/money_saver_android/ui/components/loans/LoansSummaryCard.kt`](app/src/main/java/com/example/money_saver_android/ui/components/loans/LoansSummaryCard.kt)
+- [`app/src/main/java/com/example/money_saver_android/ui/MainContainer.kt`](app/src/main/java/com/example/money_saver_android/ui/MainContainer.kt)
+- [`app/src/main/java/com/example/money_saver_android/ui/components/navigation/FloatingBottomNavigationBar.kt`](app/src/main/java/com/example/money_saver_android/ui/components/navigation/FloatingBottomNavigationBar.kt)
+- [`app/src/main/java/com/example/money_saver_android/MainActivity.kt`](app/src/main/java/com/example/money_saver_android/MainActivity.kt)
+- Traducciones: `app/src/main/assets/{es,en,de,pt}.json`
 
 **Suite adversarial generada:**
-- [`app/src/test/java/com/example/money_saver_android/adversarial/PeriodSummaryDonutChartAdversarialTest.kt`](app/src/test/java/com/example/money_saver_android/adversarial/PeriodSummaryDonutChartAdversarialTest.kt)
+- [`app/src/test/java/com/example/money_saver_android/adversarial/LoansAdversarialTest.kt`](app/src/test/java/com/example/money_saver_android/adversarial/LoansAdversarialTest.kt)
 
 > **Nota de operación:** El código productivo en `app/src/main` no fue modificado. Los tests fueron diseñados y escritos listos para ejecutarse localmente o en CI/CD (sin ejecución automática, respetando la directriz `NO EJECUTAR` de `adversarial-review-test-android`).
 
@@ -14,87 +30,160 @@
 
 ## 1. Hallazgos y Fallos Detectados
 
-### Bug #1 (Alto) — `totalAmount` no finito (`Double.NaN` / `Double.POSITIVE_INFINITY`) evade `summary.isEmpty`
+### Bug #1 (Alto) — `filterDecimalInput` destruye la coma decimal e infla montos ×100 (y permite dígitos no-ASCII)
+
+- **Ubicación:** [`AddLoanDialog.kt`](app/src/main/java/com/example/money_saver_android/ui/components/loans/AddLoanDialog.kt) (líneas 369–389: `filterDecimalInput`)
+- **Entradas que lo reproducen:**
+  - `filterDecimalInput("12,50", allowsDecimals = true, maxDecimals = 2)`
+  - `filterDecimalInput("0,75", allowsDecimals = true, maxDecimals = 2)`
+  - `filterDecimalInput("100,", allowsDecimals = true, maxDecimals = 2)`
+  - `filterDecimalInput("١٢٣", allowsDecimals = true, maxDecimals = 2)`
+- **Resultado obtenido:** La línea `for (char in raw.replace(",", ""))` elimina todas las comas antes de iterar, haciendo inalcanzable el bloque `else if ((char == '.' || char == ',') && allowsDecimals && !hasDot)`. Como resultado, `"12,50"` se convierte en `"1250"` (×100) y `"0,75"` en `"075"`. Además, `char.isDigit()` deja pasar dígitos Unicode no-ASCII (`'١'`, `'٢'`, `'٣'`) que luego `parseAmountInput` no puede parsear.
+- **Comportamiento esperado:** En teclados decimales de locales `es`/`de`/`pt`, una coma decimal sin punto previo debe normalizarse a `.` (`"12,50"` → `"12.50"`, `"0,75"` → `"0.75"`, `"100,"` → `"100."`) y solo deben aceptarse dígitos ASCII (`'0'..'9'`).
+- **Test que lo expone:** `addLoanDialog_filterDecimalInput_preservesCommaAsDecimalSeparatorAndEnforcesFormatProperty`
+
+---
+
+### Bug #2 (Alto) — `LoanDao.reassignSavingCategory` sobrescribe todos los préstamos personales si `oldCategoryName` está en blanco
+
+- **Ubicación:** [`LoansDatabase.kt`](app/src/main/java/com/example/money_saver_android/data/local/LoansDatabase.kt) (líneas 31–32)
+- **Entradas que lo reproducen:**
+  - Un préstamo personal persistido con `savingCategory = ""` (guardado como `NULL` en SQLite).
+  - Invocación `repo.reassignSavingCategory(oldName = "   ", newName = "Secuestrado")`.
+- **Resultado obtenido:** La cláusula `WHERE LOWER(TRIM(COALESCE(savingCategory, ''))) = LOWER(TRIM(:oldCategoryName))` transforma `NULL` en `''`, por lo que `'' = ''` evalúa a verdadero y muta **todos** los préstamos personales a `savingCategory = "Secuestrado"`, drenando el saldo de esa categoría.
+- **Comportamiento esperado:** Ignorar `oldCategoryName` en blanco (y excluir filas con `savingCategory IS NULL` o vacío en el `WHERE`) para nunca alterar préstamos personales.
+- **Test que lo expone:** `room_reassignSavingCategory_blankOldCategory_mustNotOverwritePersonalLoans`
+
+---
+
+### Bug #3 (Alto) — `LOWER()` de SQLite es ASCII-only y desvincula préstamos con categorías acentuadas al renombrar
+
+- **Ubicación:** [`LoansDatabase.kt`](app/src/main/java/com/example/money_saver_android/data/local/LoansDatabase.kt) (líneas 31–32)
+- **Entradas que lo reproducen:**
+  - Préstamo guardado con `savingCategory = "EDUCACIÓN"`.
+  - Renombre `repo.reassignSavingCategory(oldName = "Educación", newName = "Universidad")`.
+- **Resultado obtenido:** En SQLite, `LOWER('EDUCACIÓN')` produce `'educaciÓn'` (no convierte `'Ó'` a `'ó'`), mientras `LOWER('Educación')` produce `'educación'`. La fila del préstamo no se actualiza, quedando huérfana y dejando de descontarse del saldo neto de `"Universidad"`.
+- **Comportamiento esperado:** La reasignación case-insensitive debe soportar Unicode completo (p. ej. normalización/comparación en Kotlin o consulta que no dependa de `LOWER()` ASCII de SQLite).
+- **Test que lo expone:** `room_reassignSavingCategory_accentedCaseInsensitiveCategory_updatesLinkedLoans`
+
+---
+
+### Bug #4 (Alto) — `LoansViewModel` convierte silenciosamente un préstamo de ahorros en préstamo personal cuando se agota la categoría
+
+- **Ubicación:** [`LoansViewModel.kt`](app/src/main/java/com/example/money_saver_android/viewmodel/LoansViewModel.kt) (líneas 86–94)
+- **Entradas que lo reproducen:**
+  - Usuario llena el formulario con `selectedSavingCategory = "Emergencias"` (saldo `$500`) y monto `$300`.
+  - Un gasto concurrente o de otra pestaña drena `"Emergencias"` a `$0` antes de pulsar Guardar.
+  - Usuario pulsa `saveLoan()`.
+- **Resultado obtenido:** El colector `combine` de `LoansViewModel` limpia silenciosamente `selectedSavingCategory` a `""`. Como `""` representa un préstamo personal válido, `saveLoan()` registra un **préstamo personal** sin notificar al usuario ni rechazar por saldo insuficiente.
+- **Comportamiento esperado:** No convertir silenciosamente la intención del usuario a préstamo personal; preservar la categoría seleccionada (o invalidar con error explícito) para que `saveLoan()` rechace con `"Saldo insuficiente en la categoría de ahorro"`.
+- **Test que lo expone:** `loansViewModel_selectedSavingCategoryExhausted_doesNotSilentlyConvertToPersonalLoan`
+
+---
+
+### Bug #5 (Alto) — Excepción de persistencia no capturada en `LoansViewModel.saveLoan()`
+
+- **Ubicación:** [`LoansViewModel.kt`](app/src/main/java/com/example/money_saver_android/viewmodel/LoansViewModel.kt) (líneas 154–189)
+- **Entradas que lo reproducen:** `LoanRepository.insertLoan` lanza `IllegalStateException("SQLite disk full")` (o cualquier `RuntimeException` de Room/I/O).
+- **Resultado obtenido:** El bloque `try { ... } finally { isSaving = false }` carece de `catch`; la excepción se propaga sin manejo fuera de `viewModelScope.launch`, provocando crash en lugar de mostrar error en el diálogo.
+- **Comportamiento esperado:** Capturar excepciones no cancelatorias (re-lanzando `CancellationException`), asignar un `errorMessage` amigable, preservar los campos ingresados y permitir reintentar el guardado.
+- **Test que lo expone:** `loansViewModel_repositoryThrowsException_setsErrorAndRecoversWithoutCrashing`
+
+---
+
+### Bug #6 (Alto) — `SavingsViewModel.confirmDeleteSaving()` descarta silenciosamente el error cuando un préstamo protege el ahorro
+
+- **Ubicación:** [`SavingsViewModel.kt`](app/src/main/java/com/example/money_saver_android/viewmodel/SavingsViewModel.kt) (líneas 439–456)
+- **Entradas que lo reproducen:** Ahorro de `$500` respaldando un préstamo de `$300` en `"Emergencias"`. El usuario ejecuta `requestDeleteSaving(saving)` y `confirmDeleteSaving()`.
+- **Resultado obtenido:** `SavingsUseCase.deleteSaving` devuelve correctamente `SavingsResult.Error("No se puede eliminar el ahorro porque respalda gastos o préstamos registrados")`, pero `SavingsViewModel` solo limpia `savingToDelete = null` y deja `savingErrorMessage == null`, sin mostrar explicación al usuario.
+- **Comportamiento esperado:** Propagar `result.message` a `savingErrorMessage` al recibir `SavingsResult.Error`.
+- **Test que lo expone:** `savingsViewModel_confirmDeleteSavingBlockedByLoan_surfacesErrorMessage`
+
+---
+
+### Bug #7 (Medio) — Inconsistencia por `Locale.getDefault()` (p. ej. turco `tr_TR`) entre `calculateSavingsNetBalances` y `calculateCategoryAvailableSavings`
+
+- **Ubicación:** [`CategorySummary.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/CategorySummary.kt) (líneas 166–195)
+- **Entradas que lo reproducen:** `Locale.setDefault(Locale("tr", "TR"))`, ahorro con categoría `"INVERSIÓN"` (`$500`) y préstamo con `savingCategory = "inversión"` (`$200`).
+- **Resultado obtenido:** `calculateCategoryAvailableSavings` usa `equals(..., ignoreCase = true)` y calcula `$300`, pero `calculateSavingsNetBalances` agrupa con `.lowercase()` (sensible al locale por defecto), separando `"ınversión"` y `"inversión"` en claves distintas y reportando `netBalance = 500.0`, `totalLoaned = 0.0`.
+- **Comportamiento esperado:** Usar `.lowercase(Locale.ROOT)` consistentemente para garantizar igualdad entre ambas funciones bajo cualquier configuración regional del dispositivo.
+- **Test que lo expone:** `property_calculateSavingsNetBalances_and_calculateCategoryAvailableSavings_agreeUnderTurkishLocale`
+
+---
+
+### Bug #8 (Medio) — Desbordamiento `Double` en `LoanUseCase.calculateTotalReceivable` colapsa silenciosamente a `0.0`
+
+- **Ubicación:** [`LoanUseCase.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/LoanUseCase.kt) (líneas 36–43)
+- **Entradas que lo reproducen:** Dos préstamos registrados con `amountLentInput = "1e308"` y `amountToReceiveInput = "1e308"`.
+- **Resultado obtenido:** Ambos pasan la validación de `saveLoan`, su suma en `BigDecimal` excede `Double.MAX_VALUE`, `.toDouble()` devuelve `Double.POSITIVE_INFINITY` y `if (total.isFinite() && total > 0.0) total else 0.0` muestra `$ 0.00` por cobrar.
+- **Comportamiento esperado:** Acotar montos máximos permitidos en `saveLoan` o evitar que un desbordamiento reporte silenciosamente `0.0`.
+- **Test que lo expone:** `calculateTotalReceivable_hugeFiniteLoansExceedingDoubleMax_doesNotSilentlyCollapseToZero`
+
+---
+
+### Bug #9 (Medio) — Validación permisiva de nombres Unicode en blanco y literales numéricos en `LoanUseCase` / `parseAmountInput`
 
 - **Ubicación:**
-  - `PeriodSummaryDonutChart.kt` (línea 53: `if (summary.isEmpty || !progress.isFinite()) return emptyList()`)
-  - `CategorySummary.kt` (líneas 30–31: `val isEmpty: Boolean get() = items.isEmpty() || totalAmount <= 0.0`)
+  - [`LoanUseCase.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/LoanUseCase.kt) (líneas 52–67)
+  - [`BudgetUseCase.kt`](app/src/main/java/com/example/money_saver_android/domain/usecase/BudgetUseCase.kt) (líneas 38–61: `parseAmountInput`)
 - **Entradas que lo reproducen:**
-  - `PeriodCategorySummary(totalAmount = Double.NaN, items = listOf(CategorySummaryItem("CorruptNaN", "#EF4444", 100.0, 1.0f, 100)))`, `progress = 1f`
-  - `PeriodCategorySummary(totalAmount = Double.POSITIVE_INFINITY, items = listOf(CategorySummaryItem("CorruptInf", "#EF4444", Double.MAX_VALUE, 1.0f, 100)))`, `progress = 1f`
-- **Resultado obtenido:** En IEEE-754 tanto `Double.NaN <= 0.0` como `Double.POSITIVE_INFINITY <= 0.0` evalúan a `false`. Por lo tanto, `summary.isEmpty` es `false` y `calculateAnimatedDonutSegments` emite un segmento de `360°`.
-- **Comportamiento esperado:** Un resumen con `totalAmount` no finito (`!summary.totalAmount.isFinite()`) debe tratarse como inválido/vacío y devolver `emptyList()`.
-- **Test que lo expone:** `adversarial_corrupt_nan_and_infinite_totalAmount_must_return_empty_segments`
+  - Nombres compuestos solo por espacios Unicode (`"\u00A0"`, `"\u2003"`, `"\u3000"`).
+  - Literales flotantes Java (`"100d"`, `"100f"`, `"0x1.0p10"`).
+  - Coma decimal con cero inicial de tres decimales (`"0,500"`).
+- **Resultado obtenido:**
+  - `String.trim().isEmpty()` no detecta espacios Unicode (`> '\u0020'`), permitiendo guardar tarjetas con nombre visualmente vacío.
+  - `toDoubleOrNull()` acepta `"100d"`, `"100f"` y `"0x1.0p10"` (`1024.0`).
+  - El regex `^\d{1,3}(,\d{3})+$` trata `"0,500"` como separador de miles y lo parsea como `500.0` en lugar de `0.5`.
+- **Comportamiento esperado:** Rechazar nombres Unicode en blanco (`isBlank()`), rechazar literales Java/hexadecimales en `parseAmountInput`, y exigir dígito inicial `[1-9]` para interpretar comas como separador de miles (`^[1-9]\d{0,2}(,\d{3})+$`).
+- **Tests que lo exponen:** `saveLoan_unicodeWhitespacePersonName_isRejected`, `saveLoan_rejectsJavaFloatSuffixesAndHexFloats`, `saveLoan_europeanCommaDecimalInputs_andCanonicalCategoryTrimming`
 
 ---
 
-### Bug #2 (Alto) — El último ítem ignora `proportion` y se apropia de todo `remainingCircle` aunque su proporción sea `0f`, negativa o `Float.NaN`
+### Bug #10 (Medio) — `buildPersonInitials` divide pares sustitutos UTF-16 produciendo strings corruptos
 
-- **Ubicación:** `PeriodSummaryDonutChart.kt` (líneas 63–68)
-- **Entradas que lo reproducen:**
-  - `PeriodCategorySummary(totalAmount = 100.0, items = listOf(CategorySummaryItem("ZeroSlice", "#EF4444", 0.0, 0f, 0)))`
-  - `PeriodCategorySummary(totalAmount = 100.0, items = listOf(CategorySummaryItem("NaNSlice", "#EF4444", 100.0, Float.NaN, 0)))`
-  - `PeriodCategorySummary(totalAmount = 100.0, items = listOf(CategorySummaryItem("ValidHalf", "#1CC88A", 50.0, 0.5f, 50), CategorySummaryItem("NegativeTrailing", "#EF4444", 0.0, -1.0f, 0)))`
-- **Resultado obtenido:** Cuando `index == summary.items.lastIndex`, se asigna `fullSweep = remainingCircle` sin validar `item.proportion`. Esto permite que una categoría con proporción `0f`, negativa o `Float.NaN` se dibuje ocupando hasta `180°` o `360°` del gráfico.
-- **Comportamiento esperado:** Ningún ítem con `!item.proportion.isFinite()` o `item.proportion <= 0f` debe renderizarse con un barrido positivo, incluso si ocupa la última posición de `summary.items`.
-- **Test que lo expone:** `adversarial_last_item_with_zero_negative_or_nan_proportion_must_not_steal_remaining_circle`
+- **Ubicación:** [`LoanCardItem.kt`](app/src/main/java/com/example/money_saver_android/ui/components/loans/LoanCardItem.kt) (líneas 207–214)
+- **Entradas que lo reproducen:** `"😀 Carlos"`, `"😀 😎"`, `"A😀"`.
+- **Resultado obtenido:** `parts[0].first()` y `parts[0].take(2)` cortan por `Char` (UTF-16) en lugar de code points Unicode, devolviendo surrogates altos sin pareja (`"\uD83DC"`, `"\uD83D\uD83D"`, `"A\uD83D"`).
+- **Comportamiento esperado:** Extraer iniciales por code points Unicode (`codePointAt` / `Character.toChars`) sin generar nunca pares sustitutos huérfanos.
+- **Test que lo expone:** `property_buildPersonInitials_neverProducesUnpairedUtf16SurrogatesOrCrashes`
 
 ---
 
-### Bug #3 (Medio) — Deriva acumulativa de precisión `Float` entre `startAngle` y `accumulatedSweep`
+### Riesgo #11 (Bajo / Ciclo de vida Compose) — `showAddDialog` usa `remember` en lugar de `rememberSaveable`
 
-- **Ubicación:** `PeriodSummaryDonutChart.kt` (líneas 80–81: `startAngle += fullSweep` y `accumulatedSweep += fullSweep`)
-- **Entradas que lo reproducen:** `10_000` categorías iguales con `proportion = 1f / 10_000f` y `progress = 1f`.
-- **Resultado obtenido:** `startAngle` acumula incrementos partiendo desde `-90f` mientras `accumulatedSweep` acumula desde `0f` (con distinta resolución ULP en IEEE-754 de 32 bits). Al cerrar el último segmento con `fullSweep = 360f - accumulatedSweep` desde `startAngle`, el ángulo final `last.startAngle + last.sweepAngle` deriva respecto de `270f` (`-90f + 360f`).
-- **Comportamiento esperado:** Calcular `startAngle = -90f + accumulatedSweep` (o acumular en `Double`) para garantizar cierre preciso en `270f` dentro de tolerancia `<= 0.001f`.
-- **Test que lo expone:** `adversarial_massive_10000_tiny_segments_must_close_precisely_at_270_degrees`
+- **Ubicación:** [`LoansView.kt`](app/src/main/java/com/example/money_saver_android/ui/LoansView.kt) (línea 77: `var showAddDialog by remember { mutableStateOf(false) }`)
+- **Escenario:** Ante un cambio de configuración (rotación de pantalla o cambio de idioma/tema), el diálogo se cierra perdiendo `showAddDialog = true` mientras `LoansViewModel` conserva los valores parciales y posibles mensajes de error en `uiState` sin invocar `resetForm()`.
+- **Recomendación:** Cambiar `remember` por `rememberSaveable` para conservar la apertura del diálogo en recreaciones de configuración.
 
 ---
 
-### Riesgo #4 (Bajo / Layout Compose) — Diámetro negativo en `Canvas` bajo restricciones menores a `16.dp`
+## 2. Cobertura Adicional e Invariantes Verificados
 
-- **Ubicación:** `PeriodSummaryDonutChart.kt` (líneas 121–123: `val diameter = size.minDimension - strokeWidth`)
-- **Escenario:** Si el contenedor padre impone un tamaño estricto menor que `strokeWidth` (`16.dp`), por ejemplo `Modifier.size(8.dp)` o `Modifier.size(0.dp)`, `diameter` resulta negativo y se invoca `drawArc` con `Size(diameter, diameter)` negativo.
-- **Recomendación:** Proteger `if (diameter <= 0f) return@Canvas` (o acotar `strokeWidth`).
-- **Test de cobertura:** `compose_tight_constraints_smaller_than_stroke_width_does_not_crash_canvas`
+Además de los tests que exponen los bugs anteriores, [`LoansAdversarialTest.kt`](app/src/test/java/com/example/money_saver_android/adversarial/LoansAdversarialTest.kt) valida:
 
----
-
-## 2. Cobertura de la Suite Adversarial (`PeriodSummaryDonutChartAdversarialTest`)
-
-### Property-Based Testing (Invariantes)
-- `property_simultaneous_expansion_invariants_across_500_randomized_summaries` (500 resúmenes aleatorios de 1 a 24 categorías × 7 puntos de progreso):
-  - Finitud y acotación: `startAngle in -90f..270f`, `sweepAngle in (0f, 360f]`.
-  - Anclaje fijo simultáneo: `startAngle(p) == startAngle(1f)` para todo `p in (0, 1]`.
-  - Escalado lineal proporcional: `sweep(p) == sweep(1f) * p`.
-  - No solapamiento estricto entre segmentos adyacentes en todo `p`.
-  - Suma visible igual a `360f * p`.
-  - Monotonicidad no decreciente conforme crece `p`.
-  - Cierre contiguo completo de `360°` (`-90f` a `270f`) en `p = 1f`.
-- `property_clamping_and_invalid_progress_invariants_across_200_trials` (200 iteraciones):
-  - `progress <= 0f`, `-0.0f`, `-Float.MIN_VALUE`, `-Float.MAX_VALUE`, `Float.NaN`, `±Infinity` → siempre `emptyList()`.
-  - `progress > 1f` finito (hasta `Float.MAX_VALUE`) → resultado idéntico a `progress = 1f`.
-
-### Casos Límite Numéricos
-- `adversarial_corrupt_nan_and_infinite_totalAmount_must_return_empty_segments`
-- `adversarial_last_item_with_zero_negative_or_nan_proportion_must_not_steal_remaining_circle`
-- `adversarial_massive_10000_tiny_segments_must_close_precisely_at_270_degrees`
-- `adversarial_extreme_float_proportions_do_not_overflow_or_exceed_360`
-- `adversarial_subnormal_progress_and_proportions_exceeding_one`
-
-### Ciclo de Vida Android, Compose y Concurrencia (`LaunchedEffect` / `Animatable`)
-- `compose_rapid_summary_churn_cancels_inflight_animations_and_converges_cleanly`: 10 cambios rápidos cada `50 ms` cancelando animaciones en curso (`CancellationException`) y verificando convergencia final tras `1000 ms`.
-- `compose_populated_to_empty_mid_animation_resets_and_hides_percent_badge`: transición poblado → vacío a mitad de animación (`500 ms`) y posterior repoblado.
-- `compose_unrelated_recomposition_with_structurally_equal_summary_remains_stable`: recomposiciones por props ajenos con instancias estructuralmente iguales de `PeriodCategorySummary`.
-- `compose_tight_constraints_smaller_than_stroke_width_does_not_crash_canvas`: `Modifier.size(8.dp)` y `Modifier.size(0.dp)`.
-- `compose_adversarial_strings_malformed_hex_and_200_categories_render_safely`: hexadecimales malformados/duplicados, 200 categorías simultáneas y textos extremos Unicode/RTL/emojis/XSS a través de `0 ms`, `500 ms` y `1000 ms`.
+- **Propiedades matemáticas (200 iteraciones aleatorias con semilla):** conservación exacta en `BigDecimal` (`netBalance == max(0, totalSaved - totalSpent - totalLoaned)`), equivalencia entre `calculateSavingsNetBalances`, `calculateCategoryAvailableSavings`, `calculateCategorySavingsOutflows` y `buildSavingsNetSummary`, ordenamiento determinístico e inmunidad ante entradas corruptas (`NaN`, `±Infinity`, negativos, categorías vacías).
+- **Precisión de centavos IEEE-754:** préstamos de `0.10 + 0.20` contra ahorro de `0.30` sin falso rechazo ni sobre-giro de `0.01`.
+- **Concurrencia, carreras y cancelación:**
+  - 12 corrutinas paralelas en `LoanUseCase.saveLoan` contra un mismo ahorro (`FinancialAllocationLock.mutex`).
+  - Competencia simultánea `LoanUseCase.saveLoan` + `ExpenseUseCase.saveExpense(SAVINGS)`.
+  - Carreras entre creación de préstamo y edición/eliminación de ahorro (`SavingsUseCase`).
+  - Liberación limpia del `Mutex` tras `CancellationException` sin deadlock.
+  - Idempotencia de `LoansViewModel.saveLoan()` ante triple pulsación rápida.
+- **Persistencia Room y reactividad cruzada:** roundtrip con SQL injection, RTL árabe, emojis y textos de 2,000 caracteres; propagación reactiva de préstamos a `ExpenseViewModel` (incluyendo `editSavingsBalances` y cambio automático de fuente a `BUDGET`) y `SavingsViewModel` (`netSavingsSummary`); resiliencia ante excepciones de `Flow` en los tres ViewModels.
+- **UI Compose e i18n:** paridad completa de las 24 claves `loans.*` y `navigation.tab_loans` en `es`, `en`, `de`, `pt`; formato sin decimales (`JPY`); jerarquía de subtítulos (`note` > `savingCategory` > `"Préstamo personal"`); nombres extremos incluyendo `"polygenelubricants"` (`hashCode() == Int.MIN_VALUE`); y acceso a la pestaña Préstamos con período expirado y `requestedTab = AppTab.LOANS` en `MainContainer`.
 
 ---
 
-## 3. Comando de Ejecución
+## 3. Cómo Ejecutar la Suite
 
-Para ejecutar la suite adversarial en local o CI/CD:
+Ejecutar únicamente la suite adversarial de préstamos:
 
 ```bash
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest --tests "com.example.money_saver_android.adversarial.PeriodSummaryDonutChartAdversarialTest"
+./gradlew :app:testDebugUnitTest --tests "com.example.money_saver_android.adversarial.LoansAdversarialTest"
+```
+
+Ejecutar todas las pruebas unitarias del módulo:
+
+```bash
+./gradlew :app:testDebugUnitTest
 ```

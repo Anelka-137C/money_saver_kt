@@ -18,6 +18,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
@@ -61,6 +62,12 @@ private val BottomNavTabs = listOf(
         labelKey = "navigation.tab_incomes",
         icon = Icons.Default.AddCircle,
         testTag = "tab_incomes"
+    ),
+    BottomNavTabSpec(
+        tab = AppTab.LOANS,
+        labelKey = "navigation.tab_loans",
+        icon = Icons.Default.AccountBox,
+        testTag = "tab_loans"
     ),
     BottomNavTabSpec(
         tab = AppTab.SETTINGS,

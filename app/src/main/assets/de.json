@@ -2,6 +2,7 @@
   "navigation": {
     "tab_expenses": "Ausgaben",
     "tab_incomes": "Buchhaltung",
+    "tab_loans": "Kredite",
     "tab_settings": "Einstellungen",
     "tab_period": "Zeitraum"
   },
@@ -384,6 +385,47 @@
       "subcategory_created": "Unterkategorie erfolgreich erstellt",
       "category_deleted": "Kategorie erfolgreich gelöscht",
       "subcategory_deleted": "Unterkategorie erfolgreich gelöscht"
+    }
+  },
+  "loans": {
+    "header": {
+      "title": "Kredite"
+    },
+    "summary": {
+      "total_receivable": "Gesamtforderung",
+      "paid": "Bezahlt"
+    },
+    "section": {
+      "pending_title": "Offene Schulden",
+      "count_singular": "Kredit",
+      "count_plural": "Kredite"
+    },
+    "empty": {
+      "message": "Sie haben noch keine Kredite registriert"
+    },
+    "actions": {
+      "register_loan": "Kredit registrieren"
+    },
+    "card": {
+      "personal_loan": "Privatkredit",
+      "amount_lent": "Geliehener Betrag",
+      "paid": "Bezahlt",
+      "pending": "Ausstehend"
+    },
+    "add_dialog": {
+      "title": "Kredit registrieren",
+      "person_label": "Person",
+      "person_placeholder": "z. B. Maria Weber",
+      "amount_lent_label": "Geliehener Betrag",
+      "amount_to_receive_label": "Zu erhaltender Betrag",
+      "saving_source_label": "Quell-Sparkategorie (optional)",
+      "saving_none": "Keine (Privatkredit)",
+      "note_label": "Notiz oder Zweck (optional)",
+      "note_placeholder": "z. B. Reisekredit",
+      "save_button": "Kredit speichern"
+    },
+    "messages": {
+      "saved": "Kredit erfolgreich registriert"
     }
   }
 }

@@ -23,6 +23,7 @@ import com.example.money_saver_android.viewmodel.SettingsViewModel
 
 enum class AppTab {
     INCOMES,
+    LOANS,
     SETTINGS,
     PERIOD
 }
@@ -38,7 +39,8 @@ fun MainContainer(
     onCreateBackupClick: () -> Unit = {},
     onRestoreBackupClick: () -> Unit = {},
     onRestoreConfirmed: () -> Unit = {},
-    incomesContent: (@Composable () -> Unit)? = null
+    incomesContent: (@Composable () -> Unit)? = null,
+    loansContent: (@Composable () -> Unit)? = null
 ) {
     // Observe language changes to re-render texts in real-time
     val settingsState by settingsViewModel.uiState.collectAsState()
@@ -59,6 +61,7 @@ fun MainContainer(
         mutableStateOf(
             when {
                 requestedTab == AppTab.SETTINGS -> AppTab.SETTINGS
+                requestedTab == AppTab.LOANS -> AppTab.LOANS
                 isPeriodLocked -> AppTab.PERIOD
                 else -> requestedTab ?: AppTab.INCOMES
             }
@@ -98,6 +101,7 @@ fun MainContainer(
             ) {
                 when (activeTab) {
                     AppTab.INCOMES -> incomesContent?.invoke()
+                    AppTab.LOANS -> loansContent?.invoke()
                     AppTab.SETTINGS -> SettingsView(
                         settingsViewModel = settingsViewModel,
                         i18nManager = i18nManager,
