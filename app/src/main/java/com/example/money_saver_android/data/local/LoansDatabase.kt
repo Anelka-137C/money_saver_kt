@@ -68,6 +68,12 @@ interface LoanDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: LoanEntity): Long
 
+    @Update
+    suspend fun update(entity: LoanEntity)
+
+    @Query("DELETE FROM loans WHERE id = :loanId")
+    suspend fun deleteById(loanId: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInstallments(entities: List<LoanInstallmentEntity>)
 
@@ -84,6 +90,18 @@ interface LoanDao {
             insertInstallments(installments.map { it.copy(id = 0, loanId = loanId) })
         }
         return loanId
+    }
+
+    @Transaction
+    suspend fun updateLoanWithInstallments(
+        loan: LoanEntity,
+        installments: List<LoanInstallmentEntity>
+    ) {
+        update(loan)
+        deleteInstallmentsByLoanId(loan.id)
+        if (installments.isNotEmpty()) {
+            insertInstallments(installments.map { it.copy(id = 0, loanId = loan.id) })
+        }
     }
 
     @Transaction

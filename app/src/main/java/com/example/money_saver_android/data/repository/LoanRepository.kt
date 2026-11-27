@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.map
 interface LoanRepository {
     fun getAllLoans(): Flow<List<Loan>>
     suspend fun insertLoan(loan: Loan): Long
+    suspend fun updateLoan(loan: Loan) {}
+    suspend fun deleteLoan(loanId: Long) {}
     suspend fun replaceInstallments(loanId: Long, installments: List<LoanInstallment>) {}
     suspend fun reassignSavingCategory(oldName: String, newName: String) {}
 }
@@ -29,6 +31,17 @@ class RoomLoanRepository(
             loan = loan.toEntity(),
             installments = loan.installments.map { it.toEntity(loanId = loan.id) }
         )
+    }
+
+    override suspend fun updateLoan(loan: Loan) {
+        dao.updateLoanWithInstallments(
+            loan = loan.toEntity(),
+            installments = loan.installments.map { it.toEntity(loanId = loan.id) }
+        )
+    }
+
+    override suspend fun deleteLoan(loanId: Long) {
+        dao.deleteById(loanId)
     }
 
     override suspend fun replaceInstallments(loanId: Long, installments: List<LoanInstallment>) {

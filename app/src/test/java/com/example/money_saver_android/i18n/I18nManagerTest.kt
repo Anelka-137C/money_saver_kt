@@ -89,6 +89,16 @@ class I18nManagerTest {
             "loans.schedule.remove_content_desc",
             "loans.schedule.overdue_label",
             "loans.schedule.cancel_button",
+            "loans.options.manage_installments",
+            "loans.options.edit",
+            "loans.options.delete",
+            "loans.edit_dialog.title",
+            "loans.edit_dialog.save_button",
+            "loans.delete_dialog.title",
+            "loans.delete_dialog.warning_message",
+            "loans.delete_dialog.cancel_button",
+            "loans.messages.updated",
+            "loans.messages.deleted",
             "loans.messages.schedule_updated"
         )
 

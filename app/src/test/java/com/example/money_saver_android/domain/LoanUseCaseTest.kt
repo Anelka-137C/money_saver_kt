@@ -50,6 +50,19 @@ class FakeLoanRepository : LoanRepository {
         return id
     }
 
+    override suspend fun updateLoan(loan: Loan) {
+        val savedInstallments = loan.installments
+            .map { it.copy(id = nextInstallmentId++, loanId = loan.id) }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        loansFlow.value = loansFlow.value.map {
+            if (it.id == loan.id) loan.copy(installments = savedInstallments) else it
+        }
+    }
+
+    override suspend fun deleteLoan(loanId: Long) {
+        loansFlow.value = loansFlow.value.filterNot { it.id == loanId }
+    }
+
     override suspend fun replaceInstallments(loanId: Long, installments: List<LoanInstallment>) {
         val savedInstallments = installments
             .map { it.copy(id = nextInstallmentId++, loanId = loanId) }
@@ -389,5 +402,49 @@ class LoanUseCaseTest {
         assertEquals("15 Aug 2026", formatLoanShortDate("2026-08-15", "en"))
         assertEquals("15 Ago 2026", formatLoanShortDate("2026-08-15", "pt"))
         assertTrue(formatLoanShortDate("2026-08-15", "de").contains("2026"))
+    }
+
+    @Test
+    fun updateLoan_andDeleteLoan_adjustSavingsBalancesCorrectly() = runBlocking {
+        savingsRepo.insertSaving(
+            Saving(amount = 500.0, category = "Emergencias", periodId = 1L, incomeId = 1L, dateTime = "2026-11-05 10:00")
+        )
+        assertTrue(
+            loanUseCase.saveLoan("Ana", "300", "350", savingCategoryInput = "Emergencias") is LoanResult.Success
+        )
+        val loanId = loanRepo.loansFlow.value.single().id
+
+        // Increasing from 300 to 450 in same category must succeed (500 total available excluding self)
+        val okUpdate = loanUseCase.updateLoan(
+            loanId = loanId,
+            personNameInput = "Ana María",
+            amountLentInput = "450",
+            amountToReceiveInput = "500",
+            noteInput = "Editado",
+            savingCategoryInput = "Emergencias",
+            installmentInputs = listOf(LoanInstallmentInput("2026-12-10", "500"))
+        )
+        assertTrue(okUpdate is LoanResult.Success)
+        val updated = loanRepo.loansFlow.value.single()
+        assertEquals("Ana María", updated.personName)
+        assertEquals(450.0, updated.amountLent, 0.001)
+        assertEquals(500.0, updated.amountToReceive, 0.001)
+        assertEquals(1, updated.installments.size)
+
+        // Exceeding 500 must fail
+        assertTrue(
+            loanUseCase.updateLoan(loanId, "Ana María", "501", "550", savingCategoryInput = "Emergencias") is LoanResult.Error
+        )
+
+        // Deleting loan removes it and frees full $500 balance
+        assertTrue(loanUseCase.deleteLoan(loanId) is LoanResult.Success)
+        assertTrue(loanRepo.loansFlow.value.isEmpty())
+        val balances = calculateSavingsNetBalances(
+            savings = savingsRepo.savingsFlow.value,
+            expenses = expenseRepo.expensesFlow.value,
+            categories = savingsRepo.categoriesFlow.value,
+            loans = loanRepo.loansFlow.value
+        )
+        assertEquals(500.0, balances.single().netBalance, 0.001)
     }
 }

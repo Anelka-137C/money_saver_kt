@@ -21,7 +21,7 @@ Expensive decisions: Offline-first con backups a Google Drive; multi-idioma; mon
 - [*] **#13** Como usuario, quiero generar un backup local y sincronizarlo con mi cuenta de Google Drive, para respaldar mi información offline en la nube.
 - [*] **#14** Como usuario, quiero configurar y requerir un PIN o autenticación biométrica (huella) al abrir la aplicación, para proteger el acceso a mis datos financieros.
 - [*] **#15** Como usuario, quiero registrar un préstamo a una persona indicando el monto prestado, el monto a recibir y, de forma opcional, la categoría de ahorro de origen cuando provenga de mis ahorros, para controlar tanto préstamos nuevos como previos a la app. Requires: #10
-- [ ] **#16** Como usuario, quiero programar una o varias fechas de pago para un préstamo, para organizar el calendario acordado con la persona. Requires: #15
+- [*] **#16** Como usuario, quiero programar una o varias fechas de pago para un préstamo, para organizar el calendario acordado con la persona. Requires: #15
 - [ ] **#17** Como usuario, quiero registrar pagos totales o parciales de un préstamo acreditando el monto a la categoría de ahorro de origen —o a la categoría de ahorro que elija si no provino de ahorros— y definiendo una nueva fecha de pago cuando quede saldo pendiente, para controlar el cobro y sumar ese dinero a mis ahorros. Requires: #16
 - [ ] **#18** Como usuario, quiero consultar el historial de pagos de cada préstamo, para revisar los abonos recibidos y sus fechas. Requires: #17
 - [ ] **#19** Como usuario, quiero visualizar mis préstamos organizados en dos pestañas de vigentes e histórico, para distinguir fácilmente los préstamos pendientes de los ya saldados. Requires: #17

@@ -91,7 +91,8 @@ fun calculateCategorySavingsOutflows(
     categoryName: String,
     expenses: List<Expense>,
     loans: List<Loan> = emptyList(),
-    excludeExpenseId: Long? = null
+    excludeExpenseId: Long? = null,
+    excludeLoanId: Long? = null
 ): BigDecimal {
     val normalized = categoryName.trim()
     if (normalized.isEmpty()) return BigDecimal.ZERO
@@ -107,7 +108,8 @@ fun calculateCategorySavingsOutflows(
         .sumBigDecimal()
     val loaned = loans
         .filter {
-            it.amountLent.isFinite() &&
+            (excludeLoanId == null || it.id != excludeLoanId) &&
+                it.amountLent.isFinite() &&
                 it.amountLent > 0.0 &&
                 it.savingCategory.trim().equals(normalized, ignoreCase = true)
         }
@@ -121,7 +123,8 @@ fun calculateCategoryAvailableSavings(
     savings: List<Saving>,
     expenses: List<Expense>,
     loans: List<Loan> = emptyList(),
-    excludeExpenseId: Long? = null
+    excludeExpenseId: Long? = null,
+    excludeLoanId: Long? = null
 ): BigDecimal {
     val normalized = categoryName.trim()
     if (normalized.isEmpty()) return BigDecimal.ZERO
@@ -137,7 +140,8 @@ fun calculateCategoryAvailableSavings(
         categoryName = normalized,
         expenses = expenses,
         loans = loans,
-        excludeExpenseId = excludeExpenseId
+        excludeExpenseId = excludeExpenseId,
+        excludeLoanId = excludeLoanId
     )
     return totalSaved.subtract(totalOutflows).max(BigDecimal.ZERO)
 }
@@ -148,7 +152,8 @@ fun calculateSavingsNetBalances(
     categories: List<Category> = emptyList(),
     excludeExpenseId: Long? = null,
     defaultColorHex: String = "#3B82F6",
-    loans: List<Loan> = emptyList()
+    loans: List<Loan> = emptyList(),
+    excludeLoanId: Long? = null
 ): List<SavingsCategoryBalance> {
     val validSavings = savings.filter { it.amount.isFinite() && it.amount > 0.0 && it.category.trim().isNotEmpty() }
     if (validSavings.isEmpty()) return emptyList()
@@ -166,7 +171,8 @@ fun calculateSavingsNetBalances(
 
     val loanedByKey = loans
         .filter {
-            it.amountLent.isFinite() &&
+            (excludeLoanId == null || it.id != excludeLoanId) &&
+                it.amountLent.isFinite() &&
                 it.amountLent > 0.0 &&
                 it.savingCategory.trim().isNotEmpty()
         }

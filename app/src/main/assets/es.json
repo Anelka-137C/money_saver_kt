@@ -438,8 +438,24 @@
       "note_placeholder": "Ej. Préstamo para viaje",
       "save_button": "Guardar préstamo"
     },
+    "options": {
+      "manage_installments": "Agregar cuotas",
+      "edit": "Editar deuda",
+      "delete": "Eliminar deuda"
+    },
+    "edit_dialog": {
+      "title": "Editar préstamo",
+      "save_button": "Guardar cambios"
+    },
+    "delete_dialog": {
+      "title": "¿Eliminar este préstamo?",
+      "warning_message": "Esta acción no se puede deshacer. Desliza el botón para confirmar.",
+      "cancel_button": "Cancelar"
+    },
     "messages": {
       "saved": "Préstamo registrado exitosamente",
+      "updated": "Préstamo actualizado exitosamente",
+      "deleted": "Préstamo eliminado exitosamente",
       "schedule_updated": "Calendario de pagos actualizado"
     }
   }

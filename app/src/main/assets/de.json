@@ -438,8 +438,24 @@
       "note_placeholder": "z. B. Reisekredit",
       "save_button": "Kredit speichern"
     },
+    "options": {
+      "manage_installments": "Raten hinzufügen",
+      "edit": "Kredit bearbeiten",
+      "delete": "Kredit löschen"
+    },
+    "edit_dialog": {
+      "title": "Kredit bearbeiten",
+      "save_button": "Änderungen speichern"
+    },
+    "delete_dialog": {
+      "title": "Diesen Kredit löschen?",
+      "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Zum Bestätigen schieben.",
+      "cancel_button": "Abbrechen"
+    },
     "messages": {
       "saved": "Kredit erfolgreich registriert",
+      "updated": "Kredit erfolgreich aktualisiert",
+      "deleted": "Kredit erfolgreich gelöscht",
       "schedule_updated": "Zahlungsplan aktualisiert"
     }
   }

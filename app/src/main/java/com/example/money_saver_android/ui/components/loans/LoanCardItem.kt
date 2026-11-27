@@ -3,7 +3,6 @@ package com.example.money_saver_android.ui.components.loans
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +19,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,7 +77,9 @@ fun LoanCardItem(
     currency: Currency,
     modifier: Modifier = Modifier,
     todayIso: String = "",
-    onClick: (() -> Unit)? = null
+    onManageInstallmentsClick: () -> Unit = {},
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {}
 ) {
     val avatarColor = LoanAvatarColors[(loan.personName.trim().lowercase().hashCode().absoluteValue) % LoanAvatarColors.size]
     val subtitle = loan.note.trim().ifEmpty {
@@ -83,7 +94,6 @@ fun LoanCardItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .testTag("loan_card_${loan.id}"),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         shape = RoundedCornerShape(16.dp),
@@ -135,55 +145,123 @@ fun LoanCardItem(
                     )
                 }
 
-                if (badgeInfo != null) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    val formattedDate = formatLoanShortDate(badgeInfo.nextDueDate, language)
-                    val dueTemplate = t("loans.card.due_prefix")
-                    val baseBadge = runCatching {
-                        String.format(dueTemplate, formattedDate)
-                    }.getOrDefault("Vence: $formattedDate")
-                    val badgeLabel = if (badgeInfo.additionalCount > 0) {
-                        "$baseBadge +${badgeInfo.additionalCount}"
-                    } else {
-                        baseBadge
-                    }
-                    val badgeBg = if (badgeInfo.isOverdue) {
-                        ErrorRed.copy(alpha = 0.16f)
-                    } else {
-                        LoanDueAmber.copy(alpha = 0.16f)
-                    }
-                    val badgeBorder = if (badgeInfo.isOverdue) {
-                        ErrorRed.copy(alpha = 0.55f)
-                    } else {
-                        LoanDueAmber.copy(alpha = 0.45f)
-                    }
-                    val badgeContent = if (badgeInfo.isOverdue) ErrorRed else LoanDueAmberText
-
-                    Row(
+                Box {
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { menuExpanded = true },
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(badgeBg)
-                            .border(1.dp, badgeBorder, RoundedCornerShape(50))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                            .testTag("loan_due_badge_${loan.id}"),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .size(36.dp)
+                            .testTag("btn_options_loan_${loan.id}")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = badgeContent,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = badgeLabel,
-                            color = badgeContent,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Options",
+                            tint = TextSecondary
                         )
                     }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        modifier = Modifier
+                            .background(CardBackground)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(t("loans.options.manage_installments"), color = TextPrimary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = null,
+                                    tint = TextSecondary
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onManageInstallmentsClick()
+                            },
+                            modifier = Modifier.testTag("btn_installments_loan_${loan.id}")
+                        )
+                        DropdownMenuItem(
+                            text = { Text(t("loans.options.edit"), color = TextPrimary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = TextSecondary
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onEditClick()
+                            },
+                            modifier = Modifier.testTag("btn_edit_loan_${loan.id}")
+                        )
+                        DropdownMenuItem(
+                            text = { Text(t("loans.options.delete"), color = ErrorRed) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = ErrorRed
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDeleteClick()
+                            },
+                            modifier = Modifier.testTag("btn_delete_loan_${loan.id}")
+                        )
+                    }
+                }
+            }
+
+            if (badgeInfo != null) {
+                val formattedDate = formatLoanShortDate(badgeInfo.nextDueDate, language)
+                val dueTemplate = t("loans.card.due_prefix")
+                val baseBadge = runCatching {
+                    String.format(dueTemplate, formattedDate)
+                }.getOrDefault("Vence: $formattedDate")
+                val badgeLabel = if (badgeInfo.additionalCount > 0) {
+                    "$baseBadge +${badgeInfo.additionalCount}"
+                } else {
+                    baseBadge
+                }
+                val badgeBg = if (badgeInfo.isOverdue) {
+                    ErrorRed.copy(alpha = 0.16f)
+                } else {
+                    LoanDueAmber.copy(alpha = 0.16f)
+                }
+                val badgeBorder = if (badgeInfo.isOverdue) {
+                    ErrorRed.copy(alpha = 0.55f)
+                } else {
+                    LoanDueAmber.copy(alpha = 0.45f)
+                }
+                val badgeContent = if (badgeInfo.isOverdue) ErrorRed else LoanDueAmberText
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(badgeBg)
+                        .border(1.dp, badgeBorder, RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .testTag("loan_due_badge_${loan.id}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = null,
+                        tint = badgeContent,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = badgeLabel,
+                        color = badgeContent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 

@@ -438,8 +438,24 @@
       "note_placeholder": "Ex. Empréstimo para viagem",
       "save_button": "Salvar empréstimo"
     },
+    "options": {
+      "manage_installments": "Adicionar parcelas",
+      "edit": "Editar dívida",
+      "delete": "Excluir dívida"
+    },
+    "edit_dialog": {
+      "title": "Editar empréstimo",
+      "save_button": "Salvar alterações"
+    },
+    "delete_dialog": {
+      "title": "Excluir este empréstimo?",
+      "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
+      "cancel_button": "Cancelar"
+    },
     "messages": {
       "saved": "Empréstimo registrado com sucesso",
+      "updated": "Empréstimo atualizado com sucesso",
+      "deleted": "Empréstimo excluído com sucesso",
       "schedule_updated": "Cronograma de pagamentos atualizado"
     }
   }

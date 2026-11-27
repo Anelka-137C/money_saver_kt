@@ -36,7 +36,9 @@ data class LoansUiState(
     val totalReceivable: Double = 0.0,
     val totalPaid: Double = 0.0,
     val savingsBalances: List<SavingsCategoryBalance> = emptyList(),
+    val editSavingsBalances: List<SavingsCategoryBalance> = emptyList(),
     val todayIso: String = "",
+    val editingLoanId: Long? = null,
     val personNameInput: String = "",
     val amountLentInput: String = "",
     val amountToReceiveInput: String = "",
@@ -52,6 +54,7 @@ data class LoansUiState(
     val scheduleDateInput: String = "",
     val scheduleAmountInput: String = "",
     val scheduleErrorMessage: String? = null,
+    val loanToDelete: Loan? = null,
     val toastMessage: String? = null
 )
 
@@ -61,6 +64,8 @@ class LoansViewModel(
 
     companion object {
         const val MSG_LOAN_SAVED = "loans.messages.saved"
+        const val MSG_LOAN_UPDATED = "loans.messages.updated"
+        const val MSG_LOAN_DELETED = "loans.messages.deleted"
         const val MSG_SCHEDULE_UPDATED = "loans.messages.schedule_updated"
     }
 
@@ -75,6 +80,7 @@ class LoansViewModel(
     val uiState: StateFlow<LoansUiState> = _uiState.asStateFlow()
 
     private var isSaving: Boolean = false
+    private var latestSavingsSnapshot: SavingsBalanceSnapshot? = null
 
     private data class SavingsBalanceSnapshot(
         val savings: List<Saving>,
@@ -104,15 +110,28 @@ class LoansViewModel(
                 loanUseCase.getSavingCategories().catch { emit(emptyList()) }.onStart { emit(emptyList()) }
             ) { allSavings, allExpenses, allLoans, savingCategories ->
                 SavingsBalanceSnapshot(allSavings, allExpenses, allLoans, savingCategories)
-            }.collect { (allSavings, allExpenses, allLoans, savingCategories) ->
+            }.collect { snapshot ->
+                latestSavingsSnapshot = snapshot
                 val balances = calculateSavingsNetBalances(
-                    savings = allSavings,
-                    expenses = allExpenses,
-                    categories = savingCategories,
-                    loans = allLoans
+                    savings = snapshot.savings,
+                    expenses = snapshot.expenses,
+                    categories = snapshot.categories,
+                    loans = snapshot.loans
                 )
                 _uiState.update { current ->
-                    current.copy(savingsBalances = balances)
+                    val editBalances = current.editingLoanId?.let { editId ->
+                        calculateSavingsNetBalances(
+                            savings = snapshot.savings,
+                            expenses = snapshot.expenses,
+                            categories = snapshot.categories,
+                            loans = snapshot.loans,
+                            excludeLoanId = editId
+                        )
+                    } ?: balances
+                    current.copy(
+                        savingsBalances = balances,
+                        editSavingsBalances = editBalances
+                    )
                 }
             }
         }
@@ -279,11 +298,103 @@ class LoansViewModel(
         _uiState.update { it.copy(toastMessage = null) }
     }
 
+    fun startEditingLoan(loan: Loan) {
+        val today = loanUseCase.todayIso()
+        val existingDrafts = loan.installments
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+            .map { inst ->
+                LoanInstallmentDraft(
+                    dueDate = inst.dueDate,
+                    expectedAmountInput = formatDraftAmount(inst.expectedAmount),
+                    persistedId = inst.id
+                )
+            }
+        val snapshot = latestSavingsSnapshot
+        val editBalances = if (snapshot != null) {
+            calculateSavingsNetBalances(
+                savings = snapshot.savings,
+                expenses = snapshot.expenses,
+                categories = snapshot.categories,
+                loans = snapshot.loans,
+                excludeLoanId = loan.id
+            )
+        } else {
+            _uiState.value.savingsBalances
+        }
+        _uiState.update {
+            it.copy(
+                todayIso = today,
+                editingLoanId = loan.id,
+                editSavingsBalances = editBalances,
+                personNameInput = loan.personName,
+                amountLentInput = formatDraftAmount(loan.amountLent),
+                amountToReceiveInput = formatDraftAmount(loan.amountToReceive),
+                isAmountToReceiveManuallyEdited = true,
+                noteInput = loan.note,
+                selectedSavingCategory = loan.savingCategory,
+                draftInstallments = existingDrafts,
+                draftInstallmentDateInput = today,
+                draftInstallmentAmountInput = "",
+                errorMessage = null
+            )
+        }
+    }
+
+    fun requestDeleteLoan(loan: Loan) {
+        _uiState.update { it.copy(loanToDelete = loan) }
+    }
+
+    fun dismissDeleteLoan() {
+        _uiState.update { it.copy(loanToDelete = null) }
+    }
+
+    fun confirmDeleteLoan() {
+        if (isSaving) return
+        val loan = _uiState.value.loanToDelete ?: return
+        isSaving = true
+        viewModelScope.launch {
+            try {
+                when (val result = loanUseCase.deleteLoan(loan.id)) {
+                    is LoanResult.Success -> {
+                        _uiState.update { current ->
+                            current.copy(
+                                loanToDelete = null,
+                                editingScheduleLoan = if (current.editingScheduleLoan?.id == loan.id) null else current.editingScheduleLoan,
+                                toastMessage = MSG_LOAN_DELETED
+                            )
+                        }
+                    }
+                    is LoanResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                loanToDelete = null,
+                                errorMessage = result.message
+                            )
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        loanToDelete = null,
+                        errorMessage = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "No se pudo eliminar el préstamo"
+                    )
+                }
+            } finally {
+                isSaving = false
+            }
+        }
+    }
+
     fun resetForm() {
         val today = loanUseCase.todayIso()
         _uiState.update {
             it.copy(
                 todayIso = today,
+                editingLoanId = null,
                 personNameInput = "",
                 amountLentInput = "",
                 amountToReceiveInput = "",
@@ -301,28 +412,44 @@ class LoansViewModel(
     fun saveLoan() {
         if (isSaving) return
         val state = _uiState.value
+        val editingId = state.editingLoanId
         isSaving = true
         viewModelScope.launch {
             try {
-                when (val result = loanUseCase.saveLoan(
-                    personNameInput = state.personNameInput,
-                    amountLentInput = state.amountLentInput,
-                    amountToReceiveInput = state.amountToReceiveInput,
-                    noteInput = state.noteInput,
-                    savingCategoryInput = state.selectedSavingCategory,
-                    installmentInputs = state.draftInstallments.map {
-                        LoanInstallmentInput(
-                            dueDate = it.dueDate,
-                            expectedAmountInput = it.expectedAmountInput,
-                            persistedId = it.persistedId
-                        )
-                    }
-                )) {
+                val installmentInputs = state.draftInstallments.map {
+                    LoanInstallmentInput(
+                        dueDate = it.dueDate,
+                        expectedAmountInput = it.expectedAmountInput,
+                        persistedId = it.persistedId
+                    )
+                }
+                val result = if (editingId == null) {
+                    loanUseCase.saveLoan(
+                        personNameInput = state.personNameInput,
+                        amountLentInput = state.amountLentInput,
+                        amountToReceiveInput = state.amountToReceiveInput,
+                        noteInput = state.noteInput,
+                        savingCategoryInput = state.selectedSavingCategory,
+                        installmentInputs = installmentInputs
+                    )
+                } else {
+                    loanUseCase.updateLoan(
+                        loanId = editingId,
+                        personNameInput = state.personNameInput,
+                        amountLentInput = state.amountLentInput,
+                        amountToReceiveInput = state.amountToReceiveInput,
+                        noteInput = state.noteInput,
+                        savingCategoryInput = state.selectedSavingCategory,
+                        installmentInputs = installmentInputs
+                    )
+                }
+                when (result) {
                     is LoanResult.Success -> {
                         val today = loanUseCase.todayIso()
                         _uiState.update {
                             it.copy(
                                 todayIso = today,
+                                editingLoanId = null,
                                 personNameInput = "",
                                 amountLentInput = "",
                                 amountToReceiveInput = "",
@@ -333,7 +460,7 @@ class LoansViewModel(
                                 draftInstallmentDateInput = today,
                                 draftInstallmentAmountInput = "",
                                 errorMessage = null,
-                                toastMessage = MSG_LOAN_SAVED
+                                toastMessage = if (editingId == null) MSG_LOAN_SAVED else MSG_LOAN_UPDATED
                             )
                         }
                     }

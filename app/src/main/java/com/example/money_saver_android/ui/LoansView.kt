@@ -50,6 +50,7 @@ import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.loans.AddLoanDialog
+import com.example.money_saver_android.ui.components.loans.DeleteLoanConfirmationDialog
 import com.example.money_saver_android.ui.components.loans.LoanCardItem
 import com.example.money_saver_android.ui.components.loans.LoanScheduleDialog
 import com.example.money_saver_android.ui.components.loans.LoansSummaryCard
@@ -80,7 +81,7 @@ fun LoansView(
     LaunchedEffect(state.toastMessage) {
         state.toastMessage?.let { messageKey ->
             Toast.makeText(context, activeI18n.t(messageKey), Toast.LENGTH_SHORT).show()
-            if (messageKey == LoansViewModel.MSG_LOAN_SAVED) {
+            if (messageKey == LoansViewModel.MSG_LOAN_SAVED || messageKey == LoansViewModel.MSG_LOAN_UPDATED) {
                 showAddDialog = false
             }
             loansViewModel.clearToastMessage()
@@ -111,7 +112,10 @@ fun LoansView(
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(GreenAccent)
-                    .clickable { showAddDialog = true }
+                    .clickable {
+                        loansViewModel.resetForm()
+                        showAddDialog = true
+                    }
                     .testTag("btn_add_loan_top"),
                 contentAlignment = Alignment.Center
             ) {
@@ -185,14 +189,22 @@ fun LoansView(
                         loan = loan,
                         currency = currency,
                         todayIso = state.todayIso,
-                        onClick = { loansViewModel.openScheduleDialog(loan) }
+                        onManageInstallmentsClick = { loansViewModel.openScheduleDialog(loan) },
+                        onEditClick = {
+                            loansViewModel.startEditingLoan(loan)
+                            showAddDialog = true
+                        },
+                        onDeleteClick = { loansViewModel.requestDeleteLoan(loan) }
                     )
                 }
             }
         }
 
         OutlinedButton(
-            onClick = { showAddDialog = true },
+            onClick = {
+                loansViewModel.resetForm()
+                showAddDialog = true
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
@@ -217,13 +229,14 @@ fun LoansView(
     }
 
     if (showAddDialog) {
+        val isEditing = state.editingLoanId != null
         AddLoanDialog(
             personName = state.personNameInput,
             amountLent = state.amountLentInput,
             amountToReceive = state.amountToReceiveInput,
             note = state.noteInput,
             selectedSavingCategory = state.selectedSavingCategory,
-            savingsBalances = state.savingsBalances,
+            savingsBalances = if (isEditing) state.editSavingsBalances else state.savingsBalances,
             errorMessage = state.errorMessage,
             currency = currency,
             onPersonNameChange = loansViewModel::onPersonNameChange,
@@ -239,17 +252,16 @@ fun LoansView(
                 loansViewModel.resetForm()
                 showAddDialog = false
             },
-            draftInstallments = state.draftInstallments,
-            draftInstallmentDate = state.draftInstallmentDateInput,
-            draftInstallmentAmount = state.draftInstallmentAmountInput,
-            todayIso = state.todayIso,
-            onDraftInstallmentDateChange = loansViewModel::onDraftInstallmentDateChange,
-            onDraftInstallmentAmountChange = loansViewModel::onDraftInstallmentAmountChange,
-            onAddInstallmentClick = {
-                hideKeyboard(context, view, keyboardController, focusManager)
-                loansViewModel.addDraftInstallment()
-            },
-            onRemoveInstallmentClick = loansViewModel::removeDraftInstallment
+            isEditing = isEditing
+        )
+    }
+
+    state.loanToDelete?.let { loanToDelete ->
+        DeleteLoanConfirmationDialog(
+            loan = loanToDelete,
+            onConfirm = loansViewModel::confirmDeleteLoan,
+            onDismiss = loansViewModel::dismissDeleteLoan,
+            currency = currency
         )
     }
 

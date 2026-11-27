@@ -167,36 +167,50 @@ class LoansViewTest {
     }
 
     @Test
-    fun loansView_createLoanWithMultipleInstallments_rendersDueBadgeWithPlusNAndDatePickerOnly() {
+    fun loansView_createLoanWithoutInstallmentFieldsInAddDialog_thenScheduleMultipleInstallmentsViaMenu() {
         composeTestRule.setContent {
             CompositionLocalProvider(LocalI18nManager provides i18nManager) {
                 LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
             }
         }
 
+        // Register loan dialog must NOT show installment fields
         composeTestRule.onNodeWithTag("btn_add_loan_bottom").performClick()
+        composeTestRule.onNodeWithTag("input_loan_installment_date").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("input_loan_installment_amount").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("btn_add_loan_installment").assertDoesNotExist()
+
         composeTestRule.onNodeWithTag("input_loan_person").performTextInput("María Castillo")
         composeTestRule.onNodeWithTag("input_loan_amount_lent").performTextInput("1000")
+        composeTestRule.onNodeWithTag("btn_save_loan_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        val savedId = loanRepo.loansFlow.value.single().id
+        composeTestRule.onNodeWithTag("loan_due_badge_$savedId").assertDoesNotExist()
+
+        // Manage installments separately via 3-dot menu
+        composeTestRule.onNodeWithTag("btn_options_loan_$savedId").performClick()
+        composeTestRule.onNodeWithTag("btn_installments_loan_$savedId").performClick()
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertIsDisplayed()
 
         // Open date-only picker and verify time picker does not exist
-        composeTestRule.onNodeWithTag("input_loan_installment_date").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("input_schedule_installment_date").performScrollTo().performClick()
         composeTestRule.onNodeWithTag("date_only_picker_dialog").assertIsDisplayed()
         composeTestRule.onNodeWithTag("time_picker_dialog").assertDoesNotExist()
         composeTestRule.onNodeWithTag("btn_confirm_date_only_picker").performClick()
 
         // Add first installment ($400 on 2026-11-26)
-        composeTestRule.onNodeWithTag("input_loan_installment_amount").performScrollTo().performTextInput("400")
-        composeTestRule.onNodeWithTag("btn_add_loan_installment").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("input_schedule_installment_amount").performScrollTo().performTextInput("400")
+        composeTestRule.onNodeWithTag("btn_add_schedule_installment").performScrollTo().performClick()
 
         // Change second installment date to 2026-12-15 and add $600
-        loansViewModel.onDraftInstallmentDateChange("2026-12-15")
-        composeTestRule.onNodeWithTag("input_loan_installment_amount").performScrollTo().performTextInput("600")
-        composeTestRule.onNodeWithTag("btn_add_loan_installment").performScrollTo().performClick()
+        loansViewModel.onScheduleDateChange("2026-12-15")
+        composeTestRule.onNodeWithTag("input_schedule_installment_amount").performScrollTo().performTextInput("600")
+        composeTestRule.onNodeWithTag("btn_add_schedule_installment").performScrollTo().performClick()
 
-        composeTestRule.onNodeWithTag("btn_save_loan_dialog").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_save_schedule_dialog").performScrollTo().performClick()
         composeTestRule.waitForIdle()
 
-        val savedId = loanRepo.loansFlow.value.single().id
         composeTestRule.onNodeWithTag("loan_due_badge_$savedId", useUnmergedTree = true)
             .assertIsDisplayed()
         composeTestRule.onNodeWithText("Vence: 26 Nov 2026 +1", useUnmergedTree = true)
@@ -221,8 +235,13 @@ class LoansViewTest {
         // No installments -> no badge
         composeTestRule.onNodeWithTag("loan_due_badge_$loanId").assertDoesNotExist()
 
-        // Tap card to open schedule dialog
+        // Tapping the card itself must NOT open schedule dialog; must use 3-dot menu
         composeTestRule.onNodeWithTag("loan_card_$loanId").performClick()
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertDoesNotExist()
+
+        // Open 3-dot menu and choose "Agregar cuotas"
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_installments_loan_$loanId").performClick()
         composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertIsDisplayed()
 
         // Invalid amount (0) shows error and does not add
@@ -254,8 +273,9 @@ class LoansViewTest {
             .assertIsDisplayed()
         assertEquals(2, loanRepo.loansFlow.value.single().installments.size)
 
-        // Reopen, remove all installments, and save empty schedule -> badge disappears
-        composeTestRule.onNodeWithTag("loan_card_$loanId").performClick()
+        // Reopen via 3-dot menu, remove all installments, and save empty schedule -> badge disappears
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_installments_loan_$loanId").performClick()
         composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").performScrollTo().performClick()
         composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").performScrollTo().performClick()
         composeTestRule.onNodeWithTag("btn_save_schedule_dialog").performScrollTo().performClick()
@@ -292,8 +312,9 @@ class LoansViewTest {
         composeTestRule.onNodeWithText("Vence: 20 Nov 2026", useUnmergedTree = true)
             .assertIsDisplayed()
 
-        // Open schedule dialog, verify overdue label is visible, and saving keeps persisted overdue installment
-        composeTestRule.onNodeWithTag("loan_card_$loanId").performClick()
+        // Open schedule dialog via 3-dot menu, verify overdue label is visible, and saving keeps persisted overdue installment
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_installments_loan_$loanId").performClick()
         composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertIsDisplayed()
         composeTestRule.onNodeWithText("Vencida").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("btn_save_schedule_dialog").performScrollTo().performClick()
@@ -301,5 +322,52 @@ class LoansViewTest {
         composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertDoesNotExist()
         composeTestRule.onNodeWithTag("loan_due_badge_$loanId", useUnmergedTree = true)
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun loansView_threeDotMenu_editLoanAndDeleteLoanWithSlideConfirmationDialog() {
+        val loanId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(personName = "Roberto Díaz", amountLent = 400.0, amountToReceive = 450.0, note = "Auto")
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Open 3-dot menu -> verify all 3 options and click "Editar deuda"
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_installments_loan_$loanId").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_edit_loan_$loanId").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_delete_loan_$loanId").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_edit_loan_$loanId").performClick()
+
+        // Popup opens in edit mode prefilled
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Editar préstamo").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("input_loan_person").performTextClearance()
+        composeTestRule.onNodeWithTag("input_loan_person").performTextInput("Roberto Silva")
+        composeTestRule.onNodeWithTag("btn_save_loan_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Roberto Silva").assertIsDisplayed()
+
+        // 2. Open 3-dot menu -> click "Eliminar deuda" -> verify slide-to-confirm dialog and cancel
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_delete_loan_$loanId").performClick()
+
+        composeTestRule.onNodeWithTag("dialog_delete_loan").assertIsDisplayed()
+        composeTestRule.onNodeWithText("¿Eliminar este préstamo?").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_slide_to_confirm_delete_loan").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_cancel_delete_loan").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("dialog_delete_loan").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Roberto Silva").assertIsDisplayed()
     }
 }

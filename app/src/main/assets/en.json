@@ -438,8 +438,24 @@
       "note_placeholder": "e.g. Trip loan",
       "save_button": "Save loan"
     },
+    "options": {
+      "manage_installments": "Add installments",
+      "edit": "Edit loan",
+      "delete": "Delete loan"
+    },
+    "edit_dialog": {
+      "title": "Edit loan",
+      "save_button": "Save changes"
+    },
+    "delete_dialog": {
+      "title": "Delete this loan?",
+      "warning_message": "This action cannot be undone. Slide the button to confirm.",
+      "cancel_button": "Cancel"
+    },
     "messages": {
       "saved": "Loan registered successfully",
+      "updated": "Loan updated successfully",
+      "deleted": "Loan deleted successfully",
       "schedule_updated": "Payment schedule updated"
     }
   }

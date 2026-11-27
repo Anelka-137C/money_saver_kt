@@ -58,7 +58,6 @@ import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
-import com.example.money_saver_android.domain.usecase.parseLoanAmount
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.incomes.CurrencyFormatVisualTransformation
 import com.example.money_saver_android.ui.theme.BorderColor
@@ -68,7 +67,6 @@ import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
-import com.example.money_saver_android.viewmodel.LoanInstallmentDraft
 
 @Composable
 fun AddLoanDialog(
@@ -88,14 +86,7 @@ fun AddLoanDialog(
     onSaveClick: () -> Unit,
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier,
-    draftInstallments: List<LoanInstallmentDraft> = emptyList(),
-    draftInstallmentDate: String = "",
-    draftInstallmentAmount: String = "",
-    todayIso: String = "",
-    onDraftInstallmentDateChange: (String) -> Unit = {},
-    onDraftInstallmentAmountChange: (String) -> Unit = {},
-    onAddInstallmentClick: () -> Unit = {},
-    onRemoveInstallmentClick: (String) -> Unit = {}
+    isEditing: Boolean = false
 ) {
     var savingMenuExpanded by remember { mutableStateOf(false) }
     val selectedBalance = savingsBalances.find {
@@ -142,7 +133,7 @@ fun AddLoanDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = t("loans.add_dialog.title"),
+                        text = if (isEditing) t("loans.edit_dialog.title") else t("loans.add_dialog.title"),
                         color = TextPrimary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
@@ -276,25 +267,6 @@ fun AddLoanDialog(
                     testTag = "input_loan_note"
                 )
 
-                LoanInstallmentsSection(
-                    installments = draftInstallments,
-                    dateInput = draftInstallmentDate,
-                    amountInput = draftInstallmentAmount,
-                    todayIso = todayIso,
-                    targetAmountToReceive = parseLoanAmount(amountToReceive),
-                    currency = currency,
-                    onDateChange = onDraftInstallmentDateChange,
-                    onAmountChange = onDraftInstallmentAmountChange,
-                    onAddClick = onAddInstallmentClick,
-                    onRemoveClick = onRemoveInstallmentClick,
-                    dateFieldTestTag = "input_loan_installment_date",
-                    amountFieldTestTag = "input_loan_installment_amount",
-                    addButtonTestTag = "btn_add_loan_installment",
-                    removeButtonTagPrefix = "btn_remove_loan_installment",
-                    itemTagPrefix = "loan_draft_installment_item",
-                    sectionTitle = t("loans.schedule.section_title")
-                )
-
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage,
@@ -314,7 +286,7 @@ fun AddLoanDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = t("loans.add_dialog.save_button"),
+                        text = if (isEditing) t("loans.edit_dialog.save_button") else t("loans.add_dialog.save_button"),
                         color = Color.Black,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold

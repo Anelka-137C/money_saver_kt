@@ -243,6 +243,103 @@ class LoanUseCase(
         return LoanResult.Success
     }
 
+    suspend fun updateLoan(
+        loanId: Long,
+        personNameInput: String,
+        amountLentInput: String,
+        amountToReceiveInput: String,
+        noteInput: String = "",
+        savingCategoryInput: String = "",
+        installmentInputs: List<LoanInstallmentInput> = emptyList()
+    ): LoanResult {
+        val trimmedPerson = personNameInput.trim { it.isWhitespace() }
+        if (trimmedPerson.isEmpty()) {
+            return LoanResult.Error("Debes ingresar el nombre de la persona")
+        }
+
+        val amountLent = parseAmountInput(amountLentInput) ?: 0.0
+        if (!amountLent.isFinite() || amountLent <= 0.0) {
+            return LoanResult.Error("El monto prestado debe ser mayor a cero")
+        }
+
+        val amountToReceive = parseAmountInput(amountToReceiveInput)
+        if (amountToReceive == null || !amountToReceive.isFinite() ||
+            BigDecimal.valueOf(amountToReceive) < BigDecimal.valueOf(amountLent)
+        ) {
+            return LoanResult.Error("El monto a recibir debe ser mayor o igual al monto prestado")
+        }
+
+        val trimmedNote = noteInput.trim { it.isWhitespace() }
+        val trimmedSavingCategory = savingCategoryInput.trim { it.isWhitespace() }
+
+        return loanMutex.withLock {
+            val allLoans = loanRepository.getAllLoans().first()
+            val existingLoan = allLoans.find { it.id == loanId }
+                ?: return@withLock LoanResult.Error("Préstamo no encontrado")
+
+            val existingById = existingLoan.installments
+                .filter { it.id > 0L }
+                .associateBy { it.id }
+
+            val (validatedInstallments, scheduleError) = validateScheduleForLoan(
+                inputs = installmentInputs,
+                amountToReceive = amountToReceive,
+                existingById = existingById
+            )
+            if (scheduleError != null) {
+                return@withLock LoanResult.Error(scheduleError)
+            }
+
+            val resolvedCategory = if (trimmedSavingCategory.isEmpty()) {
+                ""
+            } else {
+                val savingsRepo = savingsRepository
+                    ?: return@withLock LoanResult.Error("Módulo de ahorros no configurado")
+                val allSavings = savingsRepo.getAllSavings().first()
+                val allExpenses = expenseRepository?.getAllExpenses()?.first() ?: emptyList()
+                val matchingSavings = allSavings.filter {
+                    it.amount.isFinite() && it.amount > 0.0 &&
+                        it.category.trim { ch -> ch.isWhitespace() }.equals(trimmedSavingCategory, ignoreCase = true)
+                }
+                val available = calculateCategoryAvailableSavings(
+                    categoryName = trimmedSavingCategory,
+                    savings = allSavings,
+                    expenses = allExpenses,
+                    loans = allLoans,
+                    excludeLoanId = loanId
+                )
+                if (matchingSavings.isEmpty() || BigDecimal.valueOf(amountLent) > available) {
+                    return@withLock LoanResult.Error("Saldo insuficiente en la categoría de ahorro")
+                }
+                matchingSavings.first().category.trim { it.isWhitespace() }
+            }
+
+            loanRepository.updateLoan(
+                Loan(
+                    id = loanId,
+                    personName = trimmedPerson,
+                    amountLent = amountLent,
+                    amountToReceive = amountToReceive,
+                    note = trimmedNote,
+                    savingCategory = resolvedCategory,
+                    installments = validatedInstallments.map { it.copy(loanId = loanId) }
+                )
+            )
+            LoanResult.Success
+        }
+    }
+
+    suspend fun deleteLoan(loanId: Long): LoanResult {
+        return loanMutex.withLock {
+            val exists = loanRepository.getAllLoans().first().any { it.id == loanId }
+            if (!exists) {
+                return@withLock LoanResult.Error("Préstamo no encontrado")
+            }
+            loanRepository.deleteLoan(loanId)
+            LoanResult.Success
+        }
+    }
+
     private fun validateScheduleForLoan(
         inputs: List<LoanInstallmentInput>,
         amountToReceive: Double,

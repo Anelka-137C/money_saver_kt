@@ -213,4 +213,48 @@ class LoansViewModelTest {
         assertNull(viewModel.uiState.value.editingScheduleLoan)
         assertTrue(viewModel.uiState.value.loans.single().installments.isEmpty())
     }
+
+    @Test
+    fun editLoan_andDeleteLoan_updateStateAndEmitMessages() = runTest(testDispatcher) {
+        val loanId = loanRepo.insertLoan(
+            com.example.money_saver_android.domain.model.Loan(
+                personName = "Pedro",
+                amountLent = 400.0,
+                amountToReceive = 450.0,
+                note = "Inicial"
+            )
+        )
+        advanceUntilIdle()
+
+        val initialLoan = viewModel.uiState.value.loans.single { it.id == loanId }
+        viewModel.startEditingLoan(initialLoan)
+        assertEquals(loanId, viewModel.uiState.value.editingLoanId)
+        assertEquals("Pedro", viewModel.uiState.value.personNameInput)
+
+        viewModel.onPersonNameChange("Pedro Gómez")
+        viewModel.onAmountToReceiveChange("500")
+        viewModel.saveLoan()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editingLoanId)
+        assertEquals(LoansViewModel.MSG_LOAN_UPDATED, viewModel.uiState.value.toastMessage)
+        assertEquals("Pedro Gómez", viewModel.uiState.value.loans.single().personName)
+        assertEquals(500.0, viewModel.uiState.value.loans.single().amountToReceive, 0.001)
+
+        // Request delete and cancel
+        viewModel.requestDeleteLoan(viewModel.uiState.value.loans.single())
+        assertNotNull(viewModel.uiState.value.loanToDelete)
+        viewModel.dismissDeleteLoan()
+        assertNull(viewModel.uiState.value.loanToDelete)
+        assertEquals(1, viewModel.uiState.value.loans.size)
+
+        // Request delete and confirm
+        viewModel.requestDeleteLoan(viewModel.uiState.value.loans.single())
+        viewModel.confirmDeleteLoan()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.loanToDelete)
+        assertTrue(viewModel.uiState.value.loans.isEmpty())
+        assertEquals(LoansViewModel.MSG_LOAN_DELETED, viewModel.uiState.value.toastMessage)
+    }
 }
