@@ -312,9 +312,22 @@ class SavingsUseCase(
             }
             .map { it.amount }
             .sumBigDecimal()
+        val repaidFromLoans = allLoans
+            .flatMap { it.payments }
+            .filter {
+                it.amount.isFinite() &&
+                    it.amount > 0.0 &&
+                    it.savingCategory.trim().equals(normalizedCheck, ignoreCase = true)
+            }
+            .map { it.amount }
+            .sumBigDecimal()
         val replacementMatches = replacementCategory != null &&
             replacementCategory.trim().equals(normalizedCheck, ignoreCase = true)
-        val totalSavedAfter = if (replacementMatches) baseSaved.add(replacementAmount) else baseSaved
+        val totalSavedAfter = if (replacementMatches) {
+            baseSaved.add(repaidFromLoans).add(replacementAmount)
+        } else {
+            baseSaved.add(repaidFromLoans)
+        }
         return totalCommitted > totalSavedAfter
     }
 

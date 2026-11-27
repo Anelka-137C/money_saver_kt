@@ -15,7 +15,8 @@ data class SavingsCategoryBalance(
     val totalSaved: Double,
     val totalSpent: Double,
     val netBalance: Double,
-    val totalLoaned: Double = 0.0
+    val totalLoaned: Double = 0.0,
+    val totalLoanRepaid: Double = 0.0
 )
 
 data class CategorySummaryItem(
@@ -118,13 +119,10 @@ fun calculateCategorySavingsOutflows(
     return spent.add(loaned)
 }
 
-fun calculateCategoryAvailableSavings(
+fun calculateCategorySavingsInflows(
     categoryName: String,
     savings: List<Saving>,
-    expenses: List<Expense>,
-    loans: List<Loan> = emptyList(),
-    excludeExpenseId: Long? = null,
-    excludeLoanId: Long? = null
+    loans: List<Loan> = emptyList()
 ): BigDecimal {
     val normalized = categoryName.trim()
     if (normalized.isEmpty()) return BigDecimal.ZERO
@@ -136,6 +134,33 @@ fun calculateCategoryAvailableSavings(
         }
         .map { it.amount }
         .sumBigDecimal()
+    val totalRepaid = loans
+        .flatMap { it.payments }
+        .filter {
+            it.amount.isFinite() &&
+                it.amount > 0.0 &&
+                it.savingCategory.trim().equals(normalized, ignoreCase = true)
+        }
+        .map { it.amount }
+        .sumBigDecimal()
+    return totalSaved.add(totalRepaid)
+}
+
+fun calculateCategoryAvailableSavings(
+    categoryName: String,
+    savings: List<Saving>,
+    expenses: List<Expense>,
+    loans: List<Loan> = emptyList(),
+    excludeExpenseId: Long? = null,
+    excludeLoanId: Long? = null
+): BigDecimal {
+    val normalized = categoryName.trim()
+    if (normalized.isEmpty()) return BigDecimal.ZERO
+    val totalInflows = calculateCategorySavingsInflows(
+        categoryName = normalized,
+        savings = savings,
+        loans = loans
+    )
     val totalOutflows = calculateCategorySavingsOutflows(
         categoryName = normalized,
         expenses = expenses,
@@ -143,7 +168,7 @@ fun calculateCategoryAvailableSavings(
         excludeExpenseId = excludeExpenseId,
         excludeLoanId = excludeLoanId
     )
-    return totalSaved.subtract(totalOutflows).max(BigDecimal.ZERO)
+    return totalInflows.subtract(totalOutflows).max(BigDecimal.ZERO)
 }
 
 fun calculateSavingsNetBalances(
@@ -156,7 +181,13 @@ fun calculateSavingsNetBalances(
     excludeLoanId: Long? = null
 ): List<SavingsCategoryBalance> {
     val validSavings = savings.filter { it.amount.isFinite() && it.amount > 0.0 && it.category.trim().isNotEmpty() }
-    if (validSavings.isEmpty()) return emptyList()
+    val validLoanPayments = loans
+        .flatMap { it.payments }
+        .filter { it.amount.isFinite() && it.amount > 0.0 && it.savingCategory.trim().isNotEmpty() }
+    if (validSavings.isEmpty() && validLoanPayments.isEmpty()) return emptyList()
+
+    val savedByKey = validSavings.groupBy { it.category.trim().lowercase(Locale.ROOT) }
+    val repaidByKey = validLoanPayments.groupBy { it.savingCategory.trim().lowercase(Locale.ROOT) }
 
     val spentByKey = expenses
         .filter {
@@ -179,24 +210,29 @@ fun calculateSavingsNetBalances(
         .groupBy { it.savingCategory.trim().lowercase(Locale.ROOT) }
         .mapValues { (_, list) -> list.map { it.amountLent }.sumBigDecimal() }
 
-    return validSavings
-        .groupBy { it.category.trim().lowercase(Locale.ROOT) }
-        .map { (key, group) ->
-            val rawName = group.first().category.trim()
+    val allKeys = (savedByKey.keys + repaidByKey.keys).distinct()
+    return allKeys
+        .map { key ->
+            val savedGroup = savedByKey[key].orEmpty()
+            val repaidGroup = repaidByKey[key].orEmpty()
+            val rawName = savedGroup.firstOrNull()?.category?.trim()
+                ?: repaidGroup.first().savingCategory.trim()
             val matched = categories.find { it.name.trim().equals(rawName, ignoreCase = true) }
             val resolvedName = matched?.name?.trim()?.ifEmpty { rawName } ?: rawName
             val resolvedColor = matched?.color?.trim()?.ifEmpty { defaultColorHex } ?: defaultColorHex
-            val savedDec = group.map { it.amount }.sumBigDecimal()
+            val savedDec = savedGroup.map { it.amount }.sumBigDecimal()
+            val repaidDec = repaidGroup.map { it.amount }.sumBigDecimal()
             val spentDec = spentByKey[key] ?: BigDecimal.ZERO
             val loanedDec = loanedByKey[key] ?: BigDecimal.ZERO
-            val netDec = savedDec.subtract(spentDec).subtract(loanedDec).max(BigDecimal.ZERO)
+            val netDec = savedDec.add(repaidDec).subtract(spentDec).subtract(loanedDec).max(BigDecimal.ZERO)
             SavingsCategoryBalance(
                 categoryName = resolvedName,
                 colorHex = resolvedColor,
                 totalSaved = savedDec.toDouble().takeIf { it.isFinite() } ?: 0.0,
                 totalSpent = spentDec.toDouble().takeIf { it.isFinite() } ?: 0.0,
                 netBalance = netDec.toDouble().takeIf { it.isFinite() } ?: 0.0,
-                totalLoaned = loanedDec.toDouble().takeIf { it.isFinite() } ?: 0.0
+                totalLoaned = loanedDec.toDouble().takeIf { it.isFinite() } ?: 0.0,
+                totalLoanRepaid = repaidDec.toDouble().takeIf { it.isFinite() } ?: 0.0
             )
         }
         .sortedWith(compareByDescending<SavingsCategoryBalance> { it.netBalance }.thenBy { it.categoryName.lowercase(Locale.ROOT) })

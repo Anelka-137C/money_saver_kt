@@ -1,4 +1,9 @@
 {
+  "common": {
+    "delete_record_confirmation": "Tem certeza de que deseja excluir o registro?",
+    "delete_action": "Excluir",
+    "cancel_action": "Cancelar"
+  },
   "navigation": {
     "tab_expenses": "Despesas",
     "tab_incomes": "Contabilidade",
@@ -404,14 +409,16 @@
       "message": "Você ainda não tem empréstimos registrados"
     },
     "actions": {
-      "register_loan": "Registrar empréstimo"
+      "register_loan": "Registrar empréstimo",
+      "register_payment": "Registrar pagamento"
     },
     "card": {
       "personal_loan": "Empréstimo pessoal",
       "amount_lent": "Valor emprestado",
       "paid": "Pago",
       "pending": "Pendente",
-      "due_prefix": "Vence: %s"
+      "due_prefix": "Vence: %s",
+      "settled_badge": "Concluído"
     },
     "schedule": {
       "section_title": "Datas de pagamento (opcional)",
@@ -423,6 +430,14 @@
       "dialog_title": "Cronograma de pagamentos",
       "save_button": "Salvar cronograma",
       "remove_content_desc": "Remover parcela",
+      "options_content_desc": "Opções da parcela",
+      "edit_installment": "Editar parcela",
+      "update_installment_button": "Atualizar parcela",
+      "discard_dialog_title": "Deseja descartar as alterações?",
+      "discard_dialog_message": "Se sair agora, você perderá as alterações não salvas no cronograma de pagamentos.",
+      "discard_cancel": "Continuar",
+      "discard_confirm": "Descartar",
+      "paid_label": "Paga",
       "overdue_label": "Vencida",
       "cancel_button": "Cancelar"
     },
@@ -436,27 +451,79 @@
       "saving_none": "Nenhuma (empréstimo pessoal)",
       "note_label": "Nota ou motivo (opcional)",
       "note_placeholder": "Ex. Empréstimo para viagem",
+      "payment_plan_label": "Data de pagamento prevista",
+      "payment_mode_none": "Sem data de pagamento prevista",
+      "payment_mode_single": "Com uma data de pagamento",
+      "payment_mode_installments": "Parcelas acordadas (abrir cronograma ao salvar)",
+      "single_due_date_label": "Data de pagamento",
       "save_button": "Salvar empréstimo"
     },
     "options": {
+      "payment_history": "Histórico de pagamentos",
       "manage_installments": "Adicionar parcelas",
       "edit": "Editar dívida",
       "delete": "Excluir dívida"
     },
+    "history_sheet": {
+      "paid_percent_label": "%d%% pago",
+      "installments_progress": "%d de %d parcelas",
+      "payments_section_title": "Pagamentos realizados",
+      "payment_singular": "pagamento",
+      "payment_plural": "pagamentos",
+      "empty_message": "Ainda não há pagamentos registrados para este empréstimo",
+      "register_new_payment": "Registrar novo pagamento",
+      "installment_of_total": "Parcela %d de %d",
+      "debt_payment_tag": "Abono à dívida",
+      "full_payment_badge": "Pagamento completo",
+      "partial_payment_badge": "Pagamento parcial",
+      "edit_payment": "Editar",
+      "delete_payment": "Excluir"
+    },
     "edit_dialog": {
       "title": "Editar empréstimo",
-      "save_button": "Salvar alterações"
+      "save_button": "Salvar alterações",
+      "discard_dialog_title": "Tem certeza de que deseja sair da edição?",
+      "discard_dialog_message": "Se sair agora, você perderá as alterações não salvas deste empréstimo."
     },
     "delete_dialog": {
       "title": "Excluir este empréstimo?",
       "warning_message": "Esta ação não pode ser desfeita. Deslize o botão para confirmar.",
       "cancel_button": "Cancelar"
     },
+    "payment_dialog": {
+      "title": "Registrar pagamento",
+      "edit_title": "Editar pagamento",
+      "target_installment_label": "Para qual parcela vai este pagamento?",
+      "single_scheduled_prefix": "Data prevista",
+      "installment_number_prefix": "Parcela %d",
+      "installment_detail": "Pendente: %s (Pago: %s / %s)",
+      "overflow_installment_hint": "O excedente desta parcela será aplicado automaticamente às próximas parcelas pendentes.",
+      "optional_new_due_date_toggle": "Definir data de pagamento (opcional)",
+      "amount_label": "Valor do pagamento",
+      "pay_full_button": "Pagar total",
+      "datetime_label": "Data e hora do pagamento",
+      "saving_destination_label": "Categoria de economia destino",
+      "saving_destination_placeholder": "Selecione uma categoria de economia",
+      "auto_credited_tag": "Crédito automático",
+      "will_settle_hint": "Este pagamento quitará o empréstimo por completo.",
+      "remaining_balance_hint": "Saldo pendente após o pagamento: %s",
+      "new_due_date_label": "Nova data de pagamento",
+      "partial_schedule_title": "Cronograma pendente (opcional)",
+      "schedule_keep": "Manter cronograma atual",
+      "schedule_add": "Registrar nova parcela",
+      "schedule_adjust": "Ajustar valor da próxima parcela",
+      "next_installment_label": "Novo valor para parcela (%s)",
+      "remainder_due_date_label": "Data para o saldo restante",
+      "save_button": "Salvar pagamento"
+    },
     "messages": {
       "saved": "Empréstimo registrado com sucesso",
       "updated": "Empréstimo atualizado com sucesso",
       "deleted": "Empréstimo excluído com sucesso",
-      "schedule_updated": "Cronograma de pagamentos atualizado"
+      "schedule_updated": "Cronograma de pagamentos atualizado",
+      "payment_saved": "Pagamento registrado com sucesso",
+      "payment_updated": "Pagamento atualizado com sucesso",
+      "payment_deleted": "Pagamento excluído com sucesso"
     }
   }
 }

@@ -1,4 +1,9 @@
 {
+  "common": {
+    "delete_record_confirmation": "Are you sure you want to delete this record?",
+    "delete_action": "Delete",
+    "cancel_action": "Cancel"
+  },
   "navigation": {
     "tab_expenses": "Expenses",
     "tab_incomes": "Accounting",
@@ -404,14 +409,16 @@
       "message": "You have no registered loans yet"
     },
     "actions": {
-      "register_loan": "Register loan"
+      "register_loan": "Register loan",
+      "register_payment": "Record payment"
     },
     "card": {
       "personal_loan": "Personal loan",
       "amount_lent": "Amount lent",
       "paid": "Paid",
       "pending": "Pending",
-      "due_prefix": "Due: %s"
+      "due_prefix": "Due: %s",
+      "settled_badge": "Completed"
     },
     "schedule": {
       "section_title": "Payment schedule (optional)",
@@ -423,6 +430,14 @@
       "dialog_title": "Payment schedule",
       "save_button": "Save schedule",
       "remove_content_desc": "Remove installment",
+      "options_content_desc": "Installment options",
+      "edit_installment": "Edit installment",
+      "update_installment_button": "Update installment",
+      "discard_dialog_title": "Do you want to discard changes?",
+      "discard_dialog_message": "If you leave now, unsaved changes to the payment schedule will be lost.",
+      "discard_cancel": "Continue",
+      "discard_confirm": "Discard",
+      "paid_label": "Paid",
       "overdue_label": "Overdue",
       "cancel_button": "Cancel"
     },
@@ -436,27 +451,79 @@
       "saving_none": "None (personal loan)",
       "note_label": "Note or concept (optional)",
       "note_placeholder": "e.g. Trip loan",
+      "payment_plan_label": "Expected payment date",
+      "payment_mode_none": "No expected payment date",
+      "payment_mode_single": "Single payment date",
+      "payment_mode_installments": "Agreed installments (open schedule on save)",
+      "single_due_date_label": "Payment date",
       "save_button": "Save loan"
     },
     "options": {
+      "payment_history": "Payment history",
       "manage_installments": "Add installments",
       "edit": "Edit loan",
       "delete": "Delete loan"
     },
+    "history_sheet": {
+      "paid_percent_label": "%d%% paid",
+      "installments_progress": "%d of %d installments",
+      "payments_section_title": "Payments made",
+      "payment_singular": "payment",
+      "payment_plural": "payments",
+      "empty_message": "No payments recorded for this loan yet",
+      "register_new_payment": "Record new payment",
+      "installment_of_total": "Installment %d of %d",
+      "debt_payment_tag": "Debt payment",
+      "full_payment_badge": "Full payment",
+      "partial_payment_badge": "Partial payment",
+      "edit_payment": "Edit",
+      "delete_payment": "Delete"
+    },
     "edit_dialog": {
       "title": "Edit loan",
-      "save_button": "Save changes"
+      "save_button": "Save changes",
+      "discard_dialog_title": "Are you sure you want to leave editing?",
+      "discard_dialog_message": "If you leave now, unsaved changes to this loan will be lost."
     },
     "delete_dialog": {
       "title": "Delete this loan?",
       "warning_message": "This action cannot be undone. Slide the button to confirm.",
       "cancel_button": "Cancel"
     },
+    "payment_dialog": {
+      "title": "Record payment",
+      "edit_title": "Edit payment",
+      "target_installment_label": "Which installment is this payment for?",
+      "single_scheduled_prefix": "Scheduled date",
+      "installment_number_prefix": "Installment %d",
+      "installment_detail": "Pending: %s (Paid: %s / %s)",
+      "overflow_installment_hint": "Any excess over this installment will automatically apply to the next pending installments.",
+      "optional_new_due_date_toggle": "Set payment date (optional)",
+      "amount_label": "Payment amount",
+      "pay_full_button": "Pay full",
+      "datetime_label": "Payment date & time",
+      "saving_destination_label": "Destination savings category",
+      "saving_destination_placeholder": "Select a savings category",
+      "auto_credited_tag": "Auto-credited",
+      "will_settle_hint": "This payment will settle the loan in full.",
+      "remaining_balance_hint": "Remaining balance after payment: %s",
+      "new_due_date_label": "New payment date",
+      "partial_schedule_title": "Remaining schedule (optional)",
+      "schedule_keep": "Keep current schedule",
+      "schedule_add": "Add new installment",
+      "schedule_adjust": "Adjust next installment amount",
+      "next_installment_label": "New amount for installment (%s)",
+      "remainder_due_date_label": "Date for remaining balance",
+      "save_button": "Save payment"
+    },
     "messages": {
       "saved": "Loan registered successfully",
       "updated": "Loan updated successfully",
       "deleted": "Loan deleted successfully",
-      "schedule_updated": "Payment schedule updated"
+      "schedule_updated": "Payment schedule updated",
+      "payment_saved": "Payment recorded successfully",
+      "payment_updated": "Payment updated successfully",
+      "payment_deleted": "Payment deleted successfully"
     }
   }
 }

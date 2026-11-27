@@ -259,7 +259,11 @@ class MainActivity : FragmentActivity() {
             LoansDatabase::class.java,
             "loans.db"
         )
-            .addMigrations(LoansDatabase.MIGRATION_1_2)
+            .addMigrations(
+                LoansDatabase.MIGRATION_1_2,
+                LoansDatabase.MIGRATION_2_3,
+                LoansDatabase.MIGRATION_3_4
+            )
             .build()
     }
 

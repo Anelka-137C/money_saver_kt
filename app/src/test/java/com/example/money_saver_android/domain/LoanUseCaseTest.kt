@@ -11,6 +11,7 @@ import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Loan
 import com.example.money_saver_android.domain.model.LoanInstallment
+import com.example.money_saver_android.domain.model.LoanPayment
 import com.example.money_saver_android.domain.model.Saving
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
@@ -18,8 +19,10 @@ import com.example.money_saver_android.domain.usecase.LoanInstallmentInput
 import com.example.money_saver_android.domain.usecase.LoanInstallmentValidationResult
 import com.example.money_saver_android.domain.usecase.LoanResult
 import com.example.money_saver_android.domain.usecase.LoanUseCase
+import com.example.money_saver_android.domain.usecase.PartialPaymentScheduleOption
 import com.example.money_saver_android.domain.usecase.SavingsResult
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
+import com.example.money_saver_android.domain.usecase.calculateCategoryAvailableSavings
 import com.example.money_saver_android.domain.usecase.calculateLoanDueBadgeInfo
 import com.example.money_saver_android.domain.usecase.calculateSavingsNetBalances
 import com.example.money_saver_android.domain.usecase.formatLoanShortDate
@@ -38,6 +41,7 @@ import org.junit.Test
 class FakeLoanRepository : LoanRepository {
     val loansFlow = MutableStateFlow<List<Loan>>(emptyList())
     private var nextInstallmentId = 1L
+    private var nextPaymentId = 1L
 
     override fun getAllLoans(): Flow<List<Loan>> = loansFlow
 
@@ -46,7 +50,10 @@ class FakeLoanRepository : LoanRepository {
         val savedInstallments = loan.installments
             .map { it.copy(id = nextInstallmentId++, loanId = id) }
             .sortedWith(compareBy({ it.dueDate }, { it.id }))
-        loansFlow.value = listOf(loan.copy(id = id, installments = savedInstallments)) + loansFlow.value
+        val savedPayments = loan.payments
+            .map { it.copy(id = nextPaymentId++, loanId = id) }
+            .sortedWith(compareBy({ it.paidAt }, { it.id }))
+        loansFlow.value = listOf(loan.copy(id = id, installments = savedInstallments, payments = savedPayments)) + loansFlow.value
         return id
     }
 
@@ -54,8 +61,12 @@ class FakeLoanRepository : LoanRepository {
         val savedInstallments = loan.installments
             .map { it.copy(id = nextInstallmentId++, loanId = loan.id) }
             .sortedWith(compareBy({ it.dueDate }, { it.id }))
-        loansFlow.value = loansFlow.value.map {
-            if (it.id == loan.id) loan.copy(installments = savedInstallments) else it
+        loansFlow.value = loansFlow.value.map { existing ->
+            if (existing.id == loan.id) {
+                loan.copy(installments = savedInstallments, payments = existing.payments)
+            } else {
+                existing
+            }
         }
     }
 
@@ -72,11 +83,81 @@ class FakeLoanRepository : LoanRepository {
         }
     }
 
+    override suspend fun recordPayment(payment: LoanPayment, updatedInstallments: List<LoanInstallment>) {
+        val savedInstallments = updatedInstallments
+            .map { inst ->
+                val resolvedId = if (inst.id > 0L) inst.id else nextInstallmentId++
+                inst.copy(id = resolvedId, loanId = payment.loanId)
+            }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        val savedPayment = payment.copy(id = nextPaymentId++)
+        loansFlow.value = loansFlow.value.map { existing ->
+            if (existing.id == payment.loanId) {
+                existing.copy(
+                    installments = savedInstallments,
+                    payments = (existing.payments + savedPayment).sortedWith(compareBy({ it.paidAt }, { it.id }))
+                )
+            } else {
+                existing
+            }
+        }
+    }
+
+    override suspend fun updatePayment(payment: LoanPayment, updatedInstallments: List<LoanInstallment>) {
+        val savedInstallments = updatedInstallments
+            .map { inst ->
+                val resolvedId = if (inst.id > 0L) inst.id else nextInstallmentId++
+                inst.copy(id = resolvedId, loanId = payment.loanId)
+            }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        loansFlow.value = loansFlow.value.map { existing ->
+            if (existing.id == payment.loanId) {
+                existing.copy(
+                    installments = savedInstallments,
+                    payments = existing.payments
+                        .map { if (it.id == payment.id) payment else it }
+                        .sortedWith(compareBy({ it.paidAt }, { it.id }))
+                )
+            } else {
+                existing
+            }
+        }
+    }
+
+    override suspend fun deletePayment(loanId: Long, paymentId: Long, updatedInstallments: List<LoanInstallment>) {
+        val savedInstallments = updatedInstallments
+            .map { inst ->
+                val resolvedId = if (inst.id > 0L) inst.id else nextInstallmentId++
+                inst.copy(id = resolvedId, loanId = loanId)
+            }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        loansFlow.value = loansFlow.value.map { existing ->
+            if (existing.id == loanId) {
+                existing.copy(
+                    installments = savedInstallments,
+                    payments = existing.payments.filterNot { it.id == paymentId }
+                )
+            } else {
+                existing
+            }
+        }
+    }
+
     override suspend fun reassignSavingCategory(oldName: String, newName: String) {
-        loansFlow.value = loansFlow.value.map {
-            if (it.savingCategory.trim().equals(oldName.trim(), ignoreCase = true)) {
-                it.copy(savingCategory = newName)
-            } else it
+        loansFlow.value = loansFlow.value.map { loan ->
+            val updatedLoanCat = if (loan.savingCategory.trim().equals(oldName.trim(), ignoreCase = true)) {
+                newName
+            } else {
+                loan.savingCategory
+            }
+            val updatedPayments = loan.payments.map { p ->
+                if (p.savingCategory.trim().equals(oldName.trim(), ignoreCase = true)) {
+                    p.copy(savingCategory = newName)
+                } else {
+                    p
+                }
+            }
+            loan.copy(savingCategory = updatedLoanCat, payments = updatedPayments)
         }
     }
 }
@@ -446,5 +527,351 @@ class LoanUseCaseTest {
             loans = loanRepo.loansFlow.value
         )
         assertEquals(500.0, balances.single().netBalance, 0.001)
+    }
+
+    @Test
+    fun recordLoanPayment_savingsBackedLoan_creditsOriginCategoryIncludingInterestAndSettles() = runBlocking {
+        savingsRepo.insertSaving(
+            Saving(amount = 500.0, category = "Emergencias", periodId = 1L, incomeId = 1L, dateTime = "2026-11-05 10:00")
+        )
+        assertTrue(
+            loanUseCase.saveLoan(
+                personNameInput = "Carlos",
+                amountLentInput = "300",
+                amountToReceiveInput = "350",
+                savingCategoryInput = "Emergencias",
+                installmentInputs = listOf(LoanInstallmentInput("2026-12-10", "350"))
+            ) is LoanResult.Success
+        )
+        val loanId = loanRepo.loansFlow.value.single().id
+
+        // Partial payment of 150 keeping current future installment
+        val partialResult = loanUseCase.recordLoanPayment(
+            loanId = loanId,
+            amountInput = "150",
+            paidAtInput = "2026-11-26 14:00",
+            scheduleOption = PartialPaymentScheduleOption.KeepCurrent
+        )
+        assertTrue(partialResult is LoanResult.Success)
+        val afterPartial = loanRepo.loansFlow.value.single()
+        assertEquals(150.0, afterPartial.paidAmount, 0.001)
+        assertEquals(200.0, afterPartial.pendingAmount, 0.001)
+        assertFalse(afterPartial.isSettled)
+        assertEquals(350.0, afterPartial.installments.single().expectedAmount, 0.001)
+        assertEquals(150.0, afterPartial.installments.single().paymentAmount, 0.001)
+        assertEquals(200.0, afterPartial.installments.single().remainingAmount, 0.001)
+
+        // Net balance should be 500 - 300 + 150 = 350
+        val balanceAfterPartial = calculateCategoryAvailableSavings(
+            categoryName = "Emergencias",
+            savings = savingsRepo.savingsFlow.value,
+            expenses = expenseRepo.expensesFlow.value,
+            loans = loanRepo.loansFlow.value
+        ).toDouble()
+        assertEquals(350.0, balanceAfterPartial, 0.001)
+
+        // Final payment of 200 settles loan, marks installment paid (paymentAmount == 350), and credits total 350 (net 550)
+        val finalResult = loanUseCase.recordLoanPayment(
+            loanId = loanId,
+            amountInput = "200",
+            paidAtInput = "2026-11-27 09:30"
+        )
+        assertTrue(finalResult is LoanResult.Success)
+        val settled = loanRepo.loansFlow.value.single()
+        assertTrue(settled.isSettled)
+        assertEquals(350.0, settled.paidAmount, 0.001)
+        assertEquals(0.0, settled.pendingAmount, 0.001)
+        assertTrue(settled.installments.single().isPaid)
+        assertEquals(350.0, settled.installments.single().paymentAmount, 0.001)
+        assertNull(calculateLoanDueBadgeInfo(settled.installments, "2026-11-27"))
+        assertEquals(0.0, loanUseCase.calculateTotalReceivable(listOf(settled)), 0.001)
+        assertEquals(350.0, loanUseCase.calculateTotalPaid(listOf(settled)), 0.001)
+
+        val finalNet = calculateSavingsNetBalances(
+            savings = savingsRepo.savingsFlow.value,
+            expenses = expenseRepo.expensesFlow.value,
+            categories = savingsRepo.categoriesFlow.value,
+            loans = loanRepo.loansFlow.value
+        ).single().netBalance
+        assertEquals(550.0, finalNet, 0.001)
+    }
+
+    @Test
+    fun recordLoanPayment_personalLoanWithoutInstallments_requiresCategoryAndNewDueDateWhenPartial() = runBlocking {
+        savingsRepo.insertCategory(Category("Viajes", "✈️", "#10B981", emptyList()))
+        val loanId = loanRepo.insertLoan(
+            Loan(personName = "María", amountLent = 400.0, amountToReceive = 400.0)
+        )
+
+        // Missing destination category must fail
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "100",
+                paidAtInput = "2026-11-26 10:00",
+                savingCategoryInput = "",
+                scheduleOption = PartialPaymentScheduleOption.SetNewDueDate("2026-12-15")
+            ) is LoanResult.Error
+        )
+
+        // Loan without scheduled dates allows partial payment with no due date (KeepCurrent)
+        val partialNoDate = loanUseCase.recordLoanPayment(
+            loanId = loanId,
+            amountInput = "50",
+            paidAtInput = "2026-11-26 10:00",
+            savingCategoryInput = "Viajes",
+            scheduleOption = PartialPaymentScheduleOption.KeepCurrent
+        )
+        assertTrue(partialNoDate is LoanResult.Success)
+        assertTrue(loanRepo.loansFlow.value.single().installments.isEmpty())
+        assertEquals(350.0, loanRepo.loansFlow.value.single().pendingAmount, 0.001)
+
+        // Past due date when optionally setting a date must fail
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "100",
+                paidAtInput = "2026-11-26 10:00",
+                savingCategoryInput = "Viajes",
+                scheduleOption = PartialPaymentScheduleOption.SetNewDueDate("2026-11-25")
+            ) is LoanResult.Error
+        )
+
+        // Valid partial payment with chosen category (even with 0 prior Savings) and optional future due date
+        val ok = loanUseCase.recordLoanPayment(
+            loanId = loanId,
+            amountInput = "100",
+            paidAtInput = "2026-11-26 10:00",
+            savingCategoryInput = "viajes",
+            scheduleOption = PartialPaymentScheduleOption.SetNewDueDate("2026-12-15")
+        )
+        assertTrue(ok is LoanResult.Success)
+        val updated = loanRepo.loansFlow.value.single()
+        assertEquals("Viajes", updated.payments.last().savingCategory)
+        assertEquals("2026-12-15", updated.installments.single().dueDate)
+        assertEquals(250.0, updated.installments.single().expectedAmount, 0.001)
+
+        val balances = calculateSavingsNetBalances(
+            savings = savingsRepo.savingsFlow.value,
+            expenses = expenseRepo.expensesFlow.value,
+            categories = savingsRepo.categoriesFlow.value,
+            loans = loanRepo.loansFlow.value
+        )
+        assertEquals(1, balances.size)
+        assertEquals("Viajes", balances.single().categoryName)
+        assertEquals(150.0, balances.single().netBalance, 0.001)
+
+        // Credited loan repayment is immediately spendable via savings-funded expense
+        val spendWithin = expenseUseCase.saveExpense(
+            amountInput = "120",
+            dateInput = "2026-11-27",
+            descriptionInput = "Boleto",
+            categoryInput = "Transporte",
+            fundingSource = ExpenseFundingSource.SAVINGS,
+            savingCategoryInput = "Viajes"
+        )
+        assertTrue(spendWithin is ExpenseResult.Success)
+        val spendOver = expenseUseCase.saveExpense(
+            amountInput = "40",
+            dateInput = "2026-11-27",
+            descriptionInput = "Extra",
+            categoryInput = "Transporte",
+            fundingSource = ExpenseFundingSource.SAVINGS,
+            savingCategoryInput = "Viajes"
+        )
+        assertTrue(spendOver is ExpenseResult.Error)
+    }
+
+    @Test
+    fun recordLoanPayment_withFutureInstallments_supportsFifoAdvanceAddAndAdjustAndValidatesErrors() = runBlocking {
+        val loanId = loanRepo.insertLoan(
+            Loan(
+                personName = "Pedro",
+                amountLent = 1000.0,
+                amountToReceive = 1000.0,
+                installments = listOf(
+                    LoanInstallment(dueDate = "2026-12-01", expectedAmount = 400.0),
+                    LoanInstallment(dueDate = "2026-12-20", expectedAmount = 600.0)
+                )
+            )
+        )
+
+        // Invalid amounts & dateTime rejected
+        assertTrue(loanUseCase.recordLoanPayment(loanId, "0", "2026-11-26 10:00", "Emergencias") is LoanResult.Error)
+        assertTrue(loanUseCase.recordLoanPayment(loanId, "1001", "2026-11-26 10:00", "Emergencias") is LoanResult.Error)
+        assertTrue(loanUseCase.recordLoanPayment(loanId, "100", "2026-02-30 10:00", "Emergencias") is LoanResult.Error)
+
+        // Pay 250 and add a new installment for the remaining 150 of Dec 1 on 2027-01-10
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "250",
+                paidAtInput = "2026-11-26 11:00",
+                savingCategoryInput = "Emergencias",
+                scheduleOption = PartialPaymentScheduleOption.AddInstallment("2027-01-10", "150")
+            ) is LoanResult.Success
+        )
+        val afterAdd = loanRepo.loansFlow.value.single()
+        assertEquals(3, afterAdd.installments.size)
+        assertEquals("2026-12-01", afterAdd.installments[0].dueDate)
+        assertEquals(250.0, afterAdd.installments[0].expectedAmount, 0.001)
+        assertEquals(250.0, afterAdd.installments[0].paymentAmount, 0.001)
+        assertTrue(afterAdd.installments[0].isPaid)
+        assertEquals("2026-12-20", afterAdd.installments[1].dueDate)
+        assertEquals(600.0, afterAdd.installments[1].expectedAmount, 0.001)
+        assertEquals("2027-01-10", afterAdd.installments[2].dueDate)
+        assertEquals(150.0, afterAdd.installments[2].expectedAmount, 0.001)
+
+        // Pay 100 toward Dec 20 installment and adjust its remaining from 500 to 350, rebalancing Jan 10 to 300
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "100",
+                paidAtInput = "2026-11-26 12:00",
+                savingCategoryInput = "Emergencias",
+                targetInstallmentId = afterAdd.installments[1].id,
+                scheduleOption = PartialPaymentScheduleOption.AdjustNextInstallment("350")
+            ) is LoanResult.Success
+        )
+        val afterAdjust = loanRepo.loansFlow.value.single()
+        assertEquals(650.0, afterAdjust.pendingAmount, 0.001)
+        assertEquals(3, afterAdjust.installments.size)
+        val dec20 = afterAdjust.installments[1]
+        assertEquals(100.0, dec20.paymentAmount, 0.001)
+        assertEquals(450.0, dec20.expectedAmount, 0.001)
+        assertEquals(350.0, dec20.remainingAmount, 0.001)
+        assertEquals(300.0, afterAdjust.installments[2].expectedAmount, 0.001)
+    }
+
+    @Test
+    fun recordLoanPayment_directedToSpecificInstallment_recordsPaymentAmountOnChosenInstallment() = runBlocking {
+        val loanId = loanRepo.insertLoan(
+            Loan(
+                personName = "Lucía",
+                amountLent = 1000.0,
+                amountToReceive = 1000.0,
+                installments = listOf(
+                    LoanInstallment(dueDate = "2026-12-01", expectedAmount = 400.0),
+                    LoanInstallment(dueDate = "2026-12-20", expectedAmount = 600.0)
+                )
+            )
+        )
+        val initialInstallments = loanRepo.loansFlow.value.single().installments
+        val firstId = initialInstallments[0].id
+        val secondId = initialInstallments[1].id
+
+        // Direct a 250 payment explicitly to installment #2
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "250",
+                paidAtInput = "2026-11-26 14:00",
+                savingCategoryInput = "Emergencias",
+                targetInstallmentId = secondId
+            ) is LoanResult.Success
+        )
+        val afterFirstPay = loanRepo.loansFlow.value.single()
+        assertEquals(secondId, afterFirstPay.payments.single().installmentId)
+        assertEquals(0.0, afterFirstPay.installments.single { it.id == firstId }.paymentAmount, 0.001)
+        assertEquals(250.0, afterFirstPay.installments.single { it.id == secondId }.paymentAmount, 0.001)
+        assertEquals(350.0, afterFirstPay.installments.single { it.id == secondId }.remainingAmount, 0.001)
+        // Badge still points to installment #1 since installment #1 is unpaid
+        assertEquals("2026-12-01", calculateLoanDueBadgeInfo(afterFirstPay.installments, "2026-11-26")?.nextDueDate)
+
+        // Direct 400 payment to installment #1 -> settles #1, badge advances to #2
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "400",
+                paidAtInput = "2026-11-27 09:00",
+                savingCategoryInput = "Emergencias",
+                targetInstallmentId = firstId
+            ) is LoanResult.Success
+        )
+        val afterSecondPay = loanRepo.loansFlow.value.single()
+        assertTrue(afterSecondPay.installments.single { it.id == firstId }.isPaid)
+        assertEquals("2026-12-20", calculateLoanDueBadgeInfo(afterSecondPay.installments, "2026-11-27")?.nextDueDate)
+        assertEquals(0, calculateLoanDueBadgeInfo(afterSecondPay.installments, "2026-11-27")?.additionalCount)
+    }
+
+    @Test
+    fun updateAndDeleteLoanPayment_recomputesInstallmentsSavingsAndProtectsCommittedSavings() = runBlocking {
+        savingsRepo.insertSaving(
+            Saving(amount = 200.0, category = "Emergencias", periodId = 1L, incomeId = 1L, dateTime = "2026-11-05 10:00")
+        )
+        val loanId = loanRepo.insertLoan(
+            Loan(
+                personName = "Mateo",
+                amountLent = 1000.0,
+                amountToReceive = 1000.0,
+                installments = listOf(
+                    LoanInstallment(dueDate = "2026-12-01", expectedAmount = 400.0),
+                    LoanInstallment(dueDate = "2026-12-20", expectedAmount = 600.0)
+                )
+            )
+        )
+        val inst1Id = loanRepo.loansFlow.value.single().installments[0].id
+        val inst2Id = loanRepo.loansFlow.value.single().installments[1].id
+
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loanId,
+                amountInput = "300",
+                paidAtInput = "2026-11-27 10:00",
+                savingCategoryInput = "Emergencias",
+                targetInstallmentId = inst1Id
+            ) is LoanResult.Success
+        )
+        val paymentId = loanRepo.loansFlow.value.single().payments.single().id
+
+        // Edit payment: change amount to 250 and redirect to installment #2
+        assertTrue(
+            loanUseCase.updateLoanPayment(
+                loanId = loanId,
+                paymentId = paymentId,
+                amountInput = "250",
+                paidAtInput = "2026-11-27 12:00",
+                savingCategoryInput = "Emergencias",
+                targetInstallmentId = inst2Id
+            ) is LoanResult.Success
+        )
+        val afterEdit = loanRepo.loansFlow.value.single()
+        assertEquals(250.0, afterEdit.paidAmount, 0.001)
+        assertEquals(750.0, afterEdit.pendingAmount, 0.001)
+        assertEquals(0.0, afterEdit.installments.single { it.id == inst1Id }.paymentAmount, 0.001)
+        assertEquals(250.0, afterEdit.installments.single { it.id == inst2Id }.paymentAmount, 0.001)
+
+        // Spend 300 from Emergencias (200 initial + 250 payment = 450 available -> 150 remaining)
+        assertTrue(
+            expenseUseCase.saveExpense(
+                amountInput = "300",
+                dateInput = "2026-11-27",
+                descriptionInput = "Uso",
+                categoryInput = "Hogar",
+                fundingSource = ExpenseFundingSource.SAVINGS,
+                savingCategoryInput = "Emergencias"
+            ) is ExpenseResult.Success
+        )
+
+        // Deleting payment must now be blocked because 200 < 300 committed outflow
+        assertTrue(loanUseCase.deleteLoanPayment(loanId, paymentId) is LoanResult.Error)
+
+        // Create a second loan without committed expenses and delete its payment
+        val loan2Id = loanRepo.insertLoan(
+            Loan(personName = "Rosa", amountLent = 100.0, amountToReceive = 100.0)
+        )
+        assertTrue(
+            loanUseCase.recordLoanPayment(
+                loanId = loan2Id,
+                amountInput = "50",
+                paidAtInput = "2026-11-27 13:00",
+                savingCategoryInput = "Emergencias"
+            ) is LoanResult.Success
+        )
+        val p2Id = loanRepo.loansFlow.value.single { it.id == loan2Id }.payments.single().id
+        assertTrue(loanUseCase.deleteLoanPayment(loan2Id, p2Id) is LoanResult.Success)
+        val loan2AfterDelete = loanRepo.loansFlow.value.single { it.id == loan2Id }
+        assertTrue(loan2AfterDelete.payments.isEmpty())
+        assertEquals(100.0, loan2AfterDelete.pendingAmount, 0.001)
     }
 }

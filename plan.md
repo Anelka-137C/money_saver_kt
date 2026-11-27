@@ -1,35 +1,21 @@
-# Historia #16 — Programación de Fechas de Pago de Préstamos
-
 ## Story
-Como usuario, quiero programar y gestionar de forma opcional una o varias fechas de pago con su monto esperado para un préstamo (al crearlo o en uno ya existente), para organizar el calendario acordado y ver rápidamente el próximo vencimiento en la tarjeta.
+Como usuario, quiero registrar pagos totales o parciales de un préstamo acreditando el monto a la categoría de ahorro de origen —o a la categoría de ahorro que elija si no provino de ahorros— y definiendo una nueva fecha de pago cuando quede saldo pendiente, para controlar el cobro y sumar ese dinero a mis ahorros.
 
 ## Acceptance criteria
-- [ ] Given que estoy registrando un préstamo nuevo, when lo guardo sin fechas o agregando una o varias cuotas con fecha igual o posterior a hoy cuyos montos esperados suman exactamente el monto a recibir, then el préstamo se guarda con su calendario y su tarjeta muestra el badge "Vence: <fecha más próxima>" (con indicador "+N" si tiene cuotas adicionales, resaltado en rojo si esa fecha ya venció, o sin badge cuando no tiene cuotas).
-- [ ] Given que tengo un préstamo registrado en la lista de deudas pendientes (con o sin cuotas previas), when abro su calendario desde la tarjeta para consultar sus cuotas, agregar nuevas (desde hoy en adelante) o quitar existentes y confirmo con el calendario vacío o sumando exactamente el monto a recibir, then los cambios quedan guardados y el badge de la tarjeta se actualiza de inmediato reflejando la nueva fecha más próxima, el indicador "+N" y su estado de vencimiento.
-- [ ] Given que intento programar una cuota con fecha inválida o anterior a hoy, con un monto esperado menor o igual a cero, o confirmar un calendario con una o más cuotas cuya suma no es exactamente igual al monto a recibir del préstamo, when confirmo la acción, then veo un mensaje de error claro y no se guardan datos inválidos.
+- [ ] **Given** un préstamo con saldo pendiente, **when** el usuario registra un pago total o parcial con un monto válido (mayor a cero y menor o igual al saldo pendiente) y una fecha y hora de pago (por defecto la fecha y hora actual, editable por el usuario), **then** el préstamo actualiza su monto pagado, su saldo pendiente y su barra de progreso, y el resumen superior actualiza el total por cobrar y el total pagado (si el monto o la fecha y hora son inválidos, o el monto supera el saldo pendiente, se impide guardar y se muestra un mensaje de error).
+- [ ] **Given** un préstamo al que se le registra un pago, **when** el préstamo provino de una categoría de ahorro, **then** el monto se acredita automáticamente al saldo neto disponible de esa categoría sin depender de un período financiero; cuando no provino de ahorros, el usuario debe seleccionar una categoría de ahorro destino y el monto se suma a su saldo neto disponible.
+- [ ] **Given** un pago parcial que deja saldo pendiente en el préstamo, **when** el préstamo no tiene cuotas futuras programadas, el usuario define una nueva fecha de pago (hoy o posterior), y si ya tiene cuotas programadas puede opcionalmente registrar una nueva cuota o ajustar el monto esperado de la siguiente cuota, **then** la tarjeta del préstamo refleja la próxima fecha de cobro actualizada (y si el pago salda el total pendiente, no se solicita nueva fecha ni se muestra vencimiento pendiente).
 
 ## Plan
-- Extender el almacenamiento local de préstamos para persistir las cuotas programadas (fecha y monto esperado) asociadas a cada préstamo, conservando los préstamos ya registrados.
-- Agregar en el dominio las validaciones del calendario (fechas válidas no anteriores a hoy, monto esperado mayor a cero y suma total exactamente igual al monto a recibir cuando existan cuotas) y el cálculo de la próxima fecha a vencer, cuotas adicionales y estado vencido según la fecha actual.
-- Incorporar en el estado de préstamos la adición y eliminación de cuotas tanto durante el registro de un préstamo nuevo como en la gestión del calendario de un préstamo existente.
-- Añadir la sección opcional de cuotas (selector de fecha desde hoy en adelante y monto esperado en la moneda configurada) al diálogo de registro, un diálogo de calendario al tocar la tarjeta de un préstamo existente y el badge de vencimiento en la tarjeta ("Vence: <fecha>", indicador "+N" y resaltado en rojo cuando esté vencida).
-- Agregar las traducciones y el formato de fecha corta localizado en los cuatro idiomas soportados, y cubrir con pruebas unitarias y de interfaz el alta, la gestión en préstamos existentes, las validaciones y los estados del badge.
+- **Persistencia de pagos**: Ampliar el modelo y almacenamiento local de préstamos mediante una migración que conserve los datos existentes para guardar cada pago (monto, fecha y hora del pago, y categoría de ahorro destino) vinculado a su préstamo.
+- **Reglas de dominio y saldo neto de ahorros**: Validar el monto del pago frente al saldo pendiente y la fecha y hora ingresadas, resolver automáticamente o exigir la categoría de ahorro destino, aplicar la nueva fecha o el ajuste opcional de la siguiente cuota cuando quede saldo pendiente, y sumar los cobros al cálculo compartido de saldo neto disponible de ahorros de forma independiente a los períodos financieros.
+- **Estado y sincronización entre pantallas**: Exponer en la gestión de estado de préstamos el flujo de registro de pago (inicializado con la fecha y hora actual), recalcular el total pagado y el total por cobrar del resumen superior, y propagar el saldo neto actualizado a las pantallas que consultan ahorros disponibles.
+- **Interfaz de registro y tarjeta de préstamo**: Extraer un contenedor base compartido para los diálogos de préstamos, agregar la acción de registrar pago en cada préstamo con saldo pendiente, crear el diálogo de pago (monto, selector de fecha y hora con valor actual por defecto, selector de categoría destino solo si no provino de ahorros y opciones condicionales para definir nueva fecha o ajustar opcionalmente la siguiente cuota en pagos parciales) y actualizar la tarjeta con el progreso, pagado, pendiente y vencimiento reales.
+- **Multi-idioma y pruebas**: Añadir los textos necesarios en los cuatro idiomas soportados y cubrir con pruebas unitarias las validaciones de pagos totales y parciales, la acreditación al saldo neto de ahorros y el manejo de nuevas fechas o ajuste de la siguiente cuota.
 
 ## Out of scope
-- Editar el monto prestado, el monto a recibir u otros datos del préstamo, o eliminar préstamos (#20 / división sugerida en #20a y #20b).
-- Registrar pagos totales o parciales, marcar cuotas como pagadas o acreditar dinero a ahorros (#17).
-- Consultar el historial de pagos realizados (#18) y separar pestañas de vigentes e historial (#19).
-- Notificaciones o recordatorios push de vencimiento de cuotas.
-- Respaldo/restauración de préstamos y cuotas en Google Drive (se integrará al cerrar #17).
-
-## Suggestions (your call)
-- **Migración explícita de la base de datos local de préstamos:** agregar una migración explícita al actualizar el esquema evitará que los préstamos ya registrados en el dispositivo se pierdan al añadir las cuotas.
-- **Componente reutilizable de selector de fecha (sin hora):** extraer un componente simple de selección de fecha evitaría duplicar la lógica ya existente en períodos y facilitará su reutilización en pagos (#17).
-
-## Decisiones confirmadas
-- **Opcionalidad:** un préstamo puede guardarse sin fechas (0 cuotas) o con 1 o varias cuotas programadas.
-- **Datos por cuota:** cada fecha programada incluye fecha (día/mes/año) y monto esperado.
-- **Suma exacta:** si el préstamo tiene al menos una cuota programada, la suma de los montos esperados debe ser exactamente igual al monto a recibir.
-- **Sin fechas pasadas:** no se permite programar fechas anteriores a hoy; las fechas previamente guardadas que venzan con el paso del tiempo se resaltan en rojo en el badge.
-- **Badge en la tarjeta:** muestra `"Vence: <fecha más próxima>"`, con indicador `"+N"` si existen cuotas adicionales, y en rojo si la fecha más próxima ya venció.
-- **Gestión en existentes y división de #20:** desde la tarjeta de un préstamo existente se gestiona su calendario de cuotas; la edición de monto prestado y monto a recibir queda fuera de #16 (en #20 / #20a).
+- Consultar el historial detallado de pagos de cada préstamo (historia **#18**).
+- Organizar los préstamos en pestañas de vigentes e histórico (historia **#19**).
+- Ajustar la edición o eliminación de préstamos que ya tienen pagos registrados (historia **#20**).
+- Editar o eliminar pagos ya registrados (historia **#21**).
+- Respaldo y restauración de préstamos/pagos en Google Drive.

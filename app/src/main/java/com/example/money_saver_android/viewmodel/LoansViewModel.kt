@@ -5,13 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.money_saver_android.data.Category
 import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.Loan
+import com.example.money_saver_android.domain.model.LoanPayment
 import com.example.money_saver_android.domain.model.Saving
 import com.example.money_saver_android.domain.usecase.LoanInstallmentInput
 import com.example.money_saver_android.domain.usecase.LoanInstallmentValidationResult
 import com.example.money_saver_android.domain.usecase.LoanResult
 import com.example.money_saver_android.domain.usecase.LoanUseCase
+import com.example.money_saver_android.domain.usecase.PartialPaymentScheduleOption
 import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
 import com.example.money_saver_android.domain.usecase.calculateSavingsNetBalances
+import com.example.money_saver_android.domain.usecase.parseLoanAmount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,8 +31,33 @@ data class LoanInstallmentDraft(
     val draftId: String = UUID.randomUUID().toString(),
     val dueDate: String,
     val expectedAmountInput: String,
-    val persistedId: Long = 0L
-)
+    val persistedId: Long = 0L,
+    val paymentAmount: Double = 0.0
+) {
+    val isPaid: Boolean
+        get() {
+            val expected = parseLoanAmount(expectedAmountInput) ?: return false
+            if (!expected.isFinite() || expected <= 0.0) return false
+            val paid = if (paymentAmount.isFinite() && paymentAmount > 0.0) {
+                BigDecimal.valueOf(paymentAmount)
+            } else {
+                BigDecimal.ZERO
+            }
+            return BigDecimal.valueOf(expected).subtract(paid) <= BigDecimal.ZERO
+        }
+}
+
+enum class PartialScheduleAction {
+    KEEP_CURRENT,
+    ADD_INSTALLMENT,
+    ADJUST_NEXT_INSTALLMENT
+}
+
+enum class LoanCreationPaymentMode {
+    NO_DATE,
+    SINGLE_DATE,
+    INSTALLMENTS
+}
 
 data class LoansUiState(
     val loans: List<Loan> = emptyList(),
@@ -37,6 +65,7 @@ data class LoansUiState(
     val totalPaid: Double = 0.0,
     val savingsBalances: List<SavingsCategoryBalance> = emptyList(),
     val editSavingsBalances: List<SavingsCategoryBalance> = emptyList(),
+    val savingCategories: List<Category> = emptyList(),
     val todayIso: String = "",
     val editingLoanId: Long? = null,
     val personNameInput: String = "",
@@ -45,15 +74,36 @@ data class LoansUiState(
     val isAmountToReceiveManuallyEdited: Boolean = false,
     val noteInput: String = "",
     val selectedSavingCategory: String = "",
+    val creationPaymentMode: LoanCreationPaymentMode = LoanCreationPaymentMode.NO_DATE,
+    val creationSingleDueDateInput: String = "",
     val draftInstallments: List<LoanInstallmentDraft> = emptyList(),
     val draftInstallmentDateInput: String = "",
     val draftInstallmentAmountInput: String = "",
     val errorMessage: String? = null,
+    val showDiscardEditLoanDialog: Boolean = false,
     val editingScheduleLoan: Loan? = null,
     val scheduleInstallments: List<LoanInstallmentDraft> = emptyList(),
+    val editingScheduleInstallmentDraftId: String? = null,
     val scheduleDateInput: String = "",
     val scheduleAmountInput: String = "",
     val scheduleErrorMessage: String? = null,
+    val showDiscardScheduleChangesDialog: Boolean = false,
+    val payingLoan: Loan? = null,
+    val editingPaymentId: Long? = null,
+    val paymentAmountInput: String = "",
+    val paymentDateTimeInput: String = "",
+    val paymentSavingCategoryInput: String = "",
+    val paymentTargetInstallmentId: Long? = null,
+    val paymentDefineNewDateOnNoSchedule: Boolean = false,
+    val paymentNewDueDateInput: String = "",
+    val partialScheduleAction: PartialScheduleAction = PartialScheduleAction.KEEP_CURRENT,
+    val paymentExtraInstallmentDateInput: String = "",
+    val paymentExtraInstallmentAmountInput: String = "",
+    val paymentAdjustedNextAmountInput: String = "",
+    val paymentAdjustedRemainderDateInput: String = "",
+    val paymentErrorMessage: String? = null,
+    val historyLoanId: Long? = null,
+    val paymentToDelete: Pair<Loan, LoanPayment>? = null,
     val loanToDelete: Loan? = null,
     val toastMessage: String? = null
 )
@@ -67,14 +117,21 @@ class LoansViewModel(
         const val MSG_LOAN_UPDATED = "loans.messages.updated"
         const val MSG_LOAN_DELETED = "loans.messages.deleted"
         const val MSG_SCHEDULE_UPDATED = "loans.messages.schedule_updated"
+        const val MSG_PAYMENT_SAVED = "loans.messages.payment_saved"
+        const val MSG_PAYMENT_UPDATED = "loans.messages.payment_updated"
+        const val MSG_PAYMENT_DELETED = "loans.messages.payment_deleted"
     }
 
     private val initialToday = loanUseCase.todayIso()
     private val _uiState = MutableStateFlow(
         LoansUiState(
             todayIso = initialToday,
+            creationSingleDueDateInput = initialToday,
             draftInstallmentDateInput = initialToday,
-            scheduleDateInput = initialToday
+            scheduleDateInput = initialToday,
+            paymentNewDueDateInput = initialToday,
+            paymentExtraInstallmentDateInput = initialToday,
+            paymentAdjustedRemainderDateInput = initialToday
         )
     )
     val uiState: StateFlow<LoansUiState> = _uiState.asStateFlow()
@@ -97,7 +154,8 @@ class LoansViewModel(
                     _uiState.update { current ->
                         current.copy(
                             loans = loanList,
-                            totalReceivable = loanUseCase.calculateTotalReceivable(loanList)
+                            totalReceivable = loanUseCase.calculateTotalReceivable(loanList),
+                            totalPaid = loanUseCase.calculateTotalPaid(loanList)
                         )
                     }
                 }
@@ -130,7 +188,8 @@ class LoansViewModel(
                     } ?: balances
                     current.copy(
                         savingsBalances = balances,
-                        editSavingsBalances = editBalances
+                        editSavingsBalances = editBalances,
+                        savingCategories = snapshot.categories
                     )
                 }
             }
@@ -167,6 +226,14 @@ class LoansViewModel(
 
     fun onSavingCategorySelected(category: String) {
         _uiState.update { it.copy(selectedSavingCategory = category, errorMessage = null) }
+    }
+
+    fun onCreationPaymentModeSelected(mode: LoanCreationPaymentMode) {
+        _uiState.update { it.copy(creationPaymentMode = mode, errorMessage = null) }
+    }
+
+    fun onCreationSingleDueDateChange(value: String) {
+        _uiState.update { it.copy(creationSingleDueDateInput = value, errorMessage = null) }
     }
 
     fun onDraftInstallmentDateChange(value: String) {
@@ -219,7 +286,8 @@ class LoansViewModel(
                 LoanInstallmentDraft(
                     dueDate = inst.dueDate,
                     expectedAmountInput = formatDraftAmount(inst.expectedAmount),
-                    persistedId = inst.id
+                    persistedId = inst.id,
+                    paymentAmount = inst.paymentAmount
                 )
             }
         _uiState.update {
@@ -227,11 +295,21 @@ class LoansViewModel(
                 todayIso = today,
                 editingScheduleLoan = loan,
                 scheduleInstallments = existingDrafts,
+                editingScheduleInstallmentDraftId = null,
                 scheduleDateInput = today,
                 scheduleAmountInput = "",
-                scheduleErrorMessage = null
+                scheduleErrorMessage = null,
+                showDiscardScheduleChangesDialog = false
             )
         }
+    }
+
+    fun requestCloseScheduleDialog() {
+        _uiState.update { it.copy(showDiscardScheduleChangesDialog = true) }
+    }
+
+    fun dismissDiscardScheduleChangesDialog() {
+        _uiState.update { it.copy(showDiscardScheduleChangesDialog = false) }
     }
 
     fun closeScheduleDialog() {
@@ -240,9 +318,11 @@ class LoansViewModel(
             it.copy(
                 editingScheduleLoan = null,
                 scheduleInstallments = emptyList(),
+                editingScheduleInstallmentDraftId = null,
                 scheduleDateInput = today,
                 scheduleAmountInput = "",
-                scheduleErrorMessage = null
+                scheduleErrorMessage = null,
+                showDiscardScheduleChangesDialog = false
             )
         }
     }
@@ -255,24 +335,78 @@ class LoansViewModel(
         _uiState.update { it.copy(scheduleAmountInput = value, scheduleErrorMessage = null) }
     }
 
+    fun startEditingScheduleInstallment(draftId: String) {
+        val target = _uiState.value.scheduleInstallments.find { it.draftId == draftId } ?: return
+        _uiState.update {
+            it.copy(
+                editingScheduleInstallmentDraftId = target.draftId,
+                scheduleDateInput = target.dueDate,
+                scheduleAmountInput = target.expectedAmountInput,
+                scheduleErrorMessage = null
+            )
+        }
+    }
+
+    fun cancelEditingScheduleInstallment() {
+        val today = loanUseCase.todayIso()
+        _uiState.update {
+            it.copy(
+                editingScheduleInstallmentDraftId = null,
+                scheduleDateInput = today,
+                scheduleAmountInput = "",
+                scheduleErrorMessage = null
+            )
+        }
+    }
+
     fun addScheduleInstallment() {
         val state = _uiState.value
+        val editingDraftId = state.editingScheduleInstallmentDraftId
+        val editingTarget = editingDraftId?.let { id ->
+            state.scheduleInstallments.find { it.draftId == id }
+        }
+        val persistedDate = editingTarget?.takeIf { it.persistedId > 0L }?.dueDate
+        val existingPaid = editingTarget?.paymentAmount ?: 0.0
         when (val validation = loanUseCase.validateInstallmentDraft(
             dueDateInput = state.scheduleDateInput,
-            expectedAmountInput = state.scheduleAmountInput
+            expectedAmountInput = state.scheduleAmountInput,
+            persistedDueDate = persistedDate,
+            existingPaymentAmount = existingPaid
         )) {
             is LoanInstallmentValidationResult.Error -> {
                 _uiState.update { it.copy(scheduleErrorMessage = validation.message) }
             }
             is LoanInstallmentValidationResult.Valid -> {
-                val nextDraft = LoanInstallmentDraft(
-                    dueDate = validation.installment.dueDate,
-                    expectedAmountInput = formatDraftAmount(validation.installment.expectedAmount),
-                    persistedId = 0L
-                )
+                val today = loanUseCase.todayIso()
+                val updatedList = if (editingTarget != null) {
+                    val keptPersistedId = if (editingTarget.persistedId > 0L &&
+                        editingTarget.dueDate == validation.installment.dueDate
+                    ) {
+                        editingTarget.persistedId
+                    } else {
+                        0L
+                    }
+                    val updatedDraft = editingTarget.copy(
+                        dueDate = validation.installment.dueDate,
+                        expectedAmountInput = formatDraftAmount(validation.installment.expectedAmount),
+                        persistedId = keptPersistedId
+                    )
+                    state.scheduleInstallments
+                        .map { if (it.draftId == editingTarget.draftId) updatedDraft else it }
+                        .sortedBy { it.dueDate }
+                } else {
+                    val nextDraft = LoanInstallmentDraft(
+                        dueDate = validation.installment.dueDate,
+                        expectedAmountInput = formatDraftAmount(validation.installment.expectedAmount),
+                        persistedId = 0L
+                    )
+                    (state.scheduleInstallments + nextDraft).sortedBy { it.dueDate }
+                }
                 _uiState.update { current ->
                     current.copy(
-                        scheduleInstallments = (current.scheduleInstallments + nextDraft).sortedBy { it.dueDate },
+                        scheduleInstallments = updatedList,
+                        editingScheduleInstallmentDraftId = null,
+                        scheduleDateInput = if (editingTarget != null) today else current.scheduleDateInput,
                         scheduleAmountInput = "",
                         scheduleErrorMessage = null
                     )
@@ -282,11 +416,342 @@ class LoansViewModel(
     }
 
     fun removeScheduleInstallment(draftId: String) {
+        val today = loanUseCase.todayIso()
         _uiState.update { current ->
+            val wasEditingRemoved = current.editingScheduleInstallmentDraftId == draftId
             current.copy(
                 scheduleInstallments = current.scheduleInstallments.filterNot { it.draftId == draftId },
+                editingScheduleInstallmentDraftId = if (wasEditingRemoved) null else current.editingScheduleInstallmentDraftId,
+                scheduleDateInput = if (wasEditingRemoved) today else current.scheduleDateInput,
+                scheduleAmountInput = if (wasEditingRemoved) "" else current.scheduleAmountInput,
                 scheduleErrorMessage = null
             )
+        }
+    }
+
+    fun openPaymentDialog(loan: Loan) {
+        val today = loanUseCase.todayIso()
+        val nowDateTime = loanUseCase.nowDateTimeIso()
+        val firstUnpaidId = loan.installments
+            .filter { !it.isPaid }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+            .firstOrNull()
+            ?.id
+        _uiState.update {
+            it.copy(
+                todayIso = today,
+                payingLoan = loan,
+                editingPaymentId = null,
+                paymentAmountInput = "",
+                paymentDateTimeInput = nowDateTime,
+                paymentSavingCategoryInput = loan.savingCategory.trim(),
+                paymentTargetInstallmentId = firstUnpaidId,
+                paymentDefineNewDateOnNoSchedule = false,
+                paymentNewDueDateInput = today,
+                partialScheduleAction = PartialScheduleAction.KEEP_CURRENT,
+                paymentExtraInstallmentDateInput = today,
+                paymentExtraInstallmentAmountInput = "",
+                paymentAdjustedNextAmountInput = "",
+                paymentAdjustedRemainderDateInput = today,
+                paymentErrorMessage = null
+            )
+        }
+    }
+
+    fun openEditPaymentDialog(loan: Loan, payment: LoanPayment) {
+        val today = loanUseCase.todayIso()
+        val installmentsWithoutThis = loanUseCase.recomputeInstallmentsWithoutPayment(loan, payment.id)
+        val loanForEdit = loan.copy(
+            payments = loan.payments.filterNot { it.id == payment.id },
+            installments = installmentsWithoutThis
+        )
+        val unpaidInstallments = loanForEdit.installments
+            .filter { !it.isPaid }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        val preferredTargetId = payment.installmentId
+            ?.takeIf { targetId -> unpaidInstallments.any { it.id == targetId } }
+            ?: unpaidInstallments.firstOrNull()?.id
+        _uiState.update {
+            it.copy(
+                todayIso = today,
+                payingLoan = loanForEdit,
+                editingPaymentId = payment.id,
+                paymentAmountInput = formatDraftAmount(payment.amount),
+                paymentDateTimeInput = payment.paidAt,
+                paymentSavingCategoryInput = payment.savingCategory,
+                paymentTargetInstallmentId = preferredTargetId,
+                paymentDefineNewDateOnNoSchedule = false,
+                paymentNewDueDateInput = today,
+                partialScheduleAction = PartialScheduleAction.KEEP_CURRENT,
+                paymentExtraInstallmentDateInput = today,
+                paymentExtraInstallmentAmountInput = "",
+                paymentAdjustedNextAmountInput = "",
+                paymentAdjustedRemainderDateInput = today,
+                paymentErrorMessage = null
+            )
+        }
+    }
+
+    fun closePaymentDialog() {
+        val today = loanUseCase.todayIso()
+        _uiState.update {
+            it.copy(
+                payingLoan = null,
+                editingPaymentId = null,
+                paymentAmountInput = "",
+                paymentDateTimeInput = "",
+                paymentSavingCategoryInput = "",
+                paymentTargetInstallmentId = null,
+                paymentDefineNewDateOnNoSchedule = false,
+                paymentNewDueDateInput = today,
+                partialScheduleAction = PartialScheduleAction.KEEP_CURRENT,
+                paymentExtraInstallmentDateInput = today,
+                paymentExtraInstallmentAmountInput = "",
+                paymentAdjustedNextAmountInput = "",
+                paymentAdjustedRemainderDateInput = today,
+                paymentErrorMessage = null
+            )
+        }
+    }
+
+    fun openPaymentHistory(loan: Loan) {
+        _uiState.update { it.copy(historyLoanId = loan.id) }
+    }
+
+    fun closePaymentHistory() {
+        _uiState.update { it.copy(historyLoanId = null) }
+    }
+
+    fun requestDeleteLoanPayment(loan: Loan, payment: LoanPayment) {
+        _uiState.update { it.copy(paymentToDelete = loan to payment) }
+    }
+
+    fun dismissDeleteLoanPayment() {
+        _uiState.update { it.copy(paymentToDelete = null) }
+    }
+
+    fun confirmDeleteLoanPayment() {
+        if (isSaving) return
+        val (loan, payment) = _uiState.value.paymentToDelete ?: return
+        isSaving = true
+        viewModelScope.launch {
+            try {
+                when (val result = loanUseCase.deleteLoanPayment(loan.id, payment.id)) {
+                    is LoanResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                paymentToDelete = null,
+                                toastMessage = MSG_PAYMENT_DELETED
+                            )
+                        }
+                    }
+                    is LoanResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                paymentToDelete = null,
+                                paymentErrorMessage = result.message,
+                                errorMessage = result.message
+                            )
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        paymentToDelete = null,
+                        errorMessage = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "No se pudo eliminar el pago"
+                    )
+                }
+            } finally {
+                isSaving = false
+            }
+        }
+    }
+
+    fun onPaymentAmountChange(value: String) {
+        _uiState.update { it.copy(paymentAmountInput = value, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentTargetInstallmentSelected(installmentId: Long) {
+        _uiState.update { it.copy(paymentTargetInstallmentId = installmentId, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentDefineNewDateToggle(enabled: Boolean) {
+        _uiState.update { it.copy(paymentDefineNewDateOnNoSchedule = enabled, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentFullAmountClick() {
+        val loan = _uiState.value.payingLoan ?: return
+        _uiState.update {
+            it.copy(
+                paymentAmountInput = formatDraftAmount(loan.pendingAmount),
+                paymentErrorMessage = null
+            )
+        }
+    }
+
+    fun onPaymentDateTimeChange(value: String) {
+        _uiState.update { it.copy(paymentDateTimeInput = value, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentSavingCategorySelected(category: String) {
+        _uiState.update { it.copy(paymentSavingCategoryInput = category, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentNewDueDateChange(value: String) {
+        _uiState.update { it.copy(paymentNewDueDateInput = value, paymentErrorMessage = null) }
+    }
+
+    fun onPartialScheduleActionSelected(action: PartialScheduleAction) {
+        _uiState.update { current ->
+            val prefilledAdjusted = if (action == PartialScheduleAction.ADJUST_NEXT_INSTALLMENT &&
+                current.paymentAdjustedNextAmountInput.isBlank()
+            ) {
+                val loan = current.payingLoan
+                val parsed = parseLoanAmount(current.paymentAmountInput) ?: 0.0
+                if (loan != null) {
+                    val nextInst = loanUseCase
+                        .previewInstallmentsAfterPayment(loan, parsed, current.paymentTargetInstallmentId)
+                        .firstOrNull { !it.isPaid }
+                    nextInst?.let { formatDraftAmount(it.remainingAmount) } ?: ""
+                } else {
+                    ""
+                }
+            } else {
+                current.paymentAdjustedNextAmountInput
+            }
+            current.copy(
+                partialScheduleAction = action,
+                paymentAdjustedNextAmountInput = prefilledAdjusted,
+                paymentErrorMessage = null
+            )
+        }
+    }
+
+    fun onPaymentExtraInstallmentDateChange(value: String) {
+        _uiState.update { it.copy(paymentExtraInstallmentDateInput = value, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentExtraInstallmentAmountChange(value: String) {
+        _uiState.update { it.copy(paymentExtraInstallmentAmountInput = value, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentAdjustedNextAmountChange(value: String) {
+        _uiState.update { it.copy(paymentAdjustedNextAmountInput = value, paymentErrorMessage = null) }
+    }
+
+    fun onPaymentAdjustedRemainderDateChange(value: String) {
+        _uiState.update { it.copy(paymentAdjustedRemainderDateInput = value, paymentErrorMessage = null) }
+    }
+
+    fun saveLoanPayment() {
+        if (isSaving) return
+        val state = _uiState.value
+        val loan = state.payingLoan ?: return
+        val parsedAmount = parseLoanAmount(state.paymentAmountInput)
+        val scheduleOption = if (parsedAmount != null && parsedAmount.isFinite() && parsedAmount > 0.0) {
+            val remainingAfter = BigDecimal.valueOf(loan.pendingAmount)
+                .subtract(BigDecimal.valueOf(parsedAmount))
+            if (remainingAfter > BigDecimal.ZERO) {
+                val afterApplying = loanUseCase.previewInstallmentsAfterPayment(
+                    loan = loan,
+                    paymentAmount = parsedAmount,
+                    targetInstallmentId = state.paymentTargetInstallmentId
+                )
+                val hasFuture = loanUseCase.hasFutureInstallments(afterApplying, state.todayIso)
+                if (!hasFuture) {
+                    if (state.paymentDefineNewDateOnNoSchedule) {
+                        PartialPaymentScheduleOption.SetNewDueDate(state.paymentNewDueDateInput)
+                    } else {
+                        PartialPaymentScheduleOption.KeepCurrent
+                    }
+                } else {
+                    when (state.partialScheduleAction) {
+                        PartialScheduleAction.KEEP_CURRENT -> PartialPaymentScheduleOption.KeepCurrent
+                        PartialScheduleAction.ADD_INSTALLMENT -> PartialPaymentScheduleOption.AddInstallment(
+                            dueDate = state.paymentExtraInstallmentDateInput,
+                            amountInput = state.paymentExtraInstallmentAmountInput
+                        )
+                        PartialScheduleAction.ADJUST_NEXT_INSTALLMENT -> PartialPaymentScheduleOption.AdjustNextInstallment(
+                            amountInput = state.paymentAdjustedNextAmountInput,
+                            remainderDueDate = state.paymentAdjustedRemainderDateInput
+                        )
+                    }
+                }
+            } else {
+                PartialPaymentScheduleOption.KeepCurrent
+            }
+        } else {
+            PartialPaymentScheduleOption.KeepCurrent
+        }
+
+        isSaving = true
+        val editingPayId = state.editingPaymentId
+        viewModelScope.launch {
+            try {
+                val result = if (editingPayId == null) {
+                    loanUseCase.recordLoanPayment(
+                        loanId = loan.id,
+                        amountInput = state.paymentAmountInput,
+                        paidAtInput = state.paymentDateTimeInput,
+                        savingCategoryInput = state.paymentSavingCategoryInput,
+                        targetInstallmentId = state.paymentTargetInstallmentId,
+                        scheduleOption = scheduleOption
+                    )
+                } else {
+                    loanUseCase.updateLoanPayment(
+                        loanId = loan.id,
+                        paymentId = editingPayId,
+                        amountInput = state.paymentAmountInput,
+                        paidAtInput = state.paymentDateTimeInput,
+                        savingCategoryInput = state.paymentSavingCategoryInput,
+                        targetInstallmentId = state.paymentTargetInstallmentId,
+                        scheduleOption = scheduleOption
+                    )
+                }
+                when (result) {
+                    is LoanResult.Success -> {
+                        val today = loanUseCase.todayIso()
+                        _uiState.update {
+                            it.copy(
+                                todayIso = today,
+                                payingLoan = null,
+                                editingPaymentId = null,
+                                paymentAmountInput = "",
+                                paymentDateTimeInput = "",
+                                paymentSavingCategoryInput = "",
+                                paymentTargetInstallmentId = null,
+                                paymentDefineNewDateOnNoSchedule = false,
+                                paymentNewDueDateInput = today,
+                                partialScheduleAction = PartialScheduleAction.KEEP_CURRENT,
+                                paymentExtraInstallmentDateInput = today,
+                                paymentExtraInstallmentAmountInput = "",
+                                paymentAdjustedNextAmountInput = "",
+                                paymentAdjustedRemainderDateInput = today,
+                                paymentErrorMessage = null,
+                                toastMessage = if (editingPayId == null) MSG_PAYMENT_SAVED else MSG_PAYMENT_UPDATED
+                            )
+                        }
+                    }
+                    is LoanResult.Error -> {
+                        _uiState.update { it.copy(paymentErrorMessage = result.message) }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        paymentErrorMessage = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "No se pudo registrar el pago"
+                    )
+                }
+            } finally {
+                isSaving = false
+            }
         }
     }
 
@@ -298,6 +763,14 @@ class LoansViewModel(
         _uiState.update { it.copy(toastMessage = null) }
     }
 
+    fun requestCloseEditLoanDialog() {
+        _uiState.update { it.copy(showDiscardEditLoanDialog = true) }
+    }
+
+    fun dismissDiscardEditLoanDialog() {
+        _uiState.update { it.copy(showDiscardEditLoanDialog = false) }
+    }
+
     fun startEditingLoan(loan: Loan) {
         val today = loanUseCase.todayIso()
         val existingDrafts = loan.installments
@@ -306,7 +779,8 @@ class LoansViewModel(
                 LoanInstallmentDraft(
                     dueDate = inst.dueDate,
                     expectedAmountInput = formatDraftAmount(inst.expectedAmount),
-                    persistedId = inst.id
+                    persistedId = inst.id,
+                    paymentAmount = inst.paymentAmount
                 )
             }
         val snapshot = latestSavingsSnapshot
@@ -335,7 +809,8 @@ class LoansViewModel(
                 draftInstallments = existingDrafts,
                 draftInstallmentDateInput = today,
                 draftInstallmentAmountInput = "",
-                errorMessage = null
+                errorMessage = null,
+                showDiscardEditLoanDialog = false
             )
         }
     }
@@ -360,6 +835,10 @@ class LoansViewModel(
                             current.copy(
                                 loanToDelete = null,
                                 editingScheduleLoan = if (current.editingScheduleLoan?.id == loan.id) null else current.editingScheduleLoan,
+                                payingLoan = if (current.payingLoan?.id == loan.id) null else current.payingLoan,
+                                editingPaymentId = if (current.payingLoan?.id == loan.id) null else current.editingPaymentId,
+                                historyLoanId = if (current.historyLoanId == loan.id) null else current.historyLoanId,
+                                paymentToDelete = if (current.paymentToDelete?.first?.id == loan.id) null else current.paymentToDelete,
                                 toastMessage = MSG_LOAN_DELETED
                             )
                         }
@@ -401,10 +880,13 @@ class LoansViewModel(
                 isAmountToReceiveManuallyEdited = false,
                 noteInput = "",
                 selectedSavingCategory = "",
+                creationPaymentMode = LoanCreationPaymentMode.NO_DATE,
+                creationSingleDueDateInput = today,
                 draftInstallments = emptyList(),
                 draftInstallmentDateInput = today,
                 draftInstallmentAmountInput = "",
-                errorMessage = null
+                errorMessage = null,
+                showDiscardEditLoanDialog = false
             )
         }
     }
@@ -413,18 +895,37 @@ class LoansViewModel(
         if (isSaving) return
         val state = _uiState.value
         val editingId = state.editingLoanId
+        val selectedCreationMode = state.creationPaymentMode
         isSaving = true
         viewModelScope.launch {
             try {
-                val installmentInputs = state.draftInstallments.map {
-                    LoanInstallmentInput(
-                        dueDate = it.dueDate,
-                        expectedAmountInput = it.expectedAmountInput,
-                        persistedId = it.persistedId
+                val installmentInputs = when {
+                    editingId != null -> state.draftInstallments.map {
+                        LoanInstallmentInput(
+                            dueDate = it.dueDate,
+                            expectedAmountInput = it.expectedAmountInput,
+                            persistedId = it.persistedId,
+                            paymentAmount = it.paymentAmount
+                        )
+                    }
+                    selectedCreationMode == LoanCreationPaymentMode.SINGLE_DATE -> listOf(
+                        LoanInstallmentInput(
+                            dueDate = state.creationSingleDueDateInput,
+                            expectedAmountInput = state.amountToReceiveInput
+                        )
                     )
+                    selectedCreationMode == LoanCreationPaymentMode.INSTALLMENTS -> emptyList()
+                    else -> state.draftInstallments.map {
+                        LoanInstallmentInput(
+                            dueDate = it.dueDate,
+                            expectedAmountInput = it.expectedAmountInput,
+                            persistedId = it.persistedId,
+                            paymentAmount = it.paymentAmount
+                        )
+                    }
                 }
-                val result = if (editingId == null) {
-                    loanUseCase.saveLoan(
+                val (result, createdLoan) = if (editingId == null) {
+                    loanUseCase.saveLoanReturningCreated(
                         personNameInput = state.personNameInput,
                         amountLentInput = state.amountLentInput,
                         amountToReceiveInput = state.amountToReceiveInput,
@@ -441,11 +942,14 @@ class LoansViewModel(
                         noteInput = state.noteInput,
                         savingCategoryInput = state.selectedSavingCategory,
                         installmentInputs = installmentInputs
-                    )
+                    ) to null
                 }
                 when (result) {
                     is LoanResult.Success -> {
                         val today = loanUseCase.todayIso()
+                        val shouldOpenSchedule = editingId == null &&
+                            selectedCreationMode == LoanCreationPaymentMode.INSTALLMENTS &&
+                            createdLoan != null
                         _uiState.update {
                             it.copy(
                                 todayIso = today,
@@ -456,10 +960,18 @@ class LoansViewModel(
                                 isAmountToReceiveManuallyEdited = false,
                                 noteInput = "",
                                 selectedSavingCategory = "",
+                                creationPaymentMode = LoanCreationPaymentMode.NO_DATE,
+                                creationSingleDueDateInput = today,
                                 draftInstallments = emptyList(),
                                 draftInstallmentDateInput = today,
                                 draftInstallmentAmountInput = "",
                                 errorMessage = null,
+                                showDiscardEditLoanDialog = false,
+                                editingScheduleLoan = if (shouldOpenSchedule) createdLoan else it.editingScheduleLoan,
+                                scheduleInstallments = if (shouldOpenSchedule) emptyList() else it.scheduleInstallments,
+                                scheduleDateInput = if (shouldOpenSchedule) today else it.scheduleDateInput,
+                                scheduleAmountInput = if (shouldOpenSchedule) "" else it.scheduleAmountInput,
+                                scheduleErrorMessage = if (shouldOpenSchedule) null else it.scheduleErrorMessage,
                                 toastMessage = if (editingId == null) MSG_LOAN_SAVED else MSG_LOAN_UPDATED
                             )
                         }
@@ -496,7 +1008,8 @@ class LoansViewModel(
                         LoanInstallmentInput(
                             dueDate = it.dueDate,
                             expectedAmountInput = it.expectedAmountInput,
-                            persistedId = it.persistedId
+                            persistedId = it.persistedId,
+                            paymentAmount = it.paymentAmount
                         )
                     }
                 )) {
@@ -507,9 +1020,11 @@ class LoansViewModel(
                                 todayIso = today,
                                 editingScheduleLoan = null,
                                 scheduleInstallments = emptyList(),
+                                editingScheduleInstallmentDraftId = null,
                                 scheduleDateInput = today,
                                 scheduleAmountInput = "",
                                 scheduleErrorMessage = null,
+                                showDiscardScheduleChangesDialog = false,
                                 toastMessage = MSG_SCHEDULE_UPDATED
                             )
                         }

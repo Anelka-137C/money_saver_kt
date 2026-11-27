@@ -2,6 +2,7 @@ package com.example.money_saver_android.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import com.example.money_saver_android.data.Category
@@ -273,11 +275,13 @@ class LoansViewTest {
             .assertIsDisplayed()
         assertEquals(2, loanRepo.loansFlow.value.single().installments.size)
 
-        // Reopen via 3-dot menu, remove all installments, and save empty schedule -> badge disappears
+        // Reopen via 3-dot menu, remove all installments via each row's 3-dot menu, and save empty schedule -> badge disappears
         composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
         composeTestRule.onNodeWithTag("btn_installments_loan_$loanId").performClick()
-        composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").performScrollTo().performClick()
-        composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_options_schedule_installment_0").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").performClick()
+        composeTestRule.onNodeWithTag("btn_options_schedule_installment_0").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").performClick()
         composeTestRule.onNodeWithTag("btn_save_schedule_dialog").performScrollTo().performClick()
         composeTestRule.waitForIdle()
 
@@ -369,5 +373,364 @@ class LoansViewTest {
 
         composeTestRule.onNodeWithTag("dialog_delete_loan").assertDoesNotExist()
         composeTestRule.onNodeWithText("Roberto Silva").assertIsDisplayed()
+    }
+
+    @Test
+    fun loansView_registerPartialAndFullPayment_updatesCardProgressBadgeAndSummary() {
+        val loanId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(personName = "Sofía Vargas", amountLent = 500.0, amountToReceive = 500.0)
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Open payment dialog -> loan without scheduled date does NOT show target installment selector
+        composeTestRule.onNodeWithTag("btn_register_payment_$loanId").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("card_record_loan_payment_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("section_payment_target_installment").assertDoesNotExist()
+
+        // Saving without category on personal loan shows error
+        composeTestRule.onNodeWithTag("input_payment_amount").performTextInput("200")
+        composeTestRule.onNodeWithTag("btn_save_payment_dialog").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("text_payment_dialog_error").performScrollTo().assertIsDisplayed()
+
+        // Choose savings category, optionally enable new due date, and save partial payment
+        composeTestRule.onNodeWithTag("selector_payment_saving_category").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("payment_saving_option_Emergencias").performClick()
+        composeTestRule.onNodeWithTag("toggle_payment_new_due_date").performScrollTo().performClick()
+        loansViewModel.onPaymentNewDueDateChange("2026-12-20")
+        composeTestRule.onNodeWithTag("btn_save_payment_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_record_loan_payment_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("loan_paid_amount_$loanId", useUnmergedTree = true).assertTextContains("$ 200.00")
+        composeTestRule.onNodeWithTag("loan_pending_amount_$loanId", useUnmergedTree = true).assertTextContains("$ 300.00")
+        composeTestRule.onNodeWithTag("text_loans_total_paid").assertTextContains("$ 200.00")
+        composeTestRule.onNodeWithTag("text_loans_total_receivable").assertTextContains("$ 300.00")
+        composeTestRule.onNodeWithText("Vence: 20 Dic 2026", useUnmergedTree = true).assertIsDisplayed()
+
+        // Register full payment using quick button
+        composeTestRule.onNodeWithTag("btn_register_payment_$loanId").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_payment_full_amount").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("text_payment_will_settle").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("selector_payment_saving_category").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("payment_saving_option_Emergencias").performClick()
+        composeTestRule.onNodeWithTag("btn_save_payment_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("loan_settled_badge_$loanId", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("loan_due_badge_$loanId").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("btn_register_payment_$loanId").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("text_loans_total_paid").assertTextContains("$ 500.00")
+        composeTestRule.onNodeWithTag("text_loans_total_receivable").assertTextContains("$ 0.00")
+    }
+
+    @Test
+    fun loansView_savingsBackedLoanWithFutureInstallments_autoCreditsOriginAndShowsOptionalScheduleActions() {
+        val loanId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(
+                    personName = "Andrés",
+                    amountLent = 300.0,
+                    amountToReceive = 350.0,
+                    savingCategory = "Emergencias",
+                    installments = listOf(
+                        LoanInstallment(dueDate = "2026-12-01", expectedAmount = 150.0),
+                        LoanInstallment(dueDate = "2026-12-20", expectedAmount = 200.0)
+                    )
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_register_payment_$loanId").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("card_record_loan_payment_dialog").assertIsDisplayed()
+
+        // Origin category is auto-credited (no manual selector) and target installment selector IS shown
+        composeTestRule.onNodeWithTag("section_payment_target_installment").performScrollTo().assertIsDisplayed()
+        val inst1Id = loanRepo.loansFlow.value.single().installments[0].id
+        val inst2Id = loanRepo.loansFlow.value.single().installments[1].id
+        composeTestRule.onNodeWithTag("payment_installment_option_$inst1Id").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("payment_installment_option_$inst2Id").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("text_payment_auto_saving_category").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("selector_payment_saving_category").assertDoesNotExist()
+
+        // Enter 150 (exact first installment) -> future installment Dec 20 remains -> optional schedule actions appear
+        composeTestRule.onNodeWithTag("input_payment_amount").performScrollTo().performTextInput("150")
+        composeTestRule.onNodeWithTag("option_schedule_keep").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("option_schedule_add").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("option_schedule_adjust").performScrollTo().assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("btn_save_payment_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // First installment has paymentAmount == 150 (paid), due badge advances to 20 Dic 2026, and Emergencias net balance becomes 500 - 300 + 150 = 350
+        assertEquals(150.0, loanRepo.loansFlow.value.single().installments[0].paymentAmount, 0.001)
+        composeTestRule.onNodeWithText("Vence: 20 Dic 2026", useUnmergedTree = true).assertIsDisplayed()
+        assertEquals(350.0, loansViewModel.uiState.value.savingsBalances.single().netBalance, 0.001)
+    }
+
+    @Test
+    fun loansView_createLoanWithSingleDateAndWithAgreedInstallmentsModes() {
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+
+        // 1. Single payment date mode
+        composeTestRule.onNodeWithTag("btn_add_loan_bottom").performClick()
+        composeTestRule.onNodeWithTag("input_loan_person").performTextInput("Elena Castro")
+        composeTestRule.onNodeWithTag("input_loan_amount_lent").performTextInput("800")
+        composeTestRule.onNodeWithTag("option_loan_payment_single").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("input_loan_single_due_date").performScrollTo().assertIsDisplayed()
+        loansViewModel.onCreationSingleDueDateChange("2026-12-22")
+        composeTestRule.onNodeWithTag("btn_save_loan_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Vence: 22 Dic 2026", useUnmergedTree = true).assertIsDisplayed()
+
+        // 2. Agreed installments mode opens LoanScheduleDialog immediately on save
+        composeTestRule.onNodeWithTag("btn_add_loan_top").performClick()
+        composeTestRule.onNodeWithTag("input_loan_person").performTextInput("Tomás Vera")
+        composeTestRule.onNodeWithTag("input_loan_amount_lent").performTextInput("600")
+        composeTestRule.onNodeWithTag("option_loan_payment_installments").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("input_loan_single_due_date").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("btn_save_loan_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertIsDisplayed()
+    }
+
+    @Test
+    fun loansView_scheduleInstallmentThreeDotMenuEditAndCloseDiscardConfirmation() {
+        val loanId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(
+                    personName = "Valeria",
+                    amountLent = 500.0,
+                    amountToReceive = 500.0,
+                    installments = listOf(
+                        LoanInstallment(dueDate = "2026-12-01", expectedAmount = 200.0),
+                        LoanInstallment(dueDate = "2026-12-20", expectedAmount = 300.0)
+                    )
+                )
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_installments_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertIsDisplayed()
+
+        // Open 3-dot menu on first installment and choose edit
+        composeTestRule.onNodeWithTag("btn_options_schedule_installment_0").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_edit_schedule_installment_0").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_remove_schedule_installment_0").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_edit_schedule_installment_0").performClick()
+
+        // Change date to 2026-12-05 and update installment
+        loansViewModel.onScheduleDateChange("2026-12-05")
+        composeTestRule.onNodeWithTag("btn_add_schedule_installment").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("5 Dic 2026", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+
+        // Click X -> confirmation dialog "¿Deseas abandonar los cambios?" appears
+        composeTestRule.onNodeWithTag("btn_close_schedule_dialog").performClick()
+        composeTestRule.onNodeWithTag("dialog_discard_schedule_changes").assertIsDisplayed()
+        composeTestRule.onNodeWithText("¿Deseas abandonar los cambios?").assertIsDisplayed()
+
+        // Cancel discard with "Continuar" button -> stays in schedule dialog with edited installment still present
+        composeTestRule.onNodeWithTag("btn_cancel_discard_schedule").assertTextContains("Continuar")
+        composeTestRule.onNodeWithTag("btn_cancel_discard_schedule").performClick()
+        composeTestRule.onNodeWithTag("dialog_discard_schedule_changes").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertIsDisplayed()
+
+        // Click X again and confirm discard -> closes schedule dialog without persisting edit
+        composeTestRule.onNodeWithTag("btn_close_schedule_dialog").performClick()
+        composeTestRule.onNodeWithTag("btn_confirm_discard_schedule").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_loan_schedule_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Vence: 1 Dic 2026 +1", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun loansView_editLoanCloseButton_showsDiscardConfirmationWithContinueAndAbandon() {
+        val loanId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(personName = "Gabriel", amountLent = 400.0, amountToReceive = 450.0)
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("btn_edit_loan_$loanId").performClick()
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("input_loan_person").performTextClearance()
+        composeTestRule.onNodeWithTag("input_loan_person").performTextInput("Gabriel Editado")
+
+        // Tap X -> shows discard confirmation with "Continuar"
+        composeTestRule.onNodeWithTag("btn_close_loan_dialog").performClick()
+        composeTestRule.onNodeWithTag("dialog_discard_edit_loan").assertIsDisplayed()
+        composeTestRule.onNodeWithText("¿Seguro que quieres abandonar la edición?").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_cancel_discard_edit_loan").assertTextContains("Continuar")
+
+        // Tap "Continuar" -> stays in edit dialog
+        composeTestRule.onNodeWithTag("btn_cancel_discard_edit_loan").performClick()
+        composeTestRule.onNodeWithTag("dialog_discard_edit_loan").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertIsDisplayed()
+
+        // Tap X again and confirm discard -> closes without saving changes
+        composeTestRule.onNodeWithTag("btn_close_loan_dialog").performClick()
+        composeTestRule.onNodeWithTag("btn_confirm_discard_edit_loan").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_add_loan_dialog").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Gabriel").assertIsDisplayed()
+    }
+
+    @Test
+    fun loansView_paymentHistorySheet_showsInstallmentBadgeOrAbonoADeudaAndOpensNewPayment() {
+        val loanWithInstallmentsId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(
+                    personName = "María Castillo",
+                    amountLent = 300.0,
+                    amountToReceive = 1500.0,
+                    savingCategory = "Emergencias",
+                    installments = listOf(
+                        LoanInstallment(dueDate = "2026-12-01", expectedAmount = 500.0),
+                        LoanInstallment(dueDate = "2026-12-20", expectedAmount = 500.0),
+                        LoanInstallment(dueDate = "2027-01-15", expectedAmount = 500.0)
+                    )
+                )
+            )
+        }
+        val personalNoScheduleId = runBlocking {
+            loanRepo.insertLoan(
+                Loan(personName = "Luis Gómez", amountLent = 300.0, amountToReceive = 300.0)
+            )
+        }
+        runBlocking {
+            val inst1Id = loanRepo.loansFlow.value.single { it.id == loanWithInstallmentsId }.installments[0].id
+            loanRepo.recordPayment(
+                payment = com.example.money_saver_android.domain.model.LoanPayment(
+                    loanId = loanWithInstallmentsId,
+                    amount = 500.0,
+                    paidAt = "2026-11-27 10:00",
+                    savingCategory = "Emergencias",
+                    installmentId = inst1Id
+                ),
+                updatedInstallments = loanRepo.loansFlow.value
+                    .single { it.id == loanWithInstallmentsId }
+                    .installments
+                    .map { if (it.id == inst1Id) it.copy(paymentAmount = 500.0) else it }
+            )
+            loanRepo.recordPayment(
+                payment = com.example.money_saver_android.domain.model.LoanPayment(
+                    loanId = personalNoScheduleId,
+                    amount = 100.0,
+                    paidAt = "2026-11-27 11:00",
+                    savingCategory = "Emergencias",
+                    installmentId = null
+                ),
+                updatedInstallments = emptyList()
+            )
+        }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalI18nManager provides i18nManager) {
+                LoansView(loansViewModel = loansViewModel, i18nManager = i18nManager, currency = usd)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Open payment history on loan with installments -> shows "33% pagado", "1 de 3 cuotas", "Cuota 1 de 3", "Abono completo"
+        composeTestRule.onNodeWithTag("btn_options_loan_$loanWithInstallmentsId").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_payment_history_loan_$loanWithInstallmentsId").performClick()
+        composeTestRule.onNodeWithTag("sheet_loan_payment_history").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("text_history_paid_percent").assertTextContains("33% pagado")
+        composeTestRule.onNodeWithTag("text_history_progress_detail").assertTextContains("1 de 3 cuotas")
+        composeTestRule.onNodeWithText("Cuota 1 de 3").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Abono completo").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_history_register_payment").assertIsDisplayed()
+
+        // Tapping "Registrar nuevo abono" closes history and opens payment dialog
+        composeTestRule.onNodeWithTag("btn_history_register_payment").performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("sheet_loan_payment_history").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("card_record_loan_payment_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_close_payment_dialog").performClick()
+
+        // 2. Open payment history on loan without installments -> shows "Abono a deuda" instead of cuota
+        composeTestRule.onNodeWithTag("btn_options_loan_$personalNoScheduleId").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_payment_history_loan_$personalNoScheduleId").performClick()
+        composeTestRule.onNodeWithTag("sheet_loan_payment_history").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Abono a deuda").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Abono parcial").assertIsDisplayed()
+
+        // 3. Inside payment history, open 3-dot menu on payment -> Edit updates amount, Delete shows atomic confirmation dialog
+        val paymentId = loanRepo.loansFlow.value.single { it.id == personalNoScheduleId }.payments.single().id
+        composeTestRule.onNodeWithTag("btn_options_payment_history_$paymentId").performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.onNodeWithTag("btn_edit_payment_history_$paymentId").performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("card_record_loan_payment_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Editar pago").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("input_payment_amount").performTextClearance()
+        composeTestRule.onNodeWithTag("input_payment_amount").performTextInput("150")
+        composeTestRule.onNodeWithTag("btn_save_payment_dialog").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(150.0, loanRepo.loansFlow.value.single { it.id == personalNoScheduleId }.paidAmount, 0.001)
+
+        // Reopen payment history -> verify updated amount, then trigger delete confirmation popup
+        composeTestRule.onNodeWithTag("btn_options_loan_$personalNoScheduleId").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_payment_history_loan_$personalNoScheduleId").performClick()
+        composeTestRule.onNodeWithTag("sheet_loan_payment_history").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_options_payment_history_$paymentId").performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.onNodeWithTag("btn_delete_payment_history_$paymentId").performSemanticsAction(SemanticsActions.OnClick)
+
+        composeTestRule.onNodeWithTag("dialog_delete_loan_payment").assertIsDisplayed()
+        composeTestRule.onNodeWithText("¿Seguro que quieres eliminar el registro?").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_confirm_delete_loan_payment").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("dialog_delete_loan_payment").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("text_payment_history_empty").assertIsDisplayed()
+        assertEquals(0.0, loanRepo.loansFlow.value.single { it.id == personalNoScheduleId }.paidAmount, 0.001)
+
+        composeTestRule.onNodeWithTag("btn_close_payment_history").performSemanticsAction(SemanticsActions.OnClick)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("sheet_loan_payment_history").assertDoesNotExist()
     }
 }

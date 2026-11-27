@@ -1,8 +1,10 @@
 package com.example.money_saver_android.ui.components.loans
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,16 +16,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,6 +46,7 @@ import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.common.DatePickerField
 import com.example.money_saver_android.ui.theme.BorderColor
+import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
@@ -61,6 +72,11 @@ internal fun LoanInstallmentsSection(
     addButtonTestTag: String,
     removeButtonTagPrefix: String,
     itemTagPrefix: String,
+    editingDraftId: String? = null,
+    onEditClick: (String) -> Unit = {},
+    onCancelEditClick: () -> Unit = {},
+    optionsButtonTagPrefix: String = "btn_options_schedule_installment",
+    editButtonTagPrefix: String = "btn_edit_schedule_installment",
     sectionTitle: String? = null,
     showEmptyState: Boolean = false
 ) {
@@ -68,11 +84,18 @@ internal fun LoanInstallmentsSection(
     val scheduledTotal = installments.fold(BigDecimal.ZERO) { acc, item ->
         val parsed = parseLoanAmount(item.expectedAmountInput)
         if (parsed != null && parsed.isFinite() && parsed > 0.0) {
-            acc.add(BigDecimal.valueOf(parsed))
+            val paid = if (item.paymentAmount.isFinite() && item.paymentAmount > 0.0) {
+                BigDecimal.valueOf(item.paymentAmount)
+            } else {
+                BigDecimal.ZERO
+            }
+            val rem = BigDecimal.valueOf(parsed).subtract(paid).max(BigDecimal.ZERO)
+            acc.add(rem)
         } else {
             acc
         }
     }
+    val isEditingInstallment = editingDraftId != null && installments.any { it.draftId == editingDraftId }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -122,7 +145,9 @@ internal fun LoanInstallmentsSection(
         } else {
             installments.forEachIndexed { index, item ->
                 val parsedAmount = parseLoanAmount(item.expectedAmountInput) ?: 0.0
-                val isPastDue = todayIso.isNotBlank() && item.dueDate < todayIso
+                val isPaid = item.isPaid
+                val isPastDue = !isPaid && todayIso.isNotBlank() && item.dueDate < todayIso
+                val isBeingEdited = item.draftId == editingDraftId
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -130,7 +155,12 @@ internal fun LoanInstallmentsSection(
                         .background(FieldBackground)
                         .border(
                             width = 1.dp,
-                            color = if (isPastDue) ErrorRed.copy(alpha = 0.6f) else BorderColor,
+                            color = when {
+                                isBeingEdited -> GreenAccent
+                                isPaid -> GreenAccent.copy(alpha = 0.5f)
+                                isPastDue -> ErrorRed.copy(alpha = 0.6f)
+                                else -> BorderColor
+                            },
                             shape = RoundedCornerShape(10.dp)
                         )
                         .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -149,7 +179,14 @@ internal fun LoanInstallmentsSection(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            if (isPastDue) {
+                            if (isPaid) {
+                                Text(
+                                    text = t("loans.schedule.paid_label"),
+                                    color = GreenAccent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            } else if (isPastDue) {
                                 Text(
                                     text = t("loans.schedule.overdue_label"),
                                     color = ErrorRed,
@@ -158,24 +195,72 @@ internal fun LoanInstallmentsSection(
                                 )
                             }
                         }
+                        val amountText = if (item.paymentAmount > 0.0) {
+                            "${CurrencyFormatter.format(parsedAmount, currency)} • ${t("loans.card.paid")}: ${CurrencyFormatter.format(item.paymentAmount, currency)}"
+                        } else {
+                            CurrencyFormatter.format(parsedAmount, currency)
+                        }
                         Text(
-                            text = CurrencyFormatter.format(parsedAmount, currency),
+                            text = amountText,
                             color = TextSecondary,
                             fontSize = 13.sp
                         )
                     }
-                    IconButton(
-                        onClick = { onRemoveClick(item.draftId) },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("${removeButtonTagPrefix}_$index")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = t("loans.schedule.remove_content_desc"),
-                            tint = ErrorRed,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    if (!isPaid) {
+                        Box {
+                            var menuExpanded by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .testTag("${optionsButtonTagPrefix}_$index")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = t("loans.schedule.options_content_desc"),
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false },
+                                modifier = Modifier
+                                    .background(CardBackground)
+                                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(t("loans.schedule.edit_installment"), color = TextPrimary) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = null,
+                                            tint = TextSecondary
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onEditClick(item.draftId)
+                                    },
+                                    modifier = Modifier.testTag("${editButtonTagPrefix}_$index")
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(t("loans.schedule.remove_content_desc"), color = ErrorRed) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = ErrorRed
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onRemoveClick(item.draftId)
+                                    },
+                                    modifier = Modifier.testTag("${removeButtonTagPrefix}_$index")
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -199,28 +284,55 @@ internal fun LoanInstallmentsSection(
             testTag = amountFieldTestTag
         )
 
-        OutlinedButton(
-            onClick = onAddClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .testTag(addButtonTestTag),
-            shape = RoundedCornerShape(10.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, GreenAccent)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                tint = GreenAccent,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = t("loans.schedule.add_button"),
-                color = GreenAccent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (isEditingInstallment) {
+                OutlinedButton(
+                    onClick = onCancelEditClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .testTag("btn_cancel_edit_schedule_installment"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, BorderColor)
+                ) {
+                    Text(
+                        text = t("loans.schedule.cancel_button"),
+                        color = TextSecondary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onAddClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .testTag(addButtonTestTag),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, GreenAccent)
+            ) {
+                Icon(
+                    imageVector = if (isEditingInstallment) Icons.Default.Check else Icons.Default.Add,
+                    contentDescription = null,
+                    tint = GreenAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isEditingInstallment) {
+                        t("loans.schedule.update_installment_button")
+                    } else {
+                        t("loans.schedule.add_button")
+                    },
+                    color = GreenAccent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }

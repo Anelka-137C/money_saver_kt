@@ -527,7 +527,7 @@ class LoanScheduleAdversarialTest {
         v1.close()
 
         val roomDb = Room.databaseBuilder(context, LoansDatabase::class.java, dbFile.absolutePath)
-            .addMigrations(LoansDatabase.MIGRATION_1_2)
+            .addMigrations(LoansDatabase.MIGRATION_1_2, LoansDatabase.MIGRATION_2_3, LoansDatabase.MIGRATION_3_4)
             .allowMainThreadQueries()
             .build()
 
@@ -744,11 +744,10 @@ class LoanScheduleAdversarialTest {
     }
 
     /**
-     * EXPOSES BUG (`LoansView.kt` / `LoansViewModel.kt` stale `draftInstallmentDateInput` across midnight):
-     * `LoansViewModel` captures `todayIso` at initialization. When the calendar date rolls over to
-     * the next day while the app stays alive, tapping "+ Registrar préstamo" opens `AddLoanDialog`
-     * without refreshing `todayIso`/`draftInstallmentDateInput`. The prefilled date is now YESTERDAY,
-     * so attempting to add an installment with the default date fails with a past-date error!
+     * Midnight rollover invariant on `AddLoanDialog`:
+     * When the calendar date rolls over past midnight while `LoansViewModel` stays alive,
+     * tapping "+ Registrar préstamo" and saving with `SINGLE_DATE` mode (default date untouched)
+     * MUST prefill and persist the new `today` (`"2026-11-27"`), never yesterday (`"2026-11-26"`).
      */
     @Test
     fun compose_loansView_dayRolloverBeforeOpeningAddDialog_prefillsNewTodayNotYesterday() {
@@ -766,16 +765,18 @@ class LoanScheduleAdversarialTest {
         // Clock rolls past midnight before user opens AddLoanDialog
         clockDate = "2026-11-27"
         composeTestRule.onNodeWithTag("btn_add_loan_bottom").performClick()
-        composeTestRule.onNodeWithTag("input_loan_installment_amount").performScrollTo().performTextInput("100")
-        composeTestRule.onNodeWithTag("btn_add_loan_installment").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("input_loan_person").performTextInput("Rollover")
+        composeTestRule.onNodeWithTag("input_loan_amount_lent").performTextInput("100")
+        composeTestRule.onNodeWithTag("option_loan_payment_single").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("btn_save_loan_dialog").performScrollTo().performClick()
         composeTestRule.waitForIdle()
 
         assertEquals(
-            "Default installment date after midnight rollover must be updated to today '2026-11-27' so adding succeeds",
+            "Default single due date after midnight rollover must be updated to today '2026-11-27' so saving succeeds",
             1,
-            viewModel.uiState.value.draftInstallments.size
+            repo.loansFlow.value.size
         )
-        assertEquals("2026-11-27", viewModel.uiState.value.draftInstallments.single().dueDate)
+        assertEquals("2026-11-27", repo.loansFlow.value.single().installments.single().dueDate)
     }
 
     @Test

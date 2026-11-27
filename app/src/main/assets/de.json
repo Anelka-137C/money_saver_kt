@@ -1,4 +1,9 @@
 {
+  "common": {
+    "delete_record_confirmation": "Möchten Sie diesen Eintrag wirklich löschen?",
+    "delete_action": "Löschen",
+    "cancel_action": "Abbrechen"
+  },
   "navigation": {
     "tab_expenses": "Ausgaben",
     "tab_incomes": "Buchhaltung",
@@ -404,14 +409,16 @@
       "message": "Sie haben noch keine Kredite registriert"
     },
     "actions": {
-      "register_loan": "Kredit registrieren"
+      "register_loan": "Kredit registrieren",
+      "register_payment": "Zahlung erfassen"
     },
     "card": {
       "personal_loan": "Privatkredit",
       "amount_lent": "Geliehener Betrag",
       "paid": "Bezahlt",
       "pending": "Ausstehend",
-      "due_prefix": "Fällig: %s"
+      "due_prefix": "Fällig: %s",
+      "settled_badge": "Abgeschlossen"
     },
     "schedule": {
       "section_title": "Zahlungsplan (optional)",
@@ -423,6 +430,14 @@
       "dialog_title": "Zahlungsplan",
       "save_button": "Plan speichern",
       "remove_content_desc": "Rate entfernen",
+      "options_content_desc": "Ratenoptionen",
+      "edit_installment": "Rate bearbeiten",
+      "update_installment_button": "Rate aktualisieren",
+      "discard_dialog_title": "Änderungen verwerfen?",
+      "discard_dialog_message": "Wenn Sie jetzt schließen, gehen ungespeicherte Änderungen am Zahlungsplan verloren.",
+      "discard_cancel": "Weiter",
+      "discard_confirm": "Verwerfen",
+      "paid_label": "Bezahlt",
       "overdue_label": "Überfällig",
       "cancel_button": "Abbrechen"
     },
@@ -436,27 +451,79 @@
       "saving_none": "Keine (Privatkredit)",
       "note_label": "Notiz oder Zweck (optional)",
       "note_placeholder": "z. B. Reisekredit",
+      "payment_plan_label": "Geplantes Zahlungsdatum",
+      "payment_mode_none": "Ohne geplantes Zahlungsdatum",
+      "payment_mode_single": "Einzelnes Zahlungsdatum",
+      "payment_mode_installments": "Vereinbarte Raten (Plan beim Speichern öffnen)",
+      "single_due_date_label": "Zahlungsdatum",
       "save_button": "Kredit speichern"
     },
     "options": {
+      "payment_history": "Zahlungsverlauf",
       "manage_installments": "Raten hinzufügen",
       "edit": "Kredit bearbeiten",
       "delete": "Kredit löschen"
     },
+    "history_sheet": {
+      "paid_percent_label": "%d%% bezahlt",
+      "installments_progress": "%d von %d Raten",
+      "payments_section_title": "Geleistete Zahlungen",
+      "payment_singular": "Zahlung",
+      "payment_plural": "Zahlungen",
+      "empty_message": "Noch keine Zahlungen für diesen Kredit erfasst",
+      "register_new_payment": "Neue Zahlung erfassen",
+      "installment_of_total": "Rate %d von %d",
+      "debt_payment_tag": "Tilgungszahlung",
+      "full_payment_badge": "Vollzahlung",
+      "partial_payment_badge": "Teilzahlung",
+      "edit_payment": "Bearbeiten",
+      "delete_payment": "Löschen"
+    },
     "edit_dialog": {
       "title": "Kredit bearbeiten",
-      "save_button": "Änderungen speichern"
+      "save_button": "Änderungen speichern",
+      "discard_dialog_title": "Bearbeitung wirklich abbrechen?",
+      "discard_dialog_message": "Wenn Sie jetzt schließen, gehen ungespeicherte Änderungen an diesem Kredit verloren."
     },
     "delete_dialog": {
       "title": "Diesen Kredit löschen?",
       "warning_message": "Diese Aktion kann nicht rückgängig gemacht werden. Zum Bestätigen schieben.",
       "cancel_button": "Abbrechen"
     },
+    "payment_dialog": {
+      "title": "Zahlung erfassen",
+      "edit_title": "Zahlung bearbeiten",
+      "target_installment_label": "Für welche Rate gilt diese Zahlung?",
+      "single_scheduled_prefix": "Geplantes Datum",
+      "installment_number_prefix": "Rate %d",
+      "installment_detail": "Ausstehend: %s (Bezahlt: %s / %s)",
+      "overflow_installment_hint": "Ein Überschuss wird automatisch auf die nächsten offenen Raten angerechnet.",
+      "optional_new_due_date_toggle": "Zahlungsdatum festlegen (optional)",
+      "amount_label": "Zahlungsbetrag",
+      "pay_full_button": "Vollständig zahlen",
+      "datetime_label": "Zahlungsdatum & Uhrzeit",
+      "saving_destination_label": "Ziel-Sparkategorie",
+      "saving_destination_placeholder": "Sparkategorie auswählen",
+      "auto_credited_tag": "Automatisch gutgeschrieben",
+      "will_settle_hint": "Diese Zahlung gleicht den Kredit vollständig aus.",
+      "remaining_balance_hint": "Restbetrag nach Zahlung: %s",
+      "new_due_date_label": "Neues Zahlungsdatum",
+      "partial_schedule_title": "Offener Zahlungsplan (optional)",
+      "schedule_keep": "Aktuellen Plan beibehalten",
+      "schedule_add": "Neue Rate hinzufügen",
+      "schedule_adjust": "Nächste Rate anpassen",
+      "next_installment_label": "Neuer Betrag für Rate (%s)",
+      "remainder_due_date_label": "Datum für Restbetrag",
+      "save_button": "Zahlung speichern"
+    },
     "messages": {
       "saved": "Kredit erfolgreich registriert",
       "updated": "Kredit erfolgreich aktualisiert",
       "deleted": "Kredit erfolgreich gelöscht",
-      "schedule_updated": "Zahlungsplan aktualisiert"
+      "schedule_updated": "Zahlungsplan aktualisiert",
+      "payment_saved": "Zahlung erfolgreich erfasst",
+      "payment_updated": "Zahlung erfolgreich aktualisiert",
+      "payment_deleted": "Zahlung erfolgreich gelöscht"
     }
   }
 }

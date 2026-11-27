@@ -1,6 +1,5 @@
 package com.example.money_saver_android.ui.components.loans
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,28 +10,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -45,28 +32,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
+import com.example.money_saver_android.domain.usecase.formatLoanShortDate
+import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.common.DatePickerField
 import com.example.money_saver_android.ui.components.incomes.CurrencyFormatVisualTransformation
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
-import com.example.money_saver_android.ui.theme.ErrorRed
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import com.example.money_saver_android.viewmodel.LoanCreationPaymentMode
 
 @Composable
 fun AddLoanDialog(
@@ -76,18 +63,27 @@ fun AddLoanDialog(
     note: String,
     selectedSavingCategory: String,
     savingsBalances: List<SavingsCategoryBalance>,
+    creationPaymentMode: LoanCreationPaymentMode = LoanCreationPaymentMode.NO_DATE,
+    singleDueDateInput: String = "",
+    todayIso: String = "",
     errorMessage: String?,
+    showDiscardConfirmation: Boolean = false,
     currency: Currency = defaultCurrencies.first(),
     onPersonNameChange: (String) -> Unit,
     onAmountLentChange: (String) -> Unit,
     onAmountToReceiveChange: (String) -> Unit,
     onNoteChange: (String) -> Unit,
     onSavingCategorySelected: (String) -> Unit,
+    onCreationPaymentModeSelected: (LoanCreationPaymentMode) -> Unit = {},
+    onSingleDueDateChange: (String) -> Unit = {},
     onSaveClick: () -> Unit,
     onCloseClick: () -> Unit,
+    onConfirmDiscardChanges: () -> Unit = onCloseClick,
+    onDismissDiscardChanges: () -> Unit = {},
     modifier: Modifier = Modifier,
     isEditing: Boolean = false
 ) {
+    val language = LocalI18nManager.current.currentLanguage
     var savingMenuExpanded by remember { mutableStateOf(false) }
     val selectedBalance = savingsBalances.find {
         it.categoryName.equals(selectedSavingCategory, ignoreCase = true)
@@ -100,201 +96,212 @@ fun AddLoanDialog(
         t("loans.add_dialog.saving_none")
     }
 
-    Dialog(
-        onDismissRequest = onCloseClick,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    LoanFormDialog(
+        title = if (isEditing) t("loans.edit_dialog.title") else t("loans.add_dialog.title"),
+        errorMessage = errorMessage,
+        confirmButtonText = if (isEditing) t("loans.edit_dialog.save_button") else t("loans.add_dialog.save_button"),
+        dialogTestTag = "card_add_loan_dialog",
+        closeButtonTestTag = "btn_close_loan_dialog",
+        errorTestTag = "text_loan_dialog_error",
+        confirmButtonTestTag = "btn_save_loan_dialog",
+        scrollTestTag = "scroll_add_loan_dialog",
+        onConfirmClick = onSaveClick,
+        onCloseClick = onCloseClick,
+        modifier = modifier
     ) {
-        val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
-        Card(
-            modifier = modifier
-                .fillMaxWidth(0.92f)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(vertical = 16.dp)
-                .heightIn(max = maxDialogHeight)
-                .testTag("card_add_loan_dialog"),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, BorderColor)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
+        LoanTextField(
+            label = t("loans.add_dialog.person_label"),
+            value = personName,
+            placeholder = t("loans.add_dialog.person_placeholder"),
+            onValueChange = onPersonNameChange,
+            testTag = "input_loan_person"
+        )
+
+        LoanAmountField(
+            label = t("loans.add_dialog.amount_lent_label"),
+            value = amountLent,
+            currency = currency,
+            onValueChange = onAmountLentChange,
+            testTag = "input_loan_amount_lent"
+        )
+
+        LoanAmountField(
+            label = t("loans.add_dialog.amount_to_receive_label"),
+            value = amountToReceive,
+            currency = currency,
+            onValueChange = onAmountToReceiveChange,
+            testTag = "input_loan_amount_to_receive"
+        )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = t("loans.add_dialog.saving_source_label"),
+                color = TextSecondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Box(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FieldBackground)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .clickable { savingMenuExpanded = true }
+                        .padding(horizontal = 16.dp)
+                        .testTag("selector_loan_saving_category"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (isEditing) t("loans.edit_dialog.title") else t("loans.add_dialog.title"),
-                        color = TextPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = savingDisplayValue,
+                        color = if (selectedSavingCategory.isNotBlank()) TextPrimary else TextSecondary,
+                        fontSize = 14.sp
                     )
-                    IconButton(
-                        onClick = onCloseClick,
-                        modifier = Modifier.size(28.dp).testTag("btn_close_loan_dialog")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(18.dp)
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = savingMenuExpanded,
+                    onDismissRequest = { savingMenuExpanded = false },
+                    modifier = Modifier.background(CardBackground)
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = t("loans.add_dialog.saving_none"),
+                                color = TextPrimary,
+                                fontSize = 14.sp
+                            )
+                        },
+                        onClick = {
+                            onSavingCategorySelected("")
+                            savingMenuExpanded = false
+                        },
+                        modifier = Modifier.testTag("loan_saving_option_none")
+                    )
+                    savingsBalances.filter { it.netBalance > 0.0 }.forEach { balance ->
+                        val formatted = CurrencyFormatter.format(balance.netBalance, currency)
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "${balance.categoryName} • $formatted",
+                                    color = TextPrimary,
+                                    fontSize = 14.sp
+                                )
+                            },
+                            onClick = {
+                                onSavingCategorySelected(balance.categoryName)
+                                savingMenuExpanded = false
+                            },
+                            modifier = Modifier.testTag("loan_saving_option_${balance.categoryName}")
                         )
                     }
                 }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .testTag("scroll_add_loan_dialog"),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-
-                LoanTextField(
-                    label = t("loans.add_dialog.person_label"),
-                    value = personName,
-                    placeholder = t("loans.add_dialog.person_placeholder"),
-                    onValueChange = onPersonNameChange,
-                    testTag = "input_loan_person"
-                )
-
-                LoanAmountField(
-                    label = t("loans.add_dialog.amount_lent_label"),
-                    value = amountLent,
-                    currency = currency,
-                    onValueChange = onAmountLentChange,
-                    testTag = "input_loan_amount_lent"
-                )
-
-                LoanAmountField(
-                    label = t("loans.add_dialog.amount_to_receive_label"),
-                    value = amountToReceive,
-                    currency = currency,
-                    onValueChange = onAmountToReceiveChange,
-                    testTag = "input_loan_amount_to_receive"
-                )
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = t("loans.add_dialog.saving_source_label"),
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(FieldBackground)
-                                .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                                .clickable { savingMenuExpanded = true }
-                                .padding(horizontal = 16.dp)
-                                .testTag("selector_loan_saving_category"),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = savingDisplayValue,
-                                color = if (selectedSavingCategory.isNotBlank()) TextPrimary else TextSecondary,
-                                fontSize = 14.sp
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = TextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = savingMenuExpanded,
-                            onDismissRequest = { savingMenuExpanded = false },
-                            modifier = Modifier.background(CardBackground)
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = t("loans.add_dialog.saving_none"),
-                                        color = TextPrimary,
-                                        fontSize = 14.sp
-                                    )
-                                },
-                                onClick = {
-                                    onSavingCategorySelected("")
-                                    savingMenuExpanded = false
-                                },
-                                modifier = Modifier.testTag("loan_saving_option_none")
-                            )
-                            savingsBalances.filter { it.netBalance > 0.0 }.forEach { balance ->
-                                val formatted = CurrencyFormatter.format(balance.netBalance, currency)
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "${balance.categoryName} • $formatted",
-                                            color = TextPrimary,
-                                            fontSize = 14.sp
-                                        )
-                                    },
-                                    onClick = {
-                                        onSavingCategorySelected(balance.categoryName)
-                                        savingMenuExpanded = false
-                                    },
-                                    modifier = Modifier.testTag("loan_saving_option_${balance.categoryName}")
-                                )
-                            }
-                        }
-                    }
-                }
-
-                LoanTextField(
-                    label = t("loans.add_dialog.note_label"),
-                    value = note,
-                    placeholder = t("loans.add_dialog.note_placeholder"),
-                    onValueChange = onNoteChange,
-                    testTag = "input_loan_note"
-                )
-
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage,
-                        color = ErrorRed,
-                        fontSize = 13.sp,
-                        modifier = Modifier.testTag("text_loan_dialog_error")
-                    )
-                }
-
-                Button(
-                    onClick = onSaveClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("btn_save_loan_dialog"),
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = if (isEditing) t("loans.edit_dialog.save_button") else t("loans.add_dialog.save_button"),
-                        color = Color.Black,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                }
             }
         }
+
+        LoanTextField(
+            label = t("loans.add_dialog.note_label"),
+            value = note,
+            placeholder = t("loans.add_dialog.note_placeholder"),
+            onValueChange = onNoteChange,
+            testTag = "input_loan_note"
+        )
+
+        if (!isEditing) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = t("loans.add_dialog.payment_plan_label"),
+                    color = TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                LoanCreationModeOption(
+                    label = t("loans.add_dialog.payment_mode_none"),
+                    selected = creationPaymentMode == LoanCreationPaymentMode.NO_DATE,
+                    onClick = { onCreationPaymentModeSelected(LoanCreationPaymentMode.NO_DATE) },
+                    testTag = "option_loan_payment_none"
+                )
+                LoanCreationModeOption(
+                    label = t("loans.add_dialog.payment_mode_single"),
+                    selected = creationPaymentMode == LoanCreationPaymentMode.SINGLE_DATE,
+                    onClick = { onCreationPaymentModeSelected(LoanCreationPaymentMode.SINGLE_DATE) },
+                    testTag = "option_loan_payment_single"
+                )
+                if (creationPaymentMode == LoanCreationPaymentMode.SINGLE_DATE) {
+                    DatePickerField(
+                        value = singleDueDateInput,
+                        onValueChange = onSingleDueDateChange,
+                        label = t("loans.add_dialog.single_due_date_label"),
+                        minDateIso = todayIso.takeIf { it.isNotBlank() },
+                        displayFormatter = { iso -> formatLoanShortDate(iso, language) },
+                        cancelText = t("loans.schedule.cancel_button"),
+                        fieldTestTag = "input_loan_single_due_date"
+                    )
+                }
+                LoanCreationModeOption(
+                    label = t("loans.add_dialog.payment_mode_installments"),
+                    selected = creationPaymentMode == LoanCreationPaymentMode.INSTALLMENTS,
+                    onClick = { onCreationPaymentModeSelected(LoanCreationPaymentMode.INSTALLMENTS) },
+                    testTag = "option_loan_payment_installments"
+                )
+            }
+        }
+    }
+
+    if (isEditing && showDiscardConfirmation) {
+        DiscardChangesDialog(
+            title = t("loans.edit_dialog.discard_dialog_title"),
+            message = t("loans.edit_dialog.discard_dialog_message"),
+            cancelText = t("loans.schedule.discard_cancel"),
+            confirmText = t("loans.schedule.discard_confirm"),
+            dialogTestTag = "dialog_discard_edit_loan",
+            cancelButtonTestTag = "btn_cancel_discard_edit_loan",
+            confirmButtonTestTag = "btn_confirm_discard_edit_loan",
+            onConfirmDiscard = onConfirmDiscardChanges,
+            onDismiss = onDismissDiscardChanges
+        )
+    }
+}
+
+@Composable
+private fun LoanCreationModeOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) GreenAccent.copy(alpha = 0.14f) else FieldBackground)
+            .border(
+                width = 1.dp,
+                color = if (selected) GreenAccent else BorderColor,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .testTag(testTag)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) GreenAccent else TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 

@@ -254,6 +254,12 @@ class ExpenseUseCase(
                 it.amount.isFinite() && it.amount > 0.0 &&
                     it.category.trim().equals(trimmedSavingCategory, ignoreCase = true)
             }
+            val matchingLoanRepaymentCategory = allLoans
+                .flatMap { it.payments }
+                .firstOrNull {
+                    it.amount.isFinite() && it.amount > 0.0 &&
+                        it.savingCategory.trim().equals(trimmedSavingCategory, ignoreCase = true)
+                }?.savingCategory?.trim()
             val available = calculateCategoryAvailableSavings(
                 categoryName = trimmedSavingCategory,
                 savings = allSavings,
@@ -261,11 +267,11 @@ class ExpenseUseCase(
                 loans = allLoans,
                 excludeExpenseId = id.takeIf { it > 0L }
             )
-            if (matchingSavings.isEmpty() || BigDecimal.valueOf(amount) > available) {
+            val canonicalSavingCategory = matchingSavings.firstOrNull()?.category?.trim()
+                ?: matchingLoanRepaymentCategory
+            if (canonicalSavingCategory == null || BigDecimal.valueOf(amount) > available) {
                 return@withLock ExpenseResult.Error("Saldo insuficiente en la categoría de ahorro")
             }
-
-            val canonicalSavingCategory = matchingSavings.first().category.trim()
             onValid(
                 Expense(
                     id = id,

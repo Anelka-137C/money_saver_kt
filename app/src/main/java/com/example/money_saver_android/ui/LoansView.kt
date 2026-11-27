@@ -49,11 +49,14 @@ import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.i18n.I18nManager
 import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
+import com.example.money_saver_android.ui.components.atom.DeleteRecordConfirmationDialog
 import com.example.money_saver_android.ui.components.loans.AddLoanDialog
 import com.example.money_saver_android.ui.components.loans.DeleteLoanConfirmationDialog
 import com.example.money_saver_android.ui.components.loans.LoanCardItem
+import com.example.money_saver_android.ui.components.loans.LoanPaymentHistorySheet
 import com.example.money_saver_android.ui.components.loans.LoanScheduleDialog
 import com.example.money_saver_android.ui.components.loans.LoansSummaryCard
+import com.example.money_saver_android.ui.components.loans.RecordLoanPaymentDialog
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.DarkBackground
@@ -190,6 +193,8 @@ fun LoansView(
                         currency = currency,
                         todayIso = state.todayIso,
                         onManageInstallmentsClick = { loansViewModel.openScheduleDialog(loan) },
+                        onPaymentHistoryClick = { loansViewModel.openPaymentHistory(loan) },
+                        onRegisterPaymentClick = { loansViewModel.openPaymentDialog(loan) },
                         onEditClick = {
                             loansViewModel.startEditingLoan(loan)
                             showAddDialog = true
@@ -237,21 +242,36 @@ fun LoansView(
             note = state.noteInput,
             selectedSavingCategory = state.selectedSavingCategory,
             savingsBalances = if (isEditing) state.editSavingsBalances else state.savingsBalances,
+            creationPaymentMode = state.creationPaymentMode,
+            singleDueDateInput = state.creationSingleDueDateInput,
+            todayIso = state.todayIso,
             errorMessage = state.errorMessage,
+            showDiscardConfirmation = isEditing && state.showDiscardEditLoanDialog,
             currency = currency,
             onPersonNameChange = loansViewModel::onPersonNameChange,
             onAmountLentChange = loansViewModel::onAmountLentChange,
             onAmountToReceiveChange = loansViewModel::onAmountToReceiveChange,
             onNoteChange = loansViewModel::onNoteChange,
             onSavingCategorySelected = loansViewModel::onSavingCategorySelected,
+            onCreationPaymentModeSelected = loansViewModel::onCreationPaymentModeSelected,
+            onSingleDueDateChange = loansViewModel::onCreationSingleDueDateChange,
             onSaveClick = {
                 hideKeyboard(context, view, keyboardController, focusManager)
                 loansViewModel.saveLoan()
             },
             onCloseClick = {
+                if (isEditing) {
+                    loansViewModel.requestCloseEditLoanDialog()
+                } else {
+                    loansViewModel.resetForm()
+                    showAddDialog = false
+                }
+            },
+            onConfirmDiscardChanges = {
                 loansViewModel.resetForm()
                 showAddDialog = false
             },
+            onDismissDiscardChanges = loansViewModel::dismissDiscardEditLoanDialog,
             isEditing = isEditing
         )
     }
@@ -269,10 +289,12 @@ fun LoansView(
         LoanScheduleDialog(
             loan = editingLoan,
             installments = state.scheduleInstallments,
+            editingDraftId = state.editingScheduleInstallmentDraftId,
             dateInput = state.scheduleDateInput,
             amountInput = state.scheduleAmountInput,
             todayIso = state.todayIso,
             errorMessage = state.scheduleErrorMessage,
+            showDiscardConfirmation = state.showDiscardScheduleChangesDialog,
             currency = currency,
             onDateChange = loansViewModel::onScheduleDateChange,
             onAmountChange = loansViewModel::onScheduleAmountChange,
@@ -280,12 +302,87 @@ fun LoansView(
                 hideKeyboard(context, view, keyboardController, focusManager)
                 loansViewModel.addScheduleInstallment()
             },
+            onEditInstallment = loansViewModel::startEditingScheduleInstallment,
+            onCancelEditInstallment = loansViewModel::cancelEditingScheduleInstallment,
             onRemoveInstallment = loansViewModel::removeScheduleInstallment,
             onSaveClick = {
                 hideKeyboard(context, view, keyboardController, focusManager)
                 loansViewModel.saveLoanSchedule()
             },
-            onCloseClick = loansViewModel::closeScheduleDialog
+            onCloseClick = loansViewModel::requestCloseScheduleDialog,
+            onConfirmDiscardChanges = loansViewModel::closeScheduleDialog,
+            onDismissDiscardChanges = loansViewModel::dismissDiscardScheduleChangesDialog
+        )
+    }
+
+    state.payingLoan?.let { payingLoan ->
+        RecordLoanPaymentDialog(
+            loan = payingLoan,
+            amountInput = state.paymentAmountInput,
+            dateTimeInput = state.paymentDateTimeInput,
+            selectedSavingCategory = state.paymentSavingCategoryInput,
+            savingCategories = state.savingCategories,
+            savingsBalances = state.savingsBalances,
+            selectedTargetInstallmentId = state.paymentTargetInstallmentId,
+            defineNewDateOnNoSchedule = state.paymentDefineNewDateOnNoSchedule,
+            newDueDateInput = state.paymentNewDueDateInput,
+            partialScheduleAction = state.partialScheduleAction,
+            extraInstallmentDateInput = state.paymentExtraInstallmentDateInput,
+            extraInstallmentAmountInput = state.paymentExtraInstallmentAmountInput,
+            adjustedNextAmountInput = state.paymentAdjustedNextAmountInput,
+            adjustedRemainderDateInput = state.paymentAdjustedRemainderDateInput,
+            todayIso = state.todayIso,
+            errorMessage = state.paymentErrorMessage,
+            currency = currency,
+            onAmountChange = loansViewModel::onPaymentAmountChange,
+            onFullAmountClick = loansViewModel::onPaymentFullAmountClick,
+            onDateTimeChange = loansViewModel::onPaymentDateTimeChange,
+            onSavingCategorySelected = loansViewModel::onPaymentSavingCategorySelected,
+            onTargetInstallmentSelected = loansViewModel::onPaymentTargetInstallmentSelected,
+            onDefineNewDateToggle = loansViewModel::onPaymentDefineNewDateToggle,
+            onNewDueDateChange = loansViewModel::onPaymentNewDueDateChange,
+            onPartialScheduleActionSelected = loansViewModel::onPartialScheduleActionSelected,
+            onExtraInstallmentDateChange = loansViewModel::onPaymentExtraInstallmentDateChange,
+            onExtraInstallmentAmountChange = loansViewModel::onPaymentExtraInstallmentAmountChange,
+            onAdjustedNextAmountChange = loansViewModel::onPaymentAdjustedNextAmountChange,
+            onAdjustedRemainderDateChange = loansViewModel::onPaymentAdjustedRemainderDateChange,
+            onSaveClick = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                loansViewModel.saveLoanPayment()
+            },
+            onCloseClick = loansViewModel::closePaymentDialog,
+            isEditing = state.editingPaymentId != null
+        )
+    }
+
+    val historyLoan = state.historyLoanId?.let { id -> state.loans.find { it.id == id } }
+    if (historyLoan != null) {
+        LoanPaymentHistorySheet(
+            loan = historyLoan,
+            currency = currency,
+            todayIso = state.todayIso,
+            onEditPaymentClick = { payment ->
+                loansViewModel.closePaymentHistory()
+                loansViewModel.openEditPaymentDialog(historyLoan, payment)
+            },
+            onDeletePaymentClick = { payment ->
+                loansViewModel.requestDeleteLoanPayment(historyLoan, payment)
+            },
+            onRegisterNewPaymentClick = {
+                loansViewModel.closePaymentHistory()
+                loansViewModel.openPaymentDialog(historyLoan)
+            },
+            onDismiss = loansViewModel::closePaymentHistory
+        )
+    }
+
+    if (state.paymentToDelete != null) {
+        DeleteRecordConfirmationDialog(
+            onConfirm = loansViewModel::confirmDeleteLoanPayment,
+            onDismiss = loansViewModel::dismissDeleteLoanPayment,
+            dialogTestTag = "dialog_delete_loan_payment",
+            confirmButtonTestTag = "btn_confirm_delete_loan_payment",
+            cancelButtonTestTag = "btn_cancel_delete_loan_payment"
         )
     }
 }

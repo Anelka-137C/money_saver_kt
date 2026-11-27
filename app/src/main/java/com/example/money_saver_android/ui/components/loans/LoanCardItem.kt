@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -28,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,6 +57,7 @@ import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.ErrorRed
 import com.example.money_saver_android.ui.theme.FieldBackground
+import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
@@ -78,17 +82,19 @@ fun LoanCardItem(
     modifier: Modifier = Modifier,
     todayIso: String = "",
     onManageInstallmentsClick: () -> Unit = {},
+    onPaymentHistoryClick: () -> Unit = {},
+    onRegisterPaymentClick: () -> Unit = {},
     onEditClick: () -> Unit = {},
     onDeleteClick: () -> Unit = {}
 ) {
-    val avatarColor = LoanAvatarColors[(loan.personName.trim().lowercase().hashCode().absoluteValue) % LoanAvatarColors.size]
+    val avatarColor = loanAvatarColor(loan.personName)
     val subtitle = loan.note.trim().ifEmpty {
         loan.savingCategory.trim().ifEmpty { t("loans.card.personal_loan") }
     }
     val effectiveTodayIso = todayIso.ifBlank {
         SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
     }
-    val badgeInfo = calculateLoanDueBadgeInfo(loan.installments, effectiveTodayIso)
+    val badgeInfo = if (loan.isSettled) null else calculateLoanDueBadgeInfo(loan.installments, effectiveTodayIso)
     val language = LocalI18nManager.current.currentLanguage
 
     Card(
@@ -167,20 +173,37 @@ fun LoanCardItem(
                             .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                     ) {
                         DropdownMenuItem(
-                            text = { Text(t("loans.options.manage_installments"), color = TextPrimary) },
+                            text = { Text(t("loans.options.payment_history"), color = TextPrimary) },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Default.DateRange,
+                                    imageVector = Icons.AutoMirrored.Filled.List,
                                     contentDescription = null,
                                     tint = TextSecondary
                                 )
                             },
                             onClick = {
                                 menuExpanded = false
-                                onManageInstallmentsClick()
+                                onPaymentHistoryClick()
                             },
-                            modifier = Modifier.testTag("btn_installments_loan_${loan.id}")
+                            modifier = Modifier.testTag("btn_payment_history_loan_${loan.id}")
                         )
+                        if (!loan.isSettled) {
+                            DropdownMenuItem(
+                                text = { Text(t("loans.options.manage_installments"), color = TextPrimary) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        tint = TextSecondary
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onManageInstallmentsClick()
+                                },
+                                modifier = Modifier.testTag("btn_installments_loan_${loan.id}")
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(t("loans.options.edit"), color = TextPrimary) },
                             leadingIcon = {
@@ -215,7 +238,31 @@ fun LoanCardItem(
                 }
             }
 
-            if (badgeInfo != null) {
+            if (loan.isSettled) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(GreenAccent.copy(alpha = 0.16f))
+                        .border(1.dp, GreenAccent.copy(alpha = 0.45f), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .testTag("loan_settled_badge_${loan.id}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = GreenAccent,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = t("loans.card.settled_badge"),
+                        color = GreenAccent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else if (badgeInfo != null) {
                 val formattedDate = formatLoanShortDate(badgeInfo.nextDueDate, language)
                 val dueTemplate = t("loans.card.due_prefix")
                 val baseBadge = runCatching {
@@ -265,7 +312,6 @@ fun LoanCardItem(
                 }
             }
 
-            // Progress bar (0% for #15 before payments exist)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -276,9 +322,9 @@ fun LoanCardItem(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0f)
+                        .fillMaxWidth(loan.progressFraction)
                         .fillMaxHeight()
-                        .background(avatarColor)
+                        .background(if (loan.isSettled) GreenAccent else avatarColor)
                 )
             }
 
@@ -298,30 +344,52 @@ fun LoanCardItem(
                 MetricDivider()
                 LoanMetricColumn(
                     label = t("loans.card.paid"),
-                    value = CurrencyFormatter.format(0.0, currency),
+                    value = CurrencyFormatter.format(loan.paidAmount, currency),
                     labelColor = TextSecondary,
-                    valueColor = TextPrimary,
+                    valueColor = if (loan.paidAmount > 0.0) GreenAccent else TextPrimary,
+                    valueTestTag = "loan_paid_amount_${loan.id}",
                     modifier = Modifier.weight(1f)
                 )
                 MetricDivider()
                 LoanMetricColumn(
                     label = t("loans.card.pending"),
-                    value = CurrencyFormatter.format(loan.amountToReceive, currency),
+                    value = CurrencyFormatter.format(loan.pendingAmount, currency),
                     labelColor = LoanPendingPurple,
                     valueColor = LoanPendingPurple,
+                    valueTestTag = "loan_pending_amount_${loan.id}",
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            if (!loan.isSettled) {
+                OutlinedButton(
+                    onClick = onRegisterPaymentClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .testTag("btn_register_payment_${loan.id}"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, GreenAccent.copy(alpha = 0.7f))
+                ) {
+                    Text(
+                        text = t("loans.actions.register_payment"),
+                        color = GreenAccent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LoanMetricColumn(
+internal fun LoanMetricColumn(
     label: String,
     value: String,
     labelColor: Color,
     valueColor: Color,
+    valueTestTag: String? = null,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.padding(horizontal = 4.dp)) {
@@ -339,13 +407,14 @@ private fun LoanMetricColumn(
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = if (valueTestTag != null) Modifier.testTag(valueTestTag) else Modifier
         )
     }
 }
 
 @Composable
-private fun MetricDivider() {
+internal fun MetricDivider() {
     Box(
         modifier = Modifier
             .padding(horizontal = 6.dp)
@@ -354,6 +423,9 @@ private fun MetricDivider() {
             .background(BorderColor)
     )
 }
+
+internal fun loanAvatarColor(personName: String): Color =
+    LoanAvatarColors[(personName.trim().lowercase().hashCode().absoluteValue) % LoanAvatarColors.size]
 
 internal fun buildPersonInitials(personName: String): String {
     val parts = personName.trim { it.isWhitespace() }.split(Regex("\\s+")).filter { it.isNotEmpty() }
