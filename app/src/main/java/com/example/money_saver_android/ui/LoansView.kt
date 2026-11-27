@@ -22,16 +22,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +59,7 @@ import com.example.money_saver_android.ui.components.loans.RecordLoanPaymentDial
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
 import com.example.money_saver_android.ui.theme.DarkBackground
+import com.example.money_saver_android.ui.theme.ErrorRed
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
@@ -79,14 +79,9 @@ fun LoansView(
     val focusManager = LocalFocusManager.current
     val activeI18n = i18nManager ?: LocalI18nManager.current
 
-    var showAddDialog by rememberSaveable { mutableStateOf(false) }
-
     LaunchedEffect(state.toastMessage) {
         state.toastMessage?.let { messageKey ->
             Toast.makeText(context, activeI18n.t(messageKey), Toast.LENGTH_SHORT).show()
-            if (messageKey == LoansViewModel.MSG_LOAN_SAVED || messageKey == LoansViewModel.MSG_LOAN_UPDATED) {
-                showAddDialog = false
-            }
             loansViewModel.clearToastMessage()
         }
     }
@@ -116,8 +111,7 @@ fun LoansView(
                     .clip(CircleShape)
                     .background(GreenAccent)
                     .clickable {
-                        loansViewModel.resetForm()
-                        showAddDialog = true
+                        loansViewModel.openCreateLoanDialog()
                     }
                     .testTag("btn_add_loan_top"),
                 contentAlignment = Alignment.Center
@@ -136,6 +130,44 @@ fun LoansView(
             totalPaid = state.totalPaid,
             currency = currency
         )
+
+        val mainScreenError = state.errorMessage?.takeIf {
+            !state.showLoanFormDialog && state.historyLoanId == null
+        }
+        if (!mainScreenError.isNullOrBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ErrorRed.copy(alpha = 0.14f))
+                    .border(1.dp, ErrorRed.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .testTag("banner_loans_error"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = mainScreenError,
+                    color = ErrorRed,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = loansViewModel::clearErrorMessage,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .testTag("btn_dismiss_loans_error")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = ErrorRed,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -197,7 +229,6 @@ fun LoansView(
                         onRegisterPaymentClick = { loansViewModel.openPaymentDialog(loan) },
                         onEditClick = {
                             loansViewModel.startEditingLoan(loan)
-                            showAddDialog = true
                         },
                         onDeleteClick = { loansViewModel.requestDeleteLoan(loan) }
                     )
@@ -207,8 +238,7 @@ fun LoansView(
 
         OutlinedButton(
             onClick = {
-                loansViewModel.resetForm()
-                showAddDialog = true
+                loansViewModel.openCreateLoanDialog()
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -233,7 +263,7 @@ fun LoansView(
         }
     }
 
-    if (showAddDialog) {
+    if (state.showLoanFormDialog) {
         val isEditing = state.editingLoanId != null
         AddLoanDialog(
             personName = state.personNameInput,
@@ -264,12 +294,10 @@ fun LoansView(
                     loansViewModel.requestCloseEditLoanDialog()
                 } else {
                     loansViewModel.resetForm()
-                    showAddDialog = false
                 }
             },
             onConfirmDiscardChanges = {
                 loansViewModel.resetForm()
-                showAddDialog = false
             },
             onDismissDiscardChanges = loansViewModel::dismissDiscardEditLoanDialog,
             isEditing = isEditing
@@ -361,6 +389,7 @@ fun LoansView(
             loan = historyLoan,
             currency = currency,
             todayIso = state.todayIso,
+            errorMessage = state.paymentErrorMessage,
             onEditPaymentClick = { payment ->
                 loansViewModel.closePaymentHistory()
                 loansViewModel.openEditPaymentDialog(historyLoan, payment)

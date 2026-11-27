@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 sealed class LoanResult {
     object Success : LoanResult()
@@ -57,7 +58,10 @@ fun parseLoanAmount(rawInput: String): Double? = parseAmountInput(rawInput)
 internal fun isValidLoanIsoDate(dateStr: String): Boolean {
     val trimmed = dateStr.trim { it.isWhitespace() }
     if (!ISO_DATE_REGEX.matches(trimmed)) return false
-    val parser = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }
+    val parser = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+        isLenient = false
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
     val pos = ParsePosition(0)
     val parsed = parser.parse(trimmed, pos)
     return parsed != null && pos.index == trimmed.length && pos.errorIndex == -1
@@ -71,7 +75,10 @@ internal fun isValidLoanPaymentDateTime(dateTimeStr: String): Boolean {
         else -> return false
     }
     return try {
-        val parser = SimpleDateFormat(pattern, Locale.ROOT).apply { isLenient = false }
+        val parser = SimpleDateFormat(pattern, Locale.ROOT).apply {
+            isLenient = false
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
         val pos = ParsePosition(0)
         val parsed = parser.parse(trimmed, pos)
         parsed != null && pos.index == trimmed.length && pos.errorIndex == -1
@@ -113,14 +120,15 @@ fun previewLoanInstallmentsAfterPayment(
     val unpaid = sortedAll.filter { !it.isPaid }
     if (unpaid.isEmpty()) return sortedAll
 
-    val target = targetInstallmentId?.let { id -> unpaid.find { it.id == id } } ?: unpaid.first()
+    val targetIndex = targetInstallmentId?.let { id -> unpaid.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
     var remainingToApply = BigDecimal.valueOf(paymentAmount)
-    val orderedToApply = listOf(target) + unpaid.filterNot { it === target }
-    val updatedByIdentity = mutableMapOf<LoanInstallment, LoanInstallment>()
+    val orderedIndices = listOf(targetIndex) + unpaid.indices.filterNot { it == targetIndex }
+    val updatedByIndex = arrayOfNulls<LoanInstallment>(unpaid.size)
 
-    for (inst in orderedToApply) {
+    for (idx in orderedIndices) {
+        val inst = unpaid[idx]
         if (remainingToApply <= BigDecimal.ZERO) {
-            updatedByIdentity[inst] = inst
+            updatedByIndex[idx] = inst
             continue
         }
         val instRemaining = BigDecimal.valueOf(inst.remainingAmount)
@@ -131,10 +139,10 @@ fun previewLoanInstallmentsAfterPayment(
         } else {
             BigDecimal.ZERO
         }
-        updatedByIdentity[inst] = inst.copy(paymentAmount = existingPaid.add(applied).toDouble())
+        updatedByIndex[idx] = inst.copy(paymentAmount = existingPaid.add(applied).toDouble())
     }
 
-    return (paidOnes + unpaid.map { updatedByIdentity[it] ?: it })
+    return (paidOnes + updatedByIndex.filterNotNull())
         .sortedWith(compareBy<LoanInstallment> { it.dueDate.trim { ch -> ch.isWhitespace() } }.thenBy { it.id })
 }
 
@@ -152,13 +160,17 @@ fun formatLoanShortDate(isoDate: String, languageTag: String): String {
     val trimmed = isoDate.trim { it.isWhitespace() }
     if (!isValidLoanIsoDate(trimmed)) return trimmed
     return try {
-        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }
+        val utc = TimeZone.getTimeZone("UTC")
+        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+            isLenient = false
+            timeZone = utc
+        }
         val parsed = parser.parse(trimmed) ?: return trimmed
-        val cal = Calendar.getInstance().apply { time = parsed }
+        val cal = Calendar.getInstance(utc).apply { time = parsed }
         val day = cal.get(Calendar.DAY_OF_MONTH)
         val year = cal.get(Calendar.YEAR)
         val locale = Locale.forLanguageTag(languageTag)
-        val monthLabel = SimpleDateFormat("MMM", locale).format(parsed)
+        val monthLabel = SimpleDateFormat("MMM", locale).apply { timeZone = utc }.format(parsed)
             .replace(".", "")
             .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
         "$day $monthLabel $year"
@@ -170,7 +182,7 @@ fun formatLoanShortDate(isoDate: String, languageTag: String): String {
 fun formatLoanPaymentDateTime(paidAt: String, languageTag: String): String {
     val trimmed = paidAt.trim { it.isWhitespace() }
     if (trimmed.isEmpty()) return trimmed
-    val parts = trimmed.split(" ")
+    val parts = trimmed.split(Regex("\\s+"))
     val formattedDate = formatLoanShortDate(parts[0], languageTag)
     return if (parts.size >= 2 && parts[1].isNotBlank()) {
         "$formattedDate ${parts[1]}"
@@ -464,11 +476,62 @@ class LoanUseCase(
             .map { it.copy(paymentAmount = 0.0) }
             .sortedWith(compareBy<LoanInstallment> { it.dueDate.trim { ch -> ch.isWhitespace() } }.thenBy { it.id })
         if (baseInstallments.isEmpty()) return emptyList()
+
         val remainingPayments = loan.payments
             .filterNot { it.id == excludedPaymentId }
             .sortedWith(compareBy<LoanPayment> { it.paidAt }.thenBy { it.id })
-        var runningLoan = loan.copy(installments = baseInstallments, payments = emptyList())
+
+        val amountToReceiveDec = if (loan.amountToReceive.isFinite() && loan.amountToReceive > 0.0) {
+            BigDecimal.valueOf(loan.amountToReceive)
+        } else {
+            BigDecimal.ZERO
+        }
+        val baseExpectedSum = baseInstallments
+            .filter { it.expectedAmount.isFinite() && it.expectedAmount > 0.0 }
+            .map { it.expectedAmount }
+            .sumBigDecimal()
+        var preScheduleDeficit = amountToReceiveDec.subtract(baseExpectedSum).max(BigDecimal.ZERO)
+
+        val baseIds = baseInstallments.map { it.id }.filter { it > 0L }.toSet()
+        val paymentsToReplay = mutableListOf<LoanPayment>()
         for (payment in remainingPayments) {
+            if (!payment.amount.isFinite() || payment.amount <= 0.0) continue
+            val isLinkedToBase = payment.installmentId != null && payment.installmentId in baseIds
+            if (!isLinkedToBase && preScheduleDeficit > BigDecimal.ZERO) {
+                val payDec = BigDecimal.valueOf(payment.amount)
+                if (payDec <= preScheduleDeficit) {
+                    preScheduleDeficit = preScheduleDeficit.subtract(payDec)
+                    continue
+                } else {
+                    val residual = payDec.subtract(preScheduleDeficit)
+                    preScheduleDeficit = BigDecimal.ZERO
+                    paymentsToReplay.add(payment.copy(amount = residual.toDouble()))
+                    continue
+                }
+            }
+            paymentsToReplay.add(payment)
+        }
+
+        val reconciledBase = if (preScheduleDeficit > BigDecimal.ZERO) {
+            val lastIdx = baseInstallments.lastIndex
+            baseInstallments.mapIndexed { idx, inst ->
+                if (idx == lastIdx) {
+                    val baseExp = if (inst.expectedAmount.isFinite() && inst.expectedAmount > 0.0) {
+                        BigDecimal.valueOf(inst.expectedAmount)
+                    } else {
+                        BigDecimal.ZERO
+                    }
+                    inst.copy(expectedAmount = baseExp.add(preScheduleDeficit).toDouble())
+                } else {
+                    inst
+                }
+            }
+        } else {
+            baseInstallments
+        }
+
+        var runningLoan = loan.copy(installments = reconciledBase, payments = emptyList())
+        for (payment in paymentsToReplay) {
             if (!payment.amount.isFinite() || payment.amount <= 0.0) continue
             val nextInstallments = previewLoanInstallmentsAfterPayment(
                 loan = runningLoan,
@@ -689,6 +752,20 @@ class LoanUseCase(
                 if (extraDec > remainingAfter) {
                     return emptyList<LoanInstallment>() to "El monto de la nueva cuota supera el saldo pendiente"
                 }
+                if (unpaidAfter.isEmpty()) {
+                    if (extraDec.compareTo(remainingAfter) != 0) {
+                        return emptyList<LoanInstallment>() to
+                            "La suma de los montos esperados debe ser exactamente igual al monto pendiente"
+                    }
+                    val added = LoanInstallment(
+                        loanId = loan.id,
+                        dueDate = trimmedDate,
+                        expectedAmount = extraDec.toDouble(),
+                        paymentAmount = 0.0
+                    )
+                    return (settledOnes + added)
+                        .sortedWith(compareBy<LoanInstallment> { it.dueDate.trim { ch -> ch.isWhitespace() } }.thenBy { it.id }) to null
+                }
 
                 var toDeduct = extraDec
                 val adjustedUnpaid = mutableListOf<LoanInstallment>()
@@ -707,6 +784,10 @@ class LoanUseCase(
                         toDeduct = BigDecimal.ZERO
                         adjustedUnpaid.add(inst.copy(expectedAmount = paidDec.add(newRem).toDouble()))
                     }
+                }
+                if (toDeduct > BigDecimal.ZERO) {
+                    return emptyList<LoanInstallment>() to
+                        "No hay suficiente saldo programado en cuotas pendientes para redistribuir"
                 }
                 val added = LoanInstallment(
                     loanId = loan.id,
@@ -810,27 +891,29 @@ class LoanUseCase(
         loanId: Long,
         installmentInputs: List<LoanInstallmentInput>
     ): LoanResult {
-        val existingLoan = loanRepository.getAllLoans().first().find { it.id == loanId }
-            ?: return LoanResult.Error("Préstamo no encontrado")
+        return loanMutex.withLock {
+            val existingLoan = loanRepository.getAllLoans().first().find { it.id == loanId }
+                ?: return@withLock LoanResult.Error("Préstamo no encontrado")
 
-        val existingById = existingLoan.installments
-            .filter { it.id > 0L }
-            .associateBy { it.id }
+            val existingById = existingLoan.installments
+                .filter { it.id > 0L }
+                .associateBy { it.id }
 
-        val (validatedInstallments, scheduleError) = validateScheduleForLoan(
-            inputs = installmentInputs,
-            expectedTargetAmount = existingLoan.pendingAmount,
-            existingById = existingById
-        )
-        if (scheduleError != null) {
-            return LoanResult.Error(scheduleError)
+            val (validatedInstallments, scheduleError) = validateScheduleForLoan(
+                inputs = installmentInputs,
+                expectedTargetAmount = existingLoan.pendingAmount,
+                existingById = existingById
+            )
+            if (scheduleError != null) {
+                return@withLock LoanResult.Error(scheduleError)
+            }
+
+            loanRepository.replaceInstallments(
+                loanId = loanId,
+                installments = validatedInstallments.map { it.copy(loanId = loanId) }
+            )
+            LoanResult.Success
         }
-
-        loanRepository.replaceInstallments(
-            loanId = loanId,
-            installments = validatedInstallments.map { it.copy(loanId = loanId) }
-        )
-        return LoanResult.Success
     }
 
     suspend fun updateLoan(
@@ -867,12 +950,20 @@ class LoanUseCase(
             val existingLoan = allLoans.find { it.id == loanId }
                 ?: return@withLock LoanResult.Error("Préstamo no encontrado")
 
+            val existingPaidDec = existingLoan.payments
+                .filter { it.amount.isFinite() && it.amount > 0.0 }
+                .map { it.amount }
+                .sumBigDecimal()
+            if (BigDecimal.valueOf(amountToReceive) < existingPaidDec) {
+                return@withLock LoanResult.Error("El monto a recibir no puede ser menor al monto ya pagado")
+            }
+
             val existingById = existingLoan.installments
                 .filter { it.id > 0L }
                 .associateBy { it.id }
 
             val pendingTarget = BigDecimal.valueOf(amountToReceive)
-                .subtract(BigDecimal.valueOf(existingLoan.paidAmount))
+                .subtract(existingPaidDec)
                 .max(BigDecimal.ZERO)
                 .toDouble()
 
@@ -935,10 +1026,33 @@ class LoanUseCase(
 
     suspend fun deleteLoan(loanId: Long): LoanResult {
         return loanMutex.withLock {
-            val exists = loanRepository.getAllLoans().first().any { it.id == loanId }
-            if (!exists) {
-                return@withLock LoanResult.Error("Préstamo no encontrado")
+            val allLoans = loanRepository.getAllLoans().first()
+            val existingLoan = allLoans.find { it.id == loanId }
+                ?: return@withLock LoanResult.Error("Préstamo no encontrado")
+
+            val savingsRepo = savingsRepository
+            if (savingsRepo != null && existingLoan.payments.isNotEmpty()) {
+                val affectedCategories = existingLoan.payments
+                    .filter { it.amount.isFinite() && it.amount > 0.0 }
+                    .map { it.savingCategory.trim { ch -> ch.isWhitespace() } }
+                    .filter { it.isNotEmpty() }
+                    .distinctBy { it.lowercase(Locale.ROOT) }
+                if (affectedCategories.isNotEmpty()) {
+                    val allSavings = savingsRepo.getAllSavings().first()
+                    val allExpenses = expenseRepository?.getAllExpenses()?.first() ?: emptyList()
+                    val remainingLoans = allLoans.filterNot { it.id == loanId }
+                    for (category in affectedCategories) {
+                        val outflowsAfter = calculateCategorySavingsOutflows(category, allExpenses, remainingLoans)
+                        val inflowsAfter = calculateCategorySavingsInflows(category, allSavings, remainingLoans)
+                        if (outflowsAfter > inflowsAfter) {
+                            return@withLock LoanResult.Error(
+                                "No se puede eliminar el préstamo porque sus pagos acreditados respaldan gastos o préstamos registrados"
+                            )
+                        }
+                    }
+                }
             }
+
             loanRepository.deleteLoan(loanId)
             LoanResult.Success
         }
@@ -949,15 +1063,41 @@ class LoanUseCase(
         expectedTargetAmount: Double,
         existingById: Map<Long, LoanInstallment>
     ): Pair<List<LoanInstallment>, String?> {
-        if (inputs.isEmpty()) return emptyList<LoanInstallment>() to null
+        val paidExistingIds = existingById.values
+            .filter { it.paymentAmount.isFinite() && it.paymentAmount > 0.0 }
+            .map { it.id }
+            .toSet()
+
+        if (inputs.isEmpty()) {
+            return if (paidExistingIds.isEmpty()) {
+                emptyList<LoanInstallment>() to null
+            } else {
+                emptyList<LoanInstallment>() to "No se pueden eliminar cuotas que ya tienen pagos registrados"
+            }
+        }
 
         val today = todayIso()
         val parsed = mutableListOf<LoanInstallment>()
+        val seenPersistedIds = mutableSetOf<Long>()
         for (input in inputs) {
-            val existing = existingById[input.persistedId]
+            if (input.persistedId < 0L) {
+                return emptyList<LoanInstallment>() to "La cuota seleccionada no existe"
+            }
+            val existing = if (input.persistedId > 0L) {
+                if (!seenPersistedIds.add(input.persistedId)) {
+                    return emptyList<LoanInstallment>() to "No se pueden duplicar cuotas existentes"
+                }
+                existingById[input.persistedId]
+                    ?: return emptyList<LoanInstallment>() to "La cuota seleccionada no existe"
+            } else {
+                if (!input.paymentAmount.isFinite() || input.paymentAmount != 0.0) {
+                    return emptyList<LoanInstallment>() to "No se puede asignar un monto pagado a una cuota nueva"
+                }
+                null
+            }
             val allowPast = existing != null &&
                 existing.dueDate.trim { it.isWhitespace() } == input.dueDate.trim { it.isWhitespace() }
-            val resolvedPaymentAmount = existing?.paymentAmount ?: input.paymentAmount
+            val resolvedPaymentAmount = existing?.paymentAmount ?: 0.0
             val (item, error) = parseAndValidateInstallment(
                 input = input.copy(paymentAmount = resolvedPaymentAmount),
                 today = today,
@@ -967,6 +1107,10 @@ class LoanUseCase(
                 return emptyList<LoanInstallment>() to (error ?: "Datos de cuota inválidos")
             }
             parsed.add(item)
+        }
+
+        if (!paidExistingIds.all { it in seenPersistedIds }) {
+            return emptyList<LoanInstallment>() to "No se pueden eliminar cuotas que ya tienen pagos registrados"
         }
 
         val totalRemainingScheduled = parsed.map { it.remainingAmount }.sumBigDecimal()
@@ -988,7 +1132,7 @@ class LoanUseCase(
         if (!isValidLoanIsoDate(trimmedDate)) {
             return null to "La fecha de la cuota no es válida"
         }
-        if (!allowPersistedPastDate && isValidLoanIsoDate(today) && trimmedDate < today) {
+        if (!allowPersistedPastDate && (!isValidLoanIsoDate(today) || trimmedDate < today)) {
             return null to "No se pueden programar cuotas con fecha anterior a hoy"
         }
         val expectedAmount = parseAmountInput(input.expectedAmountInput)

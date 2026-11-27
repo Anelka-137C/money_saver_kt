@@ -17,6 +17,7 @@ import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
+import java.math.BigDecimal
 
 @Entity(tableName = "loans")
 data class LoanEntity(
@@ -154,16 +155,23 @@ interface LoanDao {
     @Transaction
     suspend fun syncInstallments(loanId: Long, installments: List<LoanInstallmentEntity>) {
         val existingIds = getInstallmentsByLoanId(loanId).map { it.id }.toSet()
-        val toUpdate = installments.filter { it.id > 0L && it.id in existingIds }.map { it.copy(loanId = loanId) }
-        val keptIds = toUpdate.map { it.id }.toSet()
-        val idsToDelete = existingIds.filterNot { it in keptIds }
+        val seenUpdateIds = mutableSetOf<Long>()
+        val toUpdate = mutableListOf<LoanInstallmentEntity>()
+        val toInsert = mutableListOf<LoanInstallmentEntity>()
+        for (item in installments) {
+            if (item.id > 0L && item.id in existingIds && seenUpdateIds.add(item.id)) {
+                toUpdate.add(item.copy(loanId = loanId))
+            } else {
+                toInsert.add(item.copy(id = 0, loanId = loanId))
+            }
+        }
+        val idsToDelete = existingIds.filterNot { it in seenUpdateIds }
         if (idsToDelete.isNotEmpty()) {
             deleteInstallmentsByIds(idsToDelete)
         }
         if (toUpdate.isNotEmpty()) {
             updateInstallments(toUpdate)
         }
-        val toInsert = installments.filter { it.id <= 0L || it.id !in existingIds }.map { it.copy(id = 0, loanId = loanId) }
         if (toInsert.isNotEmpty()) {
             insertInstallments(toInsert)
         }
@@ -218,21 +226,19 @@ interface LoanDao {
     @Transaction
     suspend fun reassignSavingCategory(oldCategoryName: String, newCategoryName: String) {
         val trimmedOld = oldCategoryName.trim { it.isWhitespace() }
-        if (trimmedOld.isEmpty()) return
-        val normalizedNew = newCategoryName.trim { it.isWhitespace() }.takeIf { it.isNotEmpty() }
+        val trimmedNew = newCategoryName.trim { it.isWhitespace() }
+        if (trimmedOld.isEmpty() || trimmedNew.isEmpty()) return
         val toUpdate = getLoansWithSavingCategory()
             .filter { it.savingCategory?.trim { ch -> ch.isWhitespace() }?.equals(trimmedOld, ignoreCase = true) == true }
-            .map { it.copy(savingCategory = normalizedNew) }
+            .map { it.copy(savingCategory = trimmedNew) }
         if (toUpdate.isNotEmpty()) {
             updateAll(toUpdate)
         }
-        if (normalizedNew != null) {
-            val paymentsToUpdate = getPaymentsWithSavingCategory()
-                .filter { it.savingCategory.trim { ch -> ch.isWhitespace() }.equals(trimmedOld, ignoreCase = true) }
-                .map { it.copy(savingCategory = normalizedNew) }
-            if (paymentsToUpdate.isNotEmpty()) {
-                updateAllPayments(paymentsToUpdate)
-            }
+        val paymentsToUpdate = getPaymentsWithSavingCategory()
+            .filter { it.savingCategory.trim { ch -> ch.isWhitespace() }.equals(trimmedOld, ignoreCase = true) }
+            .map { it.copy(savingCategory = trimmedNew) }
+        if (paymentsToUpdate.isNotEmpty()) {
+            updateAllPayments(paymentsToUpdate)
         }
     }
 }
@@ -293,6 +299,69 @@ abstract class LoansDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `loan_payments` ADD COLUMN `installmentId` INTEGER DEFAULT NULL"
                 )
+
+                val paidByLoanId = mutableMapOf<Long, BigDecimal>()
+                db.query("SELECT `loanId`, `amount` FROM `loan_payments`").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val loanId = cursor.getLong(0)
+                        val amount = cursor.getDouble(1)
+                        if (amount.isFinite() && amount > 0.0) {
+                            paidByLoanId[loanId] = (paidByLoanId[loanId] ?: BigDecimal.ZERO)
+                                .add(BigDecimal.valueOf(amount))
+                        }
+                    }
+                }
+
+                val targetByLoanId = mutableMapOf<Long, BigDecimal>()
+                if (paidByLoanId.isNotEmpty()) {
+                    db.query("SELECT `id`, `amountToReceive` FROM `loans`").use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val loanId = cursor.getLong(0)
+                            val amountToReceive = cursor.getDouble(1)
+                            if (amountToReceive.isFinite() && amountToReceive > 0.0) {
+                                targetByLoanId[loanId] = BigDecimal.valueOf(amountToReceive)
+                            }
+                        }
+                    }
+                }
+
+                for ((loanId, totalPaid) in paidByLoanId) {
+                    if (totalPaid <= BigDecimal.ZERO) continue
+                    val installments = mutableListOf<Pair<Long, BigDecimal>>()
+                    var totalExpected = BigDecimal.ZERO
+                    db.query(
+                        "SELECT `id`, `expectedAmount` FROM `loan_installments` WHERE `loanId` = ? ORDER BY `dueDate` ASC, `id` ASC",
+                        arrayOf(loanId.toString())
+                    ).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val instId = cursor.getLong(0)
+                            val expected = cursor.getDouble(1)
+                            if (expected.isFinite() && expected > 0.0) {
+                                val expectedDec = BigDecimal.valueOf(expected)
+                                installments.add(instId to expectedDec)
+                                totalExpected = totalExpected.add(expectedDec)
+                            }
+                        }
+                    }
+                    if (installments.isEmpty()) continue
+
+                    val loanTarget = targetByLoanId[loanId] ?: totalExpected
+                    val pendingTarget = loanTarget.subtract(totalPaid).max(BigDecimal.ZERO)
+                    var remainingToBackfill = totalExpected.subtract(pendingTarget).max(BigDecimal.ZERO)
+                    if (remainingToBackfill <= BigDecimal.ZERO) continue
+
+                    for ((instId, expectedDec) in installments) {
+                        if (remainingToBackfill <= BigDecimal.ZERO) break
+                        val applied = remainingToBackfill.min(expectedDec)
+                        if (applied > BigDecimal.ZERO) {
+                            db.execSQL(
+                                "UPDATE `loan_installments` SET `paymentAmount` = ? WHERE `id` = ?",
+                                arrayOf<Any>(applied.toDouble(), instId)
+                            )
+                            remainingToBackfill = remainingToBackfill.subtract(applied)
+                        }
+                    }
+                }
             }
         }
     }

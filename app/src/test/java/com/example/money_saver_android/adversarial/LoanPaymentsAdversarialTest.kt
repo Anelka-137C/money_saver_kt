@@ -358,7 +358,7 @@ class LoanPaymentsAdversarialTest {
         override suspend fun insertCategory(category: Category) {}
         override suspend fun insertSubcategory(categoryName: String, subcategory: Subcategory) {}
         override suspend fun deleteCategory(categoryName: String) {}
-        override suspend fun deleteSubcategory(categoryName: String, subcategory: Subcategory) {}
+        override suspend fun deleteSubcategory(categoryName: String, subcategoryName: String) {}
         override suspend fun preloadDefaultCategoriesIfNeeded() {}
     }
 
@@ -2191,7 +2191,7 @@ class LoanPaymentsAdversarialTest {
                     0 -> expenseUseCase.saveExpense(
                         amountInput = "200",
                         dateInput = "2026-11-26",
-                        description = "Race Exp $idx",
+                        descriptionInput = "Race Exp $idx",
                         categoryInput = "General",
                         fundingSource = ExpenseFundingSource.SAVINGS,
                         savingCategoryInput = "Viajes"

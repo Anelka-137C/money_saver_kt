@@ -448,6 +448,16 @@ class SavingsUseCase(
         if (savingsRepository.countSavingsForCategory(canonicalName) > 0) {
             return@withLock SavingsResult.Error("No se puede eliminar la categoría porque tiene ahorros asociados")
         }
+        val allLoans = loanRepository?.getAllLoans()?.firstOrNull() ?: emptyList()
+        val hasLinkedLoansOrPayments = allLoans.any { loan ->
+            loan.savingCategory.trim { it.isWhitespace() }.equals(canonicalName, ignoreCase = true) ||
+                loan.payments.any { payment ->
+                    payment.savingCategory.trim { it.isWhitespace() }.equals(canonicalName, ignoreCase = true)
+                }
+        }
+        if (hasLinkedLoansOrPayments) {
+            return@withLock SavingsResult.Error("No se puede eliminar la categoría porque tiene préstamos o pagos asociados")
+        }
         savingsRepository.deleteCategory(canonicalName)
         SavingsResult.Success
     }

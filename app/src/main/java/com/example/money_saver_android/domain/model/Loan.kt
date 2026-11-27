@@ -25,11 +25,14 @@ data class LoanInstallment(
         }
 
     val remainingAmount: Double
-        get() = validExpectedDecimal
-            .subtract(validPaidDecimal)
-            .max(BigDecimal.ZERO)
-            .toDouble()
-            .takeIf { it.isFinite() } ?: 0.0
+        get() {
+            val remaining = validExpectedDecimal
+                .subtract(validPaidDecimal)
+                .max(BigDecimal.ZERO)
+            if (remaining <= BigDecimal.ZERO) return 0.0
+            val value = remaining.toDouble()
+            return if (value.isFinite()) value else Double.MAX_VALUE
+        }
 
     val isPaid: Boolean
         get() = validExpectedDecimal > BigDecimal.ZERO &&
@@ -67,16 +70,21 @@ data class Loan(
             .fold(BigDecimal.ZERO) { acc, item -> acc.add(BigDecimal.valueOf(item.amount)) }
 
     val paidAmount: Double
-        get() = paidDecimal.toDouble().takeIf { it.isFinite() } ?: 0.0
+        get() {
+            if (paidDecimal <= BigDecimal.ZERO) return 0.0
+            val value = paidDecimal.toDouble()
+            return if (value.isFinite()) value else Double.MAX_VALUE
+        }
 
     val pendingAmount: Double
         get() {
             if (!amountToReceive.isFinite() || amountToReceive <= 0.0) return 0.0
-            return BigDecimal.valueOf(amountToReceive)
+            val pending = BigDecimal.valueOf(amountToReceive)
                 .subtract(paidDecimal)
                 .max(BigDecimal.ZERO)
-                .toDouble()
-                .takeIf { it.isFinite() } ?: 0.0
+            if (pending <= BigDecimal.ZERO) return 0.0
+            val value = pending.toDouble()
+            return if (value.isFinite()) value else Double.MAX_VALUE
         }
 
     val isSettled: Boolean
@@ -90,6 +98,7 @@ data class Loan(
             if (!amountToReceive.isFinite() || amountToReceive <= 0.0) return 0f
             val target = BigDecimal.valueOf(amountToReceive)
             if (target <= BigDecimal.ZERO) return 0f
+            if (paidDecimal >= target) return 1f
             return paidDecimal.divide(target, 6, RoundingMode.HALF_UP)
                 .toFloat()
                 .coerceIn(0f, 1f)

@@ -86,6 +86,7 @@ fun LoanPaymentHistorySheet(
     loan: Loan,
     currency: Currency,
     todayIso: String = "",
+    errorMessage: String? = null,
     onEditPaymentClick: (LoanPayment) -> Unit = {},
     onDeletePaymentClick: (LoanPayment) -> Unit = {},
     onRegisterNewPaymentClick: () -> Unit,
@@ -344,6 +345,25 @@ fun LoanPaymentHistorySheet(
                 )
             }
 
+            if (!errorMessage.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ErrorRed.copy(alpha = 0.14f))
+                        .border(1.dp, ErrorRed.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .testTag("text_payment_history_error")
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = ErrorRed,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -460,10 +480,13 @@ private fun PaymentHistoryRow(
         t("loans.history_sheet.debt_payment_tag")
     }
 
+    val safePaymentAmount = if (payment.amount.isFinite() && payment.amount > 0.0) payment.amount else 0.0
     val isCompleteForTarget = if (matchedInstallment != null) {
-        BigDecimal.valueOf(payment.amount) >= BigDecimal.valueOf(matchedInstallment.expectedAmount)
+        val expectedDec = matchedInstallment.expectedAmount.toSafeBigDecimal()
+        expectedDec > BigDecimal.ZERO && safePaymentAmount.toSafeBigDecimal() >= expectedDec
     } else {
-        BigDecimal.valueOf(payment.amount) >= BigDecimal.valueOf(loan.amountToReceive)
+        val targetDec = loan.amountToReceive.toSafeBigDecimal()
+        targetDec > BigDecimal.ZERO && safePaymentAmount.toSafeBigDecimal() >= targetDec
     }
     val statusBadgeText = if (isCompleteForTarget) {
         t("loans.history_sheet.full_payment_badge")
@@ -558,7 +581,7 @@ private fun PaymentHistoryRow(
         Spacer(modifier = Modifier.width(10.dp))
 
         Text(
-            text = "+${CurrencyFormatter.format(payment.amount, currency)}",
+            text = "+${CurrencyFormatter.format(safePaymentAmount, currency)}",
             color = GreenAccent,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
@@ -620,3 +643,6 @@ private fun PaymentHistoryRow(
         }
     }
 }
+
+private fun Double.toSafeBigDecimal(): BigDecimal =
+    if (isFinite()) BigDecimal.valueOf(this) else BigDecimal.ZERO

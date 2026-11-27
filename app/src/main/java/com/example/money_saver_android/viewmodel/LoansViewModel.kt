@@ -67,6 +67,7 @@ data class LoansUiState(
     val editSavingsBalances: List<SavingsCategoryBalance> = emptyList(),
     val savingCategories: List<Category> = emptyList(),
     val todayIso: String = "",
+    val showLoanFormDialog: Boolean = false,
     val editingLoanId: Long? = null,
     val personNameInput: String = "",
     val amountLentInput: String = "",
@@ -100,6 +101,7 @@ data class LoansUiState(
     val paymentExtraInstallmentDateInput: String = "",
     val paymentExtraInstallmentAmountInput: String = "",
     val paymentAdjustedNextAmountInput: String = "",
+    val isAdjustedNextAmountManuallyEdited: Boolean = false,
     val paymentAdjustedRemainderDateInput: String = "",
     val paymentErrorMessage: String? = null,
     val historyLoanId: Long? = null,
@@ -229,7 +231,13 @@ class LoansViewModel(
     }
 
     fun onCreationPaymentModeSelected(mode: LoanCreationPaymentMode) {
-        _uiState.update { it.copy(creationPaymentMode = mode, errorMessage = null) }
+        _uiState.update {
+            it.copy(
+                creationPaymentMode = mode,
+                draftInstallments = emptyList(),
+                errorMessage = null
+            )
+        }
     }
 
     fun onCreationSingleDueDateChange(value: String) {
@@ -299,7 +307,8 @@ class LoansViewModel(
                 scheduleDateInput = today,
                 scheduleAmountInput = "",
                 scheduleErrorMessage = null,
-                showDiscardScheduleChangesDialog = false
+                showDiscardScheduleChangesDialog = false,
+                errorMessage = null
             )
         }
     }
@@ -379,13 +388,7 @@ class LoansViewModel(
             is LoanInstallmentValidationResult.Valid -> {
                 val today = loanUseCase.todayIso()
                 val updatedList = if (editingTarget != null) {
-                    val keptPersistedId = if (editingTarget.persistedId > 0L &&
-                        editingTarget.dueDate == validation.installment.dueDate
-                    ) {
-                        editingTarget.persistedId
-                    } else {
-                        0L
-                    }
+                    val keptPersistedId = editingTarget.persistedId
                     val updatedDraft = editingTarget.copy(
                         dueDate = validation.installment.dueDate,
                         expectedAmountInput = formatDraftAmount(validation.installment.expectedAmount),
@@ -452,8 +455,10 @@ class LoansViewModel(
                 paymentExtraInstallmentDateInput = today,
                 paymentExtraInstallmentAmountInput = "",
                 paymentAdjustedNextAmountInput = "",
+                isAdjustedNextAmountManuallyEdited = false,
                 paymentAdjustedRemainderDateInput = today,
-                paymentErrorMessage = null
+                paymentErrorMessage = null,
+                errorMessage = null
             )
         }
     }
@@ -486,8 +491,10 @@ class LoansViewModel(
                 paymentExtraInstallmentDateInput = today,
                 paymentExtraInstallmentAmountInput = "",
                 paymentAdjustedNextAmountInput = "",
+                isAdjustedNextAmountManuallyEdited = false,
                 paymentAdjustedRemainderDateInput = today,
-                paymentErrorMessage = null
+                paymentErrorMessage = null,
+                errorMessage = null
             )
         }
     }
@@ -508,6 +515,7 @@ class LoansViewModel(
                 paymentExtraInstallmentDateInput = today,
                 paymentExtraInstallmentAmountInput = "",
                 paymentAdjustedNextAmountInput = "",
+                isAdjustedNextAmountManuallyEdited = false,
                 paymentAdjustedRemainderDateInput = today,
                 paymentErrorMessage = null
             )
@@ -515,15 +523,27 @@ class LoansViewModel(
     }
 
     fun openPaymentHistory(loan: Loan) {
-        _uiState.update { it.copy(historyLoanId = loan.id) }
+        _uiState.update {
+            it.copy(
+                historyLoanId = loan.id,
+                paymentErrorMessage = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun closePaymentHistory() {
-        _uiState.update { it.copy(historyLoanId = null) }
+        _uiState.update {
+            it.copy(
+                historyLoanId = null,
+                paymentErrorMessage = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun requestDeleteLoanPayment(loan: Loan, payment: LoanPayment) {
-        _uiState.update { it.copy(paymentToDelete = loan to payment) }
+        _uiState.update { it.copy(paymentToDelete = loan to payment, paymentErrorMessage = null) }
     }
 
     fun dismissDeleteLoanPayment() {
@@ -541,6 +561,8 @@ class LoansViewModel(
                         _uiState.update {
                             it.copy(
                                 paymentToDelete = null,
+                                paymentErrorMessage = null,
+                                errorMessage = null,
                                 toastMessage = MSG_PAYMENT_DELETED
                             )
                         }
@@ -558,11 +580,13 @@ class LoansViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                val message = e.message?.takeIf { msg -> msg.isNotBlank() }
+                    ?: "No se pudo eliminar el pago"
                 _uiState.update {
                     it.copy(
                         paymentToDelete = null,
-                        errorMessage = e.message?.takeIf { msg -> msg.isNotBlank() }
-                            ?: "No se pudo eliminar el pago"
+                        paymentErrorMessage = message,
+                        errorMessage = message
                     )
                 }
             } finally {
@@ -571,12 +595,59 @@ class LoansViewModel(
         }
     }
 
+    private fun computePrefilledAdjustedNextAmount(
+        loan: Loan?,
+        paymentAmountInput: String,
+        targetInstallmentId: Long?
+    ): String {
+        if (loan == null) return ""
+        val parsed = parseLoanAmount(paymentAmountInput) ?: 0.0
+        val nextInst = loanUseCase
+            .previewInstallmentsAfterPayment(loan, parsed, targetInstallmentId)
+            .firstOrNull { !it.isPaid }
+        return nextInst?.let { formatDraftAmount(it.remainingAmount) } ?: ""
+    }
+
     fun onPaymentAmountChange(value: String) {
-        _uiState.update { it.copy(paymentAmountInput = value, paymentErrorMessage = null) }
+        _uiState.update { current ->
+            val refreshedAdjusted = if (current.partialScheduleAction == PartialScheduleAction.ADJUST_NEXT_INSTALLMENT &&
+                !current.isAdjustedNextAmountManuallyEdited
+            ) {
+                computePrefilledAdjustedNextAmount(
+                    loan = current.payingLoan,
+                    paymentAmountInput = value,
+                    targetInstallmentId = current.paymentTargetInstallmentId
+                )
+            } else {
+                current.paymentAdjustedNextAmountInput
+            }
+            current.copy(
+                paymentAmountInput = value,
+                paymentAdjustedNextAmountInput = refreshedAdjusted,
+                paymentErrorMessage = null
+            )
+        }
     }
 
     fun onPaymentTargetInstallmentSelected(installmentId: Long) {
-        _uiState.update { it.copy(paymentTargetInstallmentId = installmentId, paymentErrorMessage = null) }
+        _uiState.update { current ->
+            val refreshedAdjusted = if (current.partialScheduleAction == PartialScheduleAction.ADJUST_NEXT_INSTALLMENT &&
+                !current.isAdjustedNextAmountManuallyEdited
+            ) {
+                computePrefilledAdjustedNextAmount(
+                    loan = current.payingLoan,
+                    paymentAmountInput = current.paymentAmountInput,
+                    targetInstallmentId = installmentId
+                )
+            } else {
+                current.paymentAdjustedNextAmountInput
+            }
+            current.copy(
+                paymentTargetInstallmentId = installmentId,
+                paymentAdjustedNextAmountInput = refreshedAdjusted,
+                paymentErrorMessage = null
+            )
+        }
     }
 
     fun onPaymentDefineNewDateToggle(enabled: Boolean) {
@@ -585,9 +656,22 @@ class LoansViewModel(
 
     fun onPaymentFullAmountClick() {
         val loan = _uiState.value.payingLoan ?: return
-        _uiState.update {
-            it.copy(
-                paymentAmountInput = formatDraftAmount(loan.pendingAmount),
+        val fullAmountStr = formatDraftAmount(loan.pendingAmount)
+        _uiState.update { current ->
+            val refreshedAdjusted = if (current.partialScheduleAction == PartialScheduleAction.ADJUST_NEXT_INSTALLMENT &&
+                !current.isAdjustedNextAmountManuallyEdited
+            ) {
+                computePrefilledAdjustedNextAmount(
+                    loan = loan,
+                    paymentAmountInput = fullAmountStr,
+                    targetInstallmentId = current.paymentTargetInstallmentId
+                )
+            } else {
+                current.paymentAdjustedNextAmountInput
+            }
+            current.copy(
+                paymentAmountInput = fullAmountStr,
+                paymentAdjustedNextAmountInput = refreshedAdjusted,
                 paymentErrorMessage = null
             )
         }
@@ -607,25 +691,21 @@ class LoansViewModel(
 
     fun onPartialScheduleActionSelected(action: PartialScheduleAction) {
         _uiState.update { current ->
-            val prefilledAdjusted = if (action == PartialScheduleAction.ADJUST_NEXT_INSTALLMENT &&
-                current.paymentAdjustedNextAmountInput.isBlank()
-            ) {
-                val loan = current.payingLoan
-                val parsed = parseLoanAmount(current.paymentAmountInput) ?: 0.0
-                if (loan != null) {
-                    val nextInst = loanUseCase
-                        .previewInstallmentsAfterPayment(loan, parsed, current.paymentTargetInstallmentId)
-                        .firstOrNull { !it.isPaid }
-                    nextInst?.let { formatDraftAmount(it.remainingAmount) } ?: ""
-                } else {
-                    ""
-                }
+            val shouldRefreshPrefill = action == PartialScheduleAction.ADJUST_NEXT_INSTALLMENT &&
+                (!current.isAdjustedNextAmountManuallyEdited || current.paymentAdjustedNextAmountInput.isBlank())
+            val prefilledAdjusted = if (shouldRefreshPrefill) {
+                computePrefilledAdjustedNextAmount(
+                    loan = current.payingLoan,
+                    paymentAmountInput = current.paymentAmountInput,
+                    targetInstallmentId = current.paymentTargetInstallmentId
+                )
             } else {
                 current.paymentAdjustedNextAmountInput
             }
             current.copy(
                 partialScheduleAction = action,
                 paymentAdjustedNextAmountInput = prefilledAdjusted,
+                isAdjustedNextAmountManuallyEdited = if (shouldRefreshPrefill) false else current.isAdjustedNextAmountManuallyEdited,
                 paymentErrorMessage = null
             )
         }
@@ -640,7 +720,13 @@ class LoansViewModel(
     }
 
     fun onPaymentAdjustedNextAmountChange(value: String) {
-        _uiState.update { it.copy(paymentAdjustedNextAmountInput = value, paymentErrorMessage = null) }
+        _uiState.update {
+            it.copy(
+                paymentAdjustedNextAmountInput = value,
+                isAdjustedNextAmountManuallyEdited = value.isNotBlank(),
+                paymentErrorMessage = null
+            )
+        }
     }
 
     fun onPaymentAdjustedRemainderDateChange(value: String) {
@@ -730,6 +816,7 @@ class LoansViewModel(
                                 paymentExtraInstallmentDateInput = today,
                                 paymentExtraInstallmentAmountInput = "",
                                 paymentAdjustedNextAmountInput = "",
+                                isAdjustedNextAmountManuallyEdited = false,
                                 paymentAdjustedRemainderDateInput = today,
                                 paymentErrorMessage = null,
                                 toastMessage = if (editingPayId == null) MSG_PAYMENT_SAVED else MSG_PAYMENT_UPDATED
@@ -771,6 +858,30 @@ class LoansViewModel(
         _uiState.update { it.copy(showDiscardEditLoanDialog = false) }
     }
 
+    fun openCreateLoanDialog() {
+        val today = loanUseCase.todayIso()
+        _uiState.update {
+            it.copy(
+                todayIso = today,
+                showLoanFormDialog = true,
+                editingLoanId = null,
+                personNameInput = "",
+                amountLentInput = "",
+                amountToReceiveInput = "",
+                isAmountToReceiveManuallyEdited = false,
+                noteInput = "",
+                selectedSavingCategory = "",
+                creationPaymentMode = LoanCreationPaymentMode.NO_DATE,
+                creationSingleDueDateInput = today,
+                draftInstallments = emptyList(),
+                draftInstallmentDateInput = today,
+                draftInstallmentAmountInput = "",
+                errorMessage = null,
+                showDiscardEditLoanDialog = false
+            )
+        }
+    }
+
     fun startEditingLoan(loan: Loan) {
         val today = loanUseCase.todayIso()
         val existingDrafts = loan.installments
@@ -798,6 +909,7 @@ class LoansViewModel(
         _uiState.update {
             it.copy(
                 todayIso = today,
+                showLoanFormDialog = true,
                 editingLoanId = loan.id,
                 editSavingsBalances = editBalances,
                 personNameInput = loan.personName,
@@ -816,7 +928,7 @@ class LoansViewModel(
     }
 
     fun requestDeleteLoan(loan: Loan) {
-        _uiState.update { it.copy(loanToDelete = loan) }
+        _uiState.update { it.copy(loanToDelete = loan, errorMessage = null) }
     }
 
     fun dismissDeleteLoan() {
@@ -831,14 +943,31 @@ class LoansViewModel(
             try {
                 when (val result = loanUseCase.deleteLoan(loan.id)) {
                     is LoanResult.Success -> {
+                        val today = loanUseCase.todayIso()
                         _uiState.update { current ->
+                            val deletedEditingLoan = current.editingLoanId == loan.id
                             current.copy(
                                 loanToDelete = null,
+                                showLoanFormDialog = if (deletedEditingLoan) false else current.showLoanFormDialog,
+                                editingLoanId = if (deletedEditingLoan) null else current.editingLoanId,
+                                personNameInput = if (deletedEditingLoan) "" else current.personNameInput,
+                                amountLentInput = if (deletedEditingLoan) "" else current.amountLentInput,
+                                amountToReceiveInput = if (deletedEditingLoan) "" else current.amountToReceiveInput,
+                                isAmountToReceiveManuallyEdited = if (deletedEditingLoan) false else current.isAmountToReceiveManuallyEdited,
+                                noteInput = if (deletedEditingLoan) "" else current.noteInput,
+                                selectedSavingCategory = if (deletedEditingLoan) "" else current.selectedSavingCategory,
+                                creationPaymentMode = if (deletedEditingLoan) LoanCreationPaymentMode.NO_DATE else current.creationPaymentMode,
+                                creationSingleDueDateInput = if (deletedEditingLoan) today else current.creationSingleDueDateInput,
+                                draftInstallments = if (deletedEditingLoan) emptyList() else current.draftInstallments,
+                                draftInstallmentDateInput = if (deletedEditingLoan) today else current.draftInstallmentDateInput,
+                                draftInstallmentAmountInput = if (deletedEditingLoan) "" else current.draftInstallmentAmountInput,
+                                showDiscardEditLoanDialog = if (deletedEditingLoan) false else current.showDiscardEditLoanDialog,
                                 editingScheduleLoan = if (current.editingScheduleLoan?.id == loan.id) null else current.editingScheduleLoan,
                                 payingLoan = if (current.payingLoan?.id == loan.id) null else current.payingLoan,
                                 editingPaymentId = if (current.payingLoan?.id == loan.id) null else current.editingPaymentId,
                                 historyLoanId = if (current.historyLoanId == loan.id) null else current.historyLoanId,
                                 paymentToDelete = if (current.paymentToDelete?.first?.id == loan.id) null else current.paymentToDelete,
+                                errorMessage = null,
                                 toastMessage = MSG_LOAN_DELETED
                             )
                         }
@@ -873,6 +1002,7 @@ class LoansViewModel(
         _uiState.update {
             it.copy(
                 todayIso = today,
+                showLoanFormDialog = false,
                 editingLoanId = null,
                 personNameInput = "",
                 amountLentInput = "",
@@ -891,6 +1021,103 @@ class LoansViewModel(
         }
     }
 
+    private fun rebalanceEditDraftInstallments(
+        drafts: List<LoanInstallmentDraft>,
+        amountToReceiveInput: String,
+        existingLoan: Loan?
+    ): List<LoanInstallmentInput> {
+        val rawInputs = drafts.map {
+            LoanInstallmentInput(
+                dueDate = it.dueDate,
+                expectedAmountInput = it.expectedAmountInput,
+                persistedId = it.persistedId,
+                paymentAmount = it.paymentAmount
+            )
+        }
+        if (drafts.isEmpty()) return rawInputs
+        val newAmountToReceive = parseLoanAmount(amountToReceiveInput) ?: return rawInputs
+        if (!newAmountToReceive.isFinite() || newAmountToReceive <= 0.0) return rawInputs
+
+        val existingPaidDec = existingLoan?.payments
+            ?.filter { it.amount.isFinite() && it.amount > 0.0 }
+            ?.fold(BigDecimal.ZERO) { acc, p -> acc.add(BigDecimal.valueOf(p.amount)) }
+            ?: drafts
+                .filter { it.paymentAmount.isFinite() && it.paymentAmount > 0.0 }
+                .fold(BigDecimal.ZERO) { acc, d -> acc.add(BigDecimal.valueOf(d.paymentAmount)) }
+
+        val newPendingTarget = BigDecimal.valueOf(newAmountToReceive).subtract(existingPaidDec)
+        if (newPendingTarget < BigDecimal.ZERO) return rawInputs
+
+        data class MutableDraft(
+            val dueDate: String,
+            var expected: BigDecimal,
+            val persistedId: Long,
+            val paid: BigDecimal
+        ) {
+            val remaining: BigDecimal
+                get() = expected.subtract(paid).max(BigDecimal.ZERO)
+        }
+
+        val items = mutableListOf<MutableDraft>()
+        for (d in drafts) {
+            val exp = parseLoanAmount(d.expectedAmountInput) ?: return rawInputs
+            if (!exp.isFinite() || exp <= 0.0) return rawInputs
+            val paidDec = if (d.paymentAmount.isFinite() && d.paymentAmount > 0.0) {
+                BigDecimal.valueOf(d.paymentAmount)
+            } else {
+                BigDecimal.ZERO
+            }
+            items.add(
+                MutableDraft(
+                    dueDate = d.dueDate,
+                    expected = BigDecimal.valueOf(exp),
+                    persistedId = d.persistedId,
+                    paid = paidDec
+                )
+            )
+        }
+
+        val currentRemaining = items.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.remaining) }
+        val cmp = newPendingTarget.compareTo(currentRemaining)
+        if (cmp == 0) return rawInputs
+
+        if (cmp > 0) {
+            val delta = newPendingTarget.subtract(currentRemaining)
+            val targetIdx = items.indexOfLast { it.remaining > BigDecimal.ZERO }.takeIf { it >= 0 } ?: items.lastIndex
+            items[targetIdx].expected = items[targetIdx].expected.add(delta)
+        } else {
+            var toReduce = currentRemaining.subtract(newPendingTarget)
+            val keptReversed = mutableListOf<MutableDraft>()
+            for (item in items.asReversed()) {
+                val rem = item.remaining
+                if (toReduce <= BigDecimal.ZERO || rem <= BigDecimal.ZERO) {
+                    keptReversed.add(item)
+                } else if (rem > toReduce) {
+                    item.expected = item.expected.subtract(toReduce)
+                    toReduce = BigDecimal.ZERO
+                    keptReversed.add(item)
+                } else {
+                    toReduce = toReduce.subtract(rem)
+                    if (item.paid > BigDecimal.ZERO) {
+                        item.expected = item.paid
+                        keptReversed.add(item)
+                    }
+                }
+            }
+            items.clear()
+            items.addAll(keptReversed.asReversed())
+        }
+
+        return items.map { item ->
+            LoanInstallmentInput(
+                dueDate = item.dueDate,
+                expectedAmountInput = formatDraftDecimal(item.expected),
+                persistedId = item.persistedId,
+                paymentAmount = item.paid.toDouble()
+            )
+        }
+    }
+
     fun saveLoan() {
         if (isSaving) return
         val state = _uiState.value
@@ -900,14 +1127,11 @@ class LoansViewModel(
         viewModelScope.launch {
             try {
                 val installmentInputs = when {
-                    editingId != null -> state.draftInstallments.map {
-                        LoanInstallmentInput(
-                            dueDate = it.dueDate,
-                            expectedAmountInput = it.expectedAmountInput,
-                            persistedId = it.persistedId,
-                            paymentAmount = it.paymentAmount
-                        )
-                    }
+                    editingId != null -> rebalanceEditDraftInstallments(
+                        drafts = state.draftInstallments,
+                        amountToReceiveInput = state.amountToReceiveInput,
+                        existingLoan = state.loans.find { it.id == editingId }
+                    )
                     selectedCreationMode == LoanCreationPaymentMode.SINGLE_DATE -> listOf(
                         LoanInstallmentInput(
                             dueDate = state.creationSingleDueDateInput,
@@ -953,6 +1177,7 @@ class LoansViewModel(
                         _uiState.update {
                             it.copy(
                                 todayIso = today,
+                                showLoanFormDialog = false,
                                 editingLoanId = null,
                                 personNameInput = "",
                                 amountLentInput = "",
@@ -1050,7 +1275,11 @@ class LoansViewModel(
 
     private fun formatDraftAmount(amount: Double): String {
         if (!amount.isFinite()) return "0"
-        val bd = BigDecimal.valueOf(amount).stripTrailingZeros()
+        return formatDraftDecimal(BigDecimal.valueOf(amount))
+    }
+
+    private fun formatDraftDecimal(decimal: BigDecimal): String {
+        val bd = decimal.stripTrailingZeros()
         return if (bd.scale() < 0) bd.setScale(0).toPlainString() else bd.toPlainString()
     }
 }

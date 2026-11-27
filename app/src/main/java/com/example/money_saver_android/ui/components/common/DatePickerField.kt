@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,11 +95,6 @@ fun DatePickerField(
         }
     }
 
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialSelectedMillis,
-        selectableDates = selectableDates
-    )
-
     val displayText = if (value.isNotBlank()) displayFormatter(value) else ""
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -144,6 +140,13 @@ fun DatePickerField(
     }
 
     if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialSelectedMillis,
+            selectableDates = selectableDates
+        )
+        LaunchedEffect(initialSelectedMillis) {
+            datePickerState.selectedDateMillis = initialSelectedMillis
+        }
         DatePickerDialog(
             modifier = Modifier.testTag("date_only_picker_dialog"),
             onDismissRequest = { showDatePicker = false },
