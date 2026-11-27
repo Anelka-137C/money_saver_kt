@@ -1,31 +1,35 @@
-# Historia #15 — Registro de Préstamos
+# Historia #16 — Programación de Fechas de Pago de Préstamos
 
 ## Story
-Como usuario, quiero registrar un préstamo a una persona desde una nueva pestaña "Préstamos" en la barra de navegación inferior, indicando el monto prestado, el monto a recibir y, de forma opcional, la categoría de ahorro de origen cuando provenga de mis ahorros, para controlar tanto préstamos nuevos como previos a la app.
+Como usuario, quiero programar y gestionar de forma opcional una o varias fechas de pago con su monto esperado para un préstamo (al crearlo o en uno ya existente), para organizar el calendario acordado y ver rápidamente el próximo vencimiento en la tarjeta.
 
 ## Acceptance criteria
-- [ ] Given que accedo a la pestaña "Préstamos" en la barra de navegación inferior (habilitada incluso sin un período financiero activo), when registro un préstamo desde el botón "+" superior o "+ Registrar préstamo" ingresando la persona, el monto prestado, el monto a recibir (prellenado por defecto igual al monto prestado y siempre mayor o igual a este) y opcionalmente una nota/concepto sin elegir categoría de ahorro de origen, then el préstamo aparece en la lista de deudas pendientes siguiendo el diseño de referencia (avatar con iniciales, nombre, subtítulo con la nota o "Préstamo personal", barra de progreso en 0%, monto prestado, pagado en 0 y pendiente igual al monto a recibir) y la tarjeta resumen superior actualiza el "Total por cobrar" en la moneda configurada.
-- [ ] Given que tengo saldo neto disponible en una categoría de ahorro, when registro un préstamo seleccionando esa categoría de ahorro como origen con un monto prestado menor o igual a su saldo disponible, then el préstamo queda registrado vinculado a ese origen (mostrando la categoría de ahorro si no se ingresó nota) y el monto prestado se descuenta inmediatamente del saldo neto disponible de esa categoría en toda la aplicación (Ahorros y Gastos desde ahorros).
-- [ ] Given que intento registrar un préstamo con la persona vacía, un monto prestado inválido (menor o igual a cero), un monto a recibir menor al monto prestado o un monto prestado superior al saldo disponible de la categoría de ahorro seleccionada, when confirmo el registro, then veo un mensaje de error claro, el préstamo no se guarda y mis saldos de ahorro no se modifican.
+- [ ] Given que estoy registrando un préstamo nuevo, when lo guardo sin fechas o agregando una o varias cuotas con fecha igual o posterior a hoy cuyos montos esperados suman exactamente el monto a recibir, then el préstamo se guarda con su calendario y su tarjeta muestra el badge "Vence: <fecha más próxima>" (con indicador "+N" si tiene cuotas adicionales, resaltado en rojo si esa fecha ya venció, o sin badge cuando no tiene cuotas).
+- [ ] Given que tengo un préstamo registrado en la lista de deudas pendientes (con o sin cuotas previas), when abro su calendario desde la tarjeta para consultar sus cuotas, agregar nuevas (desde hoy en adelante) o quitar existentes y confirmo con el calendario vacío o sumando exactamente el monto a recibir, then los cambios quedan guardados y el badge de la tarjeta se actualiza de inmediato reflejando la nueva fecha más próxima, el indicador "+N" y su estado de vencimiento.
+- [ ] Given que intento programar una cuota con fecha inválida o anterior a hoy, con un monto esperado menor o igual a cero, o confirmar un calendario con una o más cuotas cuya suma no es exactamente igual al monto a recibir del préstamo, when confirmo la acción, then veo un mensaje de error claro y no se guardan datos inválidos.
 
 ## Plan
-- Integrar la pestaña "Préstamos" en la barra de navegación inferior (entre Contabilidad y Configuración, siempre habilitada aunque no haya período activo) y construir su pantalla fiel al panel de deudas pendientes del diseño de referencia (encabezado con botón "+", tarjeta resumen con total por cobrar y pagado, listado de tarjetas de préstamos, estado vacío y botón inferior "+ Registrar préstamo", sin botón de volver).
-- Definir el modelo y almacenamiento local offline para préstamos (persona, monto prestado, monto a recibir, nota/concepto opcional y categoría de ahorro de origen opcional).
-- Centralizar el cálculo del saldo neto disponible por categoría de ahorro para que descuente tanto gastos como préstamos financiados desde ahorros, implementar las validaciones de registro (incluyendo monto a recibir mayor o igual al prestado y saldo suficiente) y proteger la edición/eliminación de ahorros frente a préstamos vigentes.
-- Construir el estado reactivo de la pantalla de préstamos y el diálogo modal de registro con formato de la moneda activa, sugerencia automática del monto a recibir igual al prestado y selector opcional de categoría de ahorro mostrando su saldo disponible.
-- Agregar las traducciones correspondientes en los cuatro idiomas soportados de la aplicación y cubrir con pruebas unitarias y de interfaz el registro, las validaciones, la navegación y la consistencia del saldo de ahorros.
+- Extender el almacenamiento local de préstamos para persistir las cuotas programadas (fecha y monto esperado) asociadas a cada préstamo, conservando los préstamos ya registrados.
+- Agregar en el dominio las validaciones del calendario (fechas válidas no anteriores a hoy, monto esperado mayor a cero y suma total exactamente igual al monto a recibir cuando existan cuotas) y el cálculo de la próxima fecha a vencer, cuotas adicionales y estado vencido según la fecha actual.
+- Incorporar en el estado de préstamos la adición y eliminación de cuotas tanto durante el registro de un préstamo nuevo como en la gestión del calendario de un préstamo existente.
+- Añadir la sección opcional de cuotas (selector de fecha desde hoy en adelante y monto esperado en la moneda configurada) al diálogo de registro, un diálogo de calendario al tocar la tarjeta de un préstamo existente y el badge de vencimiento en la tarjeta ("Vence: <fecha>", indicador "+N" y resaltado en rojo cuando esté vencida).
+- Agregar las traducciones y el formato de fecha corta localizado en los cuatro idiomas soportados, y cubrir con pruebas unitarias y de interfaz el alta, la gestión en préstamos existentes, las validaciones y los estados del badge.
 
 ## Out of scope
-- Programar fechas de pago y mostrar el badge de vencimiento en cada tarjeta (#16).
-- Registrar pagos totales o parciales y acreditar el dinero a ahorros (#17).
-- Consultar el historial de pagos o abrir una vista de detalle al tocar una tarjeta (#18).
-- Selector de pestañas "Deudas pendientes" e "Historial" con préstamos saldados (#19).
-- Editar o eliminar préstamos registrados (#20).
-- Incluir préstamos en el respaldo/restauración a Google Drive (se integrará junto con pagos al cerrar #17 para hacer un único cambio al formato de backup).
+- Editar el monto prestado, el monto a recibir u otros datos del préstamo, o eliminar préstamos (#20 / división sugerida en #20a y #20b).
+- Registrar pagos totales o parciales, marcar cuotas como pagadas o acreditar dinero a ahorros (#17).
+- Consultar el historial de pagos realizados (#18) y separar pestañas de vigentes e historial (#19).
+- Notificaciones o recordatorios push de vencimiento de cuotas.
+- Respaldo/restauración de préstamos y cuotas en Google Drive (se integrará al cerrar #17).
+
+## Suggestions (your call)
+- **Migración explícita de la base de datos local de préstamos:** agregar una migración explícita al actualizar el esquema evitará que los préstamos ya registrados en el dispositivo se pierdan al añadir las cuotas.
+- **Componente reutilizable de selector de fecha (sin hora):** extraer un componente simple de selección de fecha evitaría duplicar la lógica ya existente en períodos y facilitará su reutilización en pagos (#17).
 
 ## Decisiones confirmadas
-- **Monto a recibir:** siempre mayor o igual al monto prestado; si no se edita manualmente, se prellena con el mismo valor del monto prestado.
-- **Subtítulo de la tarjeta:** campo opcional de nota/concepto; si se deja vacío, muestra la categoría de ahorro de origen o "Préstamo personal" cuando no proviene de ahorros.
-- **Navegación y diseño:** pestaña "Préstamos" siempre habilitada en la barra inferior; pantalla fiel al panel izquierdo del diseño de referencia sin flecha de volver ni elementos exclusivos de #16 y #19.
-- **Saldo neto de ahorros centralizado:** Ahorros, Gastos y Préstamos consultan un único cálculo compartido de saldo disponible por categoría.
-- **Respaldo de préstamos:** postergado hasta completar #17.
+- **Opcionalidad:** un préstamo puede guardarse sin fechas (0 cuotas) o con 1 o varias cuotas programadas.
+- **Datos por cuota:** cada fecha programada incluye fecha (día/mes/año) y monto esperado.
+- **Suma exacta:** si el préstamo tiene al menos una cuota programada, la suma de los montos esperados debe ser exactamente igual al monto a recibir.
+- **Sin fechas pasadas:** no se permite programar fechas anteriores a hoy; las fechas previamente guardadas que venzan con el paso del tiempo se resaltan en rojo en el badge.
+- **Badge en la tarjeta:** muestra `"Vence: <fecha más próxima>"`, con indicador `"+N"` si existen cuotas adicionales, y en rojo si la fecha más próxima ya venció.
+- **Gestión en existentes y división de #20:** desde la tarjeta de un préstamo existente se gestiona su calendario de cuotas; la edición de monto prestado y monto a recibir queda fuera de #16 (en #20 / #20a).

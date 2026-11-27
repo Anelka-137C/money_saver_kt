@@ -76,7 +76,20 @@ class I18nManagerTest {
             "app_lock.screen_title",
             "app_lock.screen_subtitle",
             "app_lock.auth_error",
-            "app_lock.retry_button"
+            "app_lock.retry_button",
+            "loans.card.due_prefix",
+            "loans.schedule.section_title",
+            "loans.schedule.date_label",
+            "loans.schedule.amount_label",
+            "loans.schedule.add_button",
+            "loans.schedule.empty_message",
+            "loans.schedule.sum_label",
+            "loans.schedule.dialog_title",
+            "loans.schedule.save_button",
+            "loans.schedule.remove_content_desc",
+            "loans.schedule.overdue_label",
+            "loans.schedule.cancel_button",
+            "loans.messages.schedule_updated"
         )
 
         listOf("es", "en", "de", "pt").forEach { locale ->

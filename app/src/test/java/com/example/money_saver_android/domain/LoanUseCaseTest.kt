@@ -10,33 +10,53 @@ import com.example.money_saver_android.domain.model.Expense
 import com.example.money_saver_android.domain.model.ExpenseFundingSource
 import com.example.money_saver_android.domain.model.Income
 import com.example.money_saver_android.domain.model.Loan
+import com.example.money_saver_android.domain.model.LoanInstallment
 import com.example.money_saver_android.domain.model.Saving
 import com.example.money_saver_android.domain.usecase.ExpenseResult
 import com.example.money_saver_android.domain.usecase.ExpenseUseCase
+import com.example.money_saver_android.domain.usecase.LoanInstallmentInput
+import com.example.money_saver_android.domain.usecase.LoanInstallmentValidationResult
 import com.example.money_saver_android.domain.usecase.LoanResult
 import com.example.money_saver_android.domain.usecase.LoanUseCase
 import com.example.money_saver_android.domain.usecase.SavingsResult
 import com.example.money_saver_android.domain.usecase.SavingsUseCase
+import com.example.money_saver_android.domain.usecase.calculateLoanDueBadgeInfo
 import com.example.money_saver_android.domain.usecase.calculateSavingsNetBalances
+import com.example.money_saver_android.domain.usecase.formatLoanShortDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 class FakeLoanRepository : LoanRepository {
     val loansFlow = MutableStateFlow<List<Loan>>(emptyList())
+    private var nextInstallmentId = 1L
 
     override fun getAllLoans(): Flow<List<Loan>> = loansFlow
 
     override suspend fun insertLoan(loan: Loan): Long {
         val id = (loansFlow.value.maxOfOrNull { it.id } ?: 0L) + 1L
-        loansFlow.value = listOf(loan.copy(id = id)) + loansFlow.value
+        val savedInstallments = loan.installments
+            .map { it.copy(id = nextInstallmentId++, loanId = id) }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        loansFlow.value = listOf(loan.copy(id = id, installments = savedInstallments)) + loansFlow.value
         return id
+    }
+
+    override suspend fun replaceInstallments(loanId: Long, installments: List<LoanInstallment>) {
+        val savedInstallments = installments
+            .map { it.copy(id = nextInstallmentId++, loanId = loanId) }
+            .sortedWith(compareBy({ it.dueDate }, { it.id }))
+        loansFlow.value = loansFlow.value.map {
+            if (it.id == loanId) it.copy(installments = savedInstallments) else it
+        }
     }
 
     override suspend fun reassignSavingCategory(oldName: String, newName: String) {
@@ -133,7 +153,12 @@ class LoanUseCaseTest {
         savingsRepo = TestSavingsRepo()
         expenseRepo = TestExpenseRepo()
         incomeRepo = TestIncomeRepo()
-        loanUseCase = LoanUseCase(loanRepo, savingsRepo, expenseRepo)
+        loanUseCase = LoanUseCase(
+            loanRepository = loanRepo,
+            savingsRepository = savingsRepo,
+            expenseRepository = expenseRepo,
+            currentDateProvider = { "2026-11-26" }
+        )
         expenseUseCase = ExpenseUseCase(expenseRepo, null, savingsRepo, loanRepo)
         savingsUseCase = SavingsUseCase(savingsRepo, incomeRepo, null, expenseRepo, loanRepo)
     }
@@ -221,5 +246,148 @@ class LoanUseCaseTest {
         assertTrue(loanUseCase.saveLoan("Ana", "250", "250", savingCategoryInput = "Emergencias") is LoanResult.Error)
 
         assertTrue(loanRepo.loansFlow.value.isEmpty())
+    }
+
+    @Test
+    fun saveLoan_withValidInstallmentsMatchingExactTotal_savesSortedInstallments() = runBlocking {
+        val result = loanUseCase.saveLoan(
+            personNameInput = "María Castillo",
+            amountLentInput = "0.25",
+            amountToReceiveInput = "0.30",
+            installmentInputs = listOf(
+                LoanInstallmentInput("2026-12-15", "0.20"),
+                LoanInstallmentInput("2026-11-26", "0.10")
+            )
+        )
+        assertTrue(result is LoanResult.Success)
+        val saved = loanRepo.loansFlow.value.single()
+        assertEquals(2, saved.installments.size)
+        assertEquals("2026-11-26", saved.installments[0].dueDate)
+        assertEquals(0.10, saved.installments[0].expectedAmount, 0.0001)
+        assertEquals("2026-12-15", saved.installments[1].dueDate)
+        assertEquals(0.20, saved.installments[1].expectedAmount, 0.0001)
+    }
+
+    @Test
+    fun saveLoan_withInvalidInstallmentsOrMismatchedSum_returnsErrorWithoutPersisting() = runBlocking {
+        // Past date
+        assertTrue(
+            loanUseCase.saveLoan(
+                "Ana", "100", "100",
+                installmentInputs = listOf(LoanInstallmentInput("2026-11-25", "100"))
+            ) is LoanResult.Error
+        )
+        // Invalid calendar date
+        assertTrue(
+            loanUseCase.saveLoan(
+                "Ana", "100", "100",
+                installmentInputs = listOf(LoanInstallmentInput("2026-02-30", "100"))
+            ) is LoanResult.Error
+        )
+        // Zero or negative installment amount
+        assertTrue(
+            loanUseCase.saveLoan(
+                "Ana", "100", "100",
+                installmentInputs = listOf(LoanInstallmentInput("2026-12-01", "0"))
+            ) is LoanResult.Error
+        )
+        assertTrue(
+            loanUseCase.saveLoan(
+                "Ana", "100", "100",
+                installmentInputs = listOf(LoanInstallmentInput("2026-12-01", "-10"))
+            ) is LoanResult.Error
+        )
+        // Sum does not equal amountToReceive
+        assertTrue(
+            loanUseCase.saveLoan(
+                "Ana", "100", "120",
+                installmentInputs = listOf(
+                    LoanInstallmentInput("2026-12-01", "60"),
+                    LoanInstallmentInput("2026-12-15", "59.99")
+                )
+            ) is LoanResult.Error
+        )
+
+        assertTrue(loanRepo.loansFlow.value.isEmpty())
+    }
+
+    @Test
+    fun updateLoanInstallments_supportsAddingRemovingEmptyingAndKeepingPersistedOverdue() = runBlocking {
+        val loanId = loanRepo.insertLoan(
+            Loan(
+                personName = "Carlos",
+                amountLent = 500.0,
+                amountToReceive = 600.0,
+                installments = listOf(
+                    LoanInstallment(dueDate = "2026-11-20", expectedAmount = 200.0),
+                    LoanInstallment(dueDate = "2026-12-10", expectedAmount = 400.0)
+                )
+            )
+        )
+        val persistedPast = loanRepo.loansFlow.value.single().installments.first()
+
+        // Keeps persisted overdue installment while replacing the future one with two valid future installments
+        val updateResult = loanUseCase.updateLoanInstallments(
+            loanId = loanId,
+            installmentInputs = listOf(
+                LoanInstallmentInput(persistedPast.dueDate, "200", persistedId = persistedPast.id),
+                LoanInstallmentInput("2026-12-01", "250"),
+                LoanInstallmentInput("2026-12-20", "150")
+            )
+        )
+        assertTrue(updateResult is LoanResult.Success)
+        assertEquals(3, loanRepo.loansFlow.value.single().installments.size)
+
+        // Adding a brand-new past installment must be rejected
+        val invalidNewPast = loanUseCase.updateLoanInstallments(
+            loanId = loanId,
+            installmentInputs = listOf(
+                LoanInstallmentInput("2026-11-25", "600")
+            )
+        )
+        assertTrue(invalidNewPast is LoanResult.Error)
+        assertEquals(3, loanRepo.loansFlow.value.single().installments.size)
+
+        // Emptying schedule is allowed
+        val clearResult = loanUseCase.updateLoanInstallments(loanId = loanId, installmentInputs = emptyList())
+        assertTrue(clearResult is LoanResult.Success)
+        assertTrue(loanRepo.loansFlow.value.single().installments.isEmpty())
+    }
+
+    @Test
+    fun validateInstallmentDraft_andBadgeCalculation_andLocalizedFormatting() {
+        assertTrue(loanUseCase.validateInstallmentDraft("2026-11-25", "100") is LoanInstallmentValidationResult.Error)
+        assertTrue(loanUseCase.validateInstallmentDraft("2026-11-26", "0") is LoanInstallmentValidationResult.Error)
+        assertTrue(loanUseCase.validateInstallmentDraft("2026-11-26", "100") is LoanInstallmentValidationResult.Valid)
+
+        assertNull(calculateLoanDueBadgeInfo(emptyList(), "2026-11-26"))
+
+        val upcoming = calculateLoanDueBadgeInfo(
+            listOf(
+                LoanInstallment(dueDate = "2026-12-20", expectedAmount = 50.0),
+                LoanInstallment(dueDate = "2026-11-26", expectedAmount = 50.0)
+            ),
+            todayIso = "2026-11-26"
+        )
+        assertEquals("2026-11-26", upcoming?.nextDueDate)
+        assertEquals(1, upcoming?.additionalCount)
+        assertFalse(upcoming?.isOverdue ?: true)
+
+        val overdue = calculateLoanDueBadgeInfo(
+            listOf(
+                LoanInstallment(dueDate = "2026-11-25", expectedAmount = 50.0),
+                LoanInstallment(dueDate = "2026-12-05", expectedAmount = 50.0),
+                LoanInstallment(dueDate = "2026-12-20", expectedAmount = 50.0)
+            ),
+            todayIso = "2026-11-26"
+        )
+        assertEquals("2026-11-25", overdue?.nextDueDate)
+        assertEquals(2, overdue?.additionalCount)
+        assertTrue(overdue?.isOverdue == true)
+
+        assertEquals("30 Jul 2026", formatLoanShortDate("2026-07-30", "es"))
+        assertEquals("15 Aug 2026", formatLoanShortDate("2026-08-15", "en"))
+        assertEquals("15 Ago 2026", formatLoanShortDate("2026-08-15", "pt"))
+        assertTrue(formatLoanShortDate("2026-08-15", "de").contains("2026"))
     }
 }

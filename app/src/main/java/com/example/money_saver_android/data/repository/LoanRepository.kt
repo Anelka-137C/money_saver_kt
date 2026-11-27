@@ -2,13 +2,17 @@ package com.example.money_saver_android.data.repository
 
 import com.example.money_saver_android.data.local.LoanDao
 import com.example.money_saver_android.data.local.LoanEntity
+import com.example.money_saver_android.data.local.LoanInstallmentEntity
+import com.example.money_saver_android.data.local.LoanWithInstallments
 import com.example.money_saver_android.domain.model.Loan
+import com.example.money_saver_android.domain.model.LoanInstallment
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 interface LoanRepository {
     fun getAllLoans(): Flow<List<Loan>>
     suspend fun insertLoan(loan: Loan): Long
+    suspend fun replaceInstallments(loanId: Long, installments: List<LoanInstallment>) {}
     suspend fun reassignSavingCategory(oldName: String, newName: String) {}
 }
 
@@ -17,11 +21,21 @@ class RoomLoanRepository(
 ) : LoanRepository {
 
     override fun getAllLoans(): Flow<List<Loan>> {
-        return dao.getAllLoans().map { entities -> entities.map { it.toDomain() } }
+        return dao.getAllLoansWithInstallments().map { entities -> entities.map { it.toDomain() } }
     }
 
     override suspend fun insertLoan(loan: Loan): Long {
-        return dao.insert(loan.toEntity())
+        return dao.insertLoanWithInstallments(
+            loan = loan.toEntity(),
+            installments = loan.installments.map { it.toEntity(loanId = loan.id) }
+        )
+    }
+
+    override suspend fun replaceInstallments(loanId: Long, installments: List<LoanInstallment>) {
+        dao.replaceInstallments(
+            loanId = loanId,
+            installments = installments.map { it.toEntity(loanId = loanId) }
+        )
     }
 
     override suspend fun reassignSavingCategory(oldName: String, newName: String) {
@@ -38,6 +52,19 @@ fun LoanEntity.toDomain(): Loan = Loan(
     savingCategory = savingCategory.orEmpty()
 )
 
+fun LoanInstallmentEntity.toDomain(): LoanInstallment = LoanInstallment(
+    id = id,
+    loanId = loanId,
+    dueDate = dueDate,
+    expectedAmount = expectedAmount
+)
+
+fun LoanWithInstallments.toDomain(): Loan = loan.toDomain().copy(
+    installments = installments
+        .sortedWith(compareBy<LoanInstallmentEntity> { it.dueDate }.thenBy { it.id })
+        .map { it.toDomain() }
+)
+
 fun Loan.toEntity(): LoanEntity = LoanEntity(
     id = id,
     personName = personName,
@@ -45,4 +72,11 @@ fun Loan.toEntity(): LoanEntity = LoanEntity(
     amountToReceive = amountToReceive,
     note = note,
     savingCategory = savingCategory.takeIf { it.isNotBlank() }
+)
+
+fun LoanInstallment.toEntity(loanId: Long = this.loanId): LoanInstallmentEntity = LoanInstallmentEntity(
+    id = id,
+    loanId = loanId,
+    dueDate = dueDate,
+    expectedAmount = expectedAmount
 )

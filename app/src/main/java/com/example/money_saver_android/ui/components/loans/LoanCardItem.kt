@@ -2,6 +2,8 @@ package com.example.money_saver_android.ui.components.loans
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,12 +37,18 @@ import androidx.compose.ui.unit.sp
 import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.model.Loan
+import com.example.money_saver_android.domain.usecase.calculateLoanDueBadgeInfo
+import com.example.money_saver_android.domain.usecase.formatLoanShortDate
+import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
+import com.example.money_saver_android.ui.theme.ErrorRed
 import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.absoluteValue
 
@@ -48,21 +59,31 @@ private val LoanAvatarColors = listOf(
     Color(0xFFD97706)
 )
 private val LoanPendingPurple = Color(0xFFA855F7)
+private val LoanDueAmber = Color(0xFFF59E0B)
+private val LoanDueAmberText = Color(0xFFFBBF24)
 
 @Composable
 fun LoanCardItem(
     loan: Loan,
     currency: Currency,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    todayIso: String = "",
+    onClick: (() -> Unit)? = null
 ) {
     val avatarColor = LoanAvatarColors[(loan.personName.trim().lowercase().hashCode().absoluteValue) % LoanAvatarColors.size]
     val subtitle = loan.note.trim().ifEmpty {
         loan.savingCategory.trim().ifEmpty { t("loans.card.personal_loan") }
     }
+    val effectiveTodayIso = todayIso.ifBlank {
+        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+    }
+    val badgeInfo = calculateLoanDueBadgeInfo(loan.installments, effectiveTodayIso)
+    val language = LocalI18nManager.current.currentLanguage
 
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .testTag("loan_card_${loan.id}"),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         shape = RoundedCornerShape(16.dp),
@@ -112,6 +133,57 @@ fun LoanCardItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                if (badgeInfo != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val formattedDate = formatLoanShortDate(badgeInfo.nextDueDate, language)
+                    val dueTemplate = t("loans.card.due_prefix")
+                    val baseBadge = runCatching {
+                        String.format(dueTemplate, formattedDate)
+                    }.getOrDefault("Vence: $formattedDate")
+                    val badgeLabel = if (badgeInfo.additionalCount > 0) {
+                        "$baseBadge +${badgeInfo.additionalCount}"
+                    } else {
+                        baseBadge
+                    }
+                    val badgeBg = if (badgeInfo.isOverdue) {
+                        ErrorRed.copy(alpha = 0.16f)
+                    } else {
+                        LoanDueAmber.copy(alpha = 0.16f)
+                    }
+                    val badgeBorder = if (badgeInfo.isOverdue) {
+                        ErrorRed.copy(alpha = 0.55f)
+                    } else {
+                        LoanDueAmber.copy(alpha = 0.45f)
+                    }
+                    val badgeContent = if (badgeInfo.isOverdue) ErrorRed else LoanDueAmberText
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(badgeBg)
+                            .border(1.dp, badgeBorder, RoundedCornerShape(50))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .testTag("loan_due_badge_${loan.id}"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = badgeContent,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = badgeLabel,
+                            color = badgeContent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 

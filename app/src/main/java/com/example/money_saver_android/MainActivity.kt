@@ -259,7 +259,7 @@ class MainActivity : FragmentActivity() {
             LoansDatabase::class.java,
             "loans.db"
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(LoansDatabase.MIGRATION_1_2)
             .build()
     }
 

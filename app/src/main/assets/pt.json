@@ -410,7 +410,21 @@
       "personal_loan": "Empréstimo pessoal",
       "amount_lent": "Valor emprestado",
       "paid": "Pago",
-      "pending": "Pendente"
+      "pending": "Pendente",
+      "due_prefix": "Vence: %s"
+    },
+    "schedule": {
+      "section_title": "Datas de pagamento (opcional)",
+      "date_label": "Data de pagamento",
+      "amount_label": "Valor esperado",
+      "add_button": "Adicionar parcela",
+      "empty_message": "Nenhuma parcela programada",
+      "sum_label": "Agendado: %s / %s",
+      "dialog_title": "Cronograma de pagamentos",
+      "save_button": "Salvar cronograma",
+      "remove_content_desc": "Remover parcela",
+      "overdue_label": "Vencida",
+      "cancel_button": "Cancelar"
     },
     "add_dialog": {
       "title": "Registrar empréstimo",
@@ -425,7 +439,8 @@
       "save_button": "Salvar empréstimo"
     },
     "messages": {
-      "saved": "Empréstimo registrado com sucesso"
+      "saved": "Empréstimo registrado com sucesso",
+      "schedule_updated": "Cronograma de pagamentos atualizado"
     }
   }
 }

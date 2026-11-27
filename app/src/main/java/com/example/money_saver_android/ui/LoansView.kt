@@ -51,6 +51,7 @@ import com.example.money_saver_android.i18n.LocalI18nManager
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.loans.AddLoanDialog
 import com.example.money_saver_android.ui.components.loans.LoanCardItem
+import com.example.money_saver_android.ui.components.loans.LoanScheduleDialog
 import com.example.money_saver_android.ui.components.loans.LoansSummaryCard
 import com.example.money_saver_android.ui.theme.BorderColor
 import com.example.money_saver_android.ui.theme.CardBackground
@@ -182,7 +183,9 @@ fun LoansView(
                 state.loans.forEach { loan ->
                     LoanCardItem(
                         loan = loan,
-                        currency = currency
+                        currency = currency,
+                        todayIso = state.todayIso,
+                        onClick = { loansViewModel.openScheduleDialog(loan) }
                     )
                 }
             }
@@ -235,7 +238,42 @@ fun LoansView(
             onCloseClick = {
                 loansViewModel.resetForm()
                 showAddDialog = false
-            }
+            },
+            draftInstallments = state.draftInstallments,
+            draftInstallmentDate = state.draftInstallmentDateInput,
+            draftInstallmentAmount = state.draftInstallmentAmountInput,
+            todayIso = state.todayIso,
+            onDraftInstallmentDateChange = loansViewModel::onDraftInstallmentDateChange,
+            onDraftInstallmentAmountChange = loansViewModel::onDraftInstallmentAmountChange,
+            onAddInstallmentClick = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                loansViewModel.addDraftInstallment()
+            },
+            onRemoveInstallmentClick = loansViewModel::removeDraftInstallment
+        )
+    }
+
+    state.editingScheduleLoan?.let { editingLoan ->
+        LoanScheduleDialog(
+            loan = editingLoan,
+            installments = state.scheduleInstallments,
+            dateInput = state.scheduleDateInput,
+            amountInput = state.scheduleAmountInput,
+            todayIso = state.todayIso,
+            errorMessage = state.scheduleErrorMessage,
+            currency = currency,
+            onDateChange = loansViewModel::onScheduleDateChange,
+            onAmountChange = loansViewModel::onScheduleAmountChange,
+            onAddInstallment = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                loansViewModel.addScheduleInstallment()
+            },
+            onRemoveInstallment = loansViewModel::removeScheduleInstallment,
+            onSaveClick = {
+                hideKeyboard(context, view, keyboardController, focusManager)
+                loansViewModel.saveLoanSchedule()
+            },
+            onCloseClick = loansViewModel::closeScheduleDialog
         )
     }
 }

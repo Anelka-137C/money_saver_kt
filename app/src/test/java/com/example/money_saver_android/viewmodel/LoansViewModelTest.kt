@@ -64,7 +64,14 @@ class LoansViewModelTest {
         Dispatchers.setMain(testDispatcher)
         loanRepo = FakeLoanRepository()
         savingsRepo = StubSavingsRepository()
-        viewModel = LoansViewModel(LoanUseCase(loanRepo, savingsRepo, StubExpenseRepository()))
+        viewModel = LoansViewModel(
+            LoanUseCase(
+                loanRepository = loanRepo,
+                savingsRepository = savingsRepo,
+                expenseRepository = StubExpenseRepository(),
+                currentDateProvider = { "2026-11-26" }
+            )
+        )
     }
 
     @After
@@ -120,5 +127,90 @@ class LoansViewModelTest {
         assertEquals("Ana", state.personNameInput)
         assertEquals("300", state.amountLentInput)
         assertEquals("200", state.amountToReceiveInput)
+    }
+
+    @Test
+    fun draftInstallments_addRemoveValidateAndSaveWithLoan() = runTest(testDispatcher) {
+        viewModel.onPersonNameChange("María")
+        viewModel.onAmountLentChange("500")
+        viewModel.onAmountToReceiveChange("600")
+
+        // Reject past date when adding draft
+        viewModel.onDraftInstallmentDateChange("2026-11-25")
+        viewModel.onDraftInstallmentAmountChange("300")
+        viewModel.addDraftInstallment()
+        assertNotNull(viewModel.uiState.value.errorMessage)
+        assertTrue(viewModel.uiState.value.draftInstallments.isEmpty())
+
+        // Add two valid installments summing 600
+        viewModel.onDraftInstallmentDateChange("2026-12-10")
+        viewModel.onDraftInstallmentAmountChange("350")
+        viewModel.addDraftInstallment()
+        assertNull(viewModel.uiState.value.errorMessage)
+        assertEquals(1, viewModel.uiState.value.draftInstallments.size)
+
+        viewModel.onDraftInstallmentDateChange("2026-12-01")
+        viewModel.onDraftInstallmentAmountChange("250")
+        viewModel.addDraftInstallment()
+        assertEquals(2, viewModel.uiState.value.draftInstallments.size)
+        assertEquals("2026-12-01", viewModel.uiState.value.draftInstallments[0].dueDate)
+
+        viewModel.saveLoan()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.loans.size)
+        assertEquals(2, state.loans.single().installments.size)
+        assertTrue(state.draftInstallments.isEmpty())
+        assertEquals(LoansViewModel.MSG_LOAN_SAVED, state.toastMessage)
+    }
+
+    @Test
+    fun existingLoanSchedule_openEditValidateAndSave() = runTest(testDispatcher) {
+        val loanId = loanRepo.insertLoan(
+            com.example.money_saver_android.domain.model.Loan(
+                personName = "Pedro",
+                amountLent = 400.0,
+                amountToReceive = 450.0
+            )
+        )
+        advanceUntilIdle()
+        val loan = viewModel.uiState.value.loans.single { it.id == loanId }
+
+        viewModel.openScheduleDialog(loan)
+        assertNotNull(viewModel.uiState.value.editingScheduleLoan)
+
+        // Add installment with partial sum 200 -> saving must fail with error
+        viewModel.onScheduleDateChange("2026-12-05")
+        viewModel.onScheduleAmountChange("200")
+        viewModel.addScheduleInstallment()
+        viewModel.saveLoanSchedule()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.scheduleErrorMessage)
+        assertNotNull(viewModel.uiState.value.editingScheduleLoan)
+        assertTrue(loanRepo.loansFlow.value.single().installments.isEmpty())
+
+        // Complete sum to 450 -> saves and closes dialog
+        viewModel.onScheduleDateChange("2026-12-20")
+        viewModel.onScheduleAmountChange("250")
+        viewModel.addScheduleInstallment()
+        viewModel.saveLoanSchedule()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editingScheduleLoan)
+        assertNull(viewModel.uiState.value.scheduleErrorMessage)
+        assertEquals(LoansViewModel.MSG_SCHEDULE_UPDATED, viewModel.uiState.value.toastMessage)
+        assertEquals(2, viewModel.uiState.value.loans.single().installments.size)
+
+        // Reopen, remove all installments, and save empty schedule
+        viewModel.openScheduleDialog(viewModel.uiState.value.loans.single())
+        val ids = viewModel.uiState.value.scheduleInstallments.map { it.draftId }
+        ids.forEach { viewModel.removeScheduleInstallment(it) }
+        viewModel.saveLoanSchedule()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.editingScheduleLoan)
+        assertTrue(viewModel.uiState.value.loans.single().installments.isEmpty())
     }
 }

@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +58,7 @@ import com.example.money_saver_android.data.Currency
 import com.example.money_saver_android.data.defaultCurrencies
 import com.example.money_saver_android.domain.CurrencyFormatter
 import com.example.money_saver_android.domain.usecase.SavingsCategoryBalance
+import com.example.money_saver_android.domain.usecase.parseLoanAmount
 import com.example.money_saver_android.i18n.t
 import com.example.money_saver_android.ui.components.incomes.CurrencyFormatVisualTransformation
 import com.example.money_saver_android.ui.theme.BorderColor
@@ -62,6 +68,7 @@ import com.example.money_saver_android.ui.theme.FieldBackground
 import com.example.money_saver_android.ui.theme.GreenAccent
 import com.example.money_saver_android.ui.theme.TextPrimary
 import com.example.money_saver_android.ui.theme.TextSecondary
+import com.example.money_saver_android.viewmodel.LoanInstallmentDraft
 
 @Composable
 fun AddLoanDialog(
@@ -80,7 +87,15 @@ fun AddLoanDialog(
     onSavingCategorySelected: (String) -> Unit,
     onSaveClick: () -> Unit,
     onCloseClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    draftInstallments: List<LoanInstallmentDraft> = emptyList(),
+    draftInstallmentDate: String = "",
+    draftInstallmentAmount: String = "",
+    todayIso: String = "",
+    onDraftInstallmentDateChange: (String) -> Unit = {},
+    onDraftInstallmentAmountChange: (String) -> Unit = {},
+    onAddInstallmentClick: () -> Unit = {},
+    onRemoveInstallmentClick: (String) -> Unit = {}
 ) {
     var savingMenuExpanded by remember { mutableStateOf(false) }
     val selectedBalance = savingsBalances.find {
@@ -96,12 +111,20 @@ fun AddLoanDialog(
 
     Dialog(
         onDismissRequest = onCloseClick,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
         Card(
             modifier = modifier
                 .fillMaxWidth(0.92f)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(vertical = 16.dp)
+                .heightIn(max = maxDialogHeight)
                 .testTag("card_add_loan_dialog"),
             colors = CardDefaults.cardColors(containerColor = CardBackground),
             shape = RoundedCornerShape(20.dp),
@@ -110,7 +133,6 @@ fun AddLoanDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
@@ -137,6 +159,15 @@ fun AddLoanDialog(
                         )
                     }
                 }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .testTag("scroll_add_loan_dialog"),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
 
                 LoanTextField(
                     label = t("loans.add_dialog.person_label"),
@@ -245,6 +276,25 @@ fun AddLoanDialog(
                     testTag = "input_loan_note"
                 )
 
+                LoanInstallmentsSection(
+                    installments = draftInstallments,
+                    dateInput = draftInstallmentDate,
+                    amountInput = draftInstallmentAmount,
+                    todayIso = todayIso,
+                    targetAmountToReceive = parseLoanAmount(amountToReceive),
+                    currency = currency,
+                    onDateChange = onDraftInstallmentDateChange,
+                    onAmountChange = onDraftInstallmentAmountChange,
+                    onAddClick = onAddInstallmentClick,
+                    onRemoveClick = onRemoveInstallmentClick,
+                    dateFieldTestTag = "input_loan_installment_date",
+                    amountFieldTestTag = "input_loan_installment_amount",
+                    addButtonTestTag = "btn_add_loan_installment",
+                    removeButtonTagPrefix = "btn_remove_loan_installment",
+                    itemTagPrefix = "loan_draft_installment_item",
+                    sectionTitle = t("loans.schedule.section_title")
+                )
+
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage,
@@ -269,6 +319,7 @@ fun AddLoanDialog(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
                 }
             }
         }
@@ -308,7 +359,7 @@ private fun LoanTextField(
 }
 
 @Composable
-private fun LoanAmountField(
+internal fun LoanAmountField(
     label: String,
     value: String,
     currency: Currency,

@@ -410,7 +410,21 @@
       "personal_loan": "Préstamo personal",
       "amount_lent": "Monto prestado",
       "paid": "Pagado",
-      "pending": "Pendiente"
+      "pending": "Pendiente",
+      "due_prefix": "Vence: %s"
+    },
+    "schedule": {
+      "section_title": "Fechas de pago (opcional)",
+      "date_label": "Fecha de pago",
+      "amount_label": "Monto esperado",
+      "add_button": "Agregar cuota",
+      "empty_message": "Sin cuotas programadas",
+      "sum_label": "Programado: %s / %s",
+      "dialog_title": "Calendario de pagos",
+      "save_button": "Guardar calendario",
+      "remove_content_desc": "Quitar cuota",
+      "overdue_label": "Vencida",
+      "cancel_button": "Cancelar"
     },
     "add_dialog": {
       "title": "Registrar préstamo",
@@ -425,7 +439,8 @@
       "save_button": "Guardar préstamo"
     },
     "messages": {
-      "saved": "Préstamo registrado exitosamente"
+      "saved": "Préstamo registrado exitosamente",
+      "schedule_updated": "Calendario de pagos actualizado"
     }
   }
 }

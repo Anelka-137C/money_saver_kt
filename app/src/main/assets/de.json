@@ -410,7 +410,21 @@
       "personal_loan": "Privatkredit",
       "amount_lent": "Geliehener Betrag",
       "paid": "Bezahlt",
-      "pending": "Ausstehend"
+      "pending": "Ausstehend",
+      "due_prefix": "Fällig: %s"
+    },
+    "schedule": {
+      "section_title": "Zahlungsplan (optional)",
+      "date_label": "Zahlungsdatum",
+      "amount_label": "Erwarteter Betrag",
+      "add_button": "Rate hinzufügen",
+      "empty_message": "Keine Raten geplant",
+      "sum_label": "Geplant: %s / %s",
+      "dialog_title": "Zahlungsplan",
+      "save_button": "Plan speichern",
+      "remove_content_desc": "Rate entfernen",
+      "overdue_label": "Überfällig",
+      "cancel_button": "Abbrechen"
     },
     "add_dialog": {
       "title": "Kredit registrieren",
@@ -425,7 +439,8 @@
       "save_button": "Kredit speichern"
     },
     "messages": {
-      "saved": "Kredit erfolgreich registriert"
+      "saved": "Kredit erfolgreich registriert",
+      "schedule_updated": "Zahlungsplan aktualisiert"
     }
   }
 }

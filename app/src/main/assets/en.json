@@ -410,7 +410,21 @@
       "personal_loan": "Personal loan",
       "amount_lent": "Amount lent",
       "paid": "Paid",
-      "pending": "Pending"
+      "pending": "Pending",
+      "due_prefix": "Due: %s"
+    },
+    "schedule": {
+      "section_title": "Payment schedule (optional)",
+      "date_label": "Payment date",
+      "amount_label": "Expected amount",
+      "add_button": "Add installment",
+      "empty_message": "No scheduled installments",
+      "sum_label": "Scheduled: %s / %s",
+      "dialog_title": "Payment schedule",
+      "save_button": "Save schedule",
+      "remove_content_desc": "Remove installment",
+      "overdue_label": "Overdue",
+      "cancel_button": "Cancel"
     },
     "add_dialog": {
       "title": "Register loan",
@@ -425,7 +439,8 @@
       "save_button": "Save loan"
     },
     "messages": {
-      "saved": "Loan registered successfully"
+      "saved": "Loan registered successfully",
+      "schedule_updated": "Payment schedule updated"
     }
   }
 }
